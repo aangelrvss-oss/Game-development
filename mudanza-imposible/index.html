@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>La Mudanza Imposible · demo</title>
+<style>
+  :root { --ink:#1f1633; --panel:rgba(31,22,51,.86); --accent:#facc15; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#9fd8ff; font-family: system-ui, "Segoe UI", Roboto, sans-serif; color:#fff; }
+  canvas#c { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  .pill { background:var(--panel); border-radius:14px; padding:8px 12px; box-shadow:0 3px 0 rgba(0,0,0,.25); }
+  #hud { display:none; position:fixed; inset:0; pointer-events:none; }
+  #h-top { position:absolute; top:10px; left:10px; right:10px; display:flex; gap:10px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; }
+  #h-time { font-weight:900; font-size:26px; min-width:96px; text-align:center; font-variant-numeric: tabular-nums; }
+  #h-time.late { color:#fca5a5; }
+  #h-stages { font-weight:800; font-size:13px; display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:center; }
+  #h-stages i { opacity:.5; font-style:normal; }
+  .stage { padding:4px 8px; border-radius:10px; background:rgba(255,255,255,.12); }
+  .stage.done { background:#16a34a; }
+  .stage.now { background:var(--accent); color:var(--ink); }
+  #h-sofa { min-width:190px; }
+  #h-sofa .lbl { font-size:12px; font-weight:800; opacity:.9; display:flex; justify-content:space-between; }
+  #h-sofa .track { height:12px; border-radius:6px; background:rgba(255,255,255,.18); overflow:hidden; margin-top:4px; }
+  #h-bar { height:100%; width:100%; background:#22c55e; transition:width .2s; }
+  #h-center { position:absolute; top:32%; left:50%; transform:translate(-50%,-50%); font-weight:900; text-shadow:0 4px 0 rgba(0,0,0,.35); }
+  #h-center.big { font-size:110px; }
+  #h-center.go { color:var(--accent); font-size:72px; }
+  #h-warn { display:none; position:absolute; top:96px; left:50%; transform:translateX(-50%); background:#ef4444; font-weight:900; font-size:17px; padding:8px 16px; border-radius:14px; box-shadow:0 3px 0 rgba(0,0,0,.25); text-align:center; max-width:92vw; }
+  #h-light { position:absolute; top:96px; right:12px; display:none; font-weight:900; font-size:16px; padding:8px 12px; border-radius:14px; }
+  #h-light.go { background:#16a34a; } #h-light.stop { background:#b91c1c; }
+  #h-toasts { position:absolute; top:150px; left:12px; display:flex; flex-direction:column; gap:6px; }
+  .toast { background:var(--panel); padding:7px 12px; border-radius:12px; font-weight:800; font-size:15px; animation: pop .25s ease-out; }
+  .toast.bad { background:#b91c1c; } .toast.good { background:#15803d; }
+  @keyframes pop { from { transform:scale(.6); opacity:0 } to { transform:scale(1); opacity:1 } }
+  #h-players { position:absolute; bottom:10px; left:10px; display:flex; gap:8px; flex-wrap:wrap; }
+  .pl { background:var(--panel); border-left:6px solid var(--c); border-radius:12px; padding:6px 10px; font-size:13px; font-weight:700; }
+  .pl b { color:var(--c); } .pl small { display:block; opacity:.75; font-weight:600; margin-top:2px; }
+  #h-hint { position:absolute; bottom:10px; right:10px; font-size:12px; opacity:.85; text-align:right; }
+  .overlay { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(20,12,40,.55); padding:16px; }
+  .card { background:#fffaf0; color:var(--ink); border-radius:24px; padding:24px; width:min(760px,100%); max-height:100%; overflow:auto; box-shadow:0 10px 0 rgba(0,0,0,.25); }
+  .card h1 { margin:0; font-size:clamp(30px,6vw,52px); line-height:1; letter-spacing:.5px; }
+  .card h1 span { color:#7c3aed; }
+  .card p.sub { margin:6px 0 16px; font-weight:600; opacity:.8; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:10px 0; }
+  .row > label { font-weight:800; min-width:180px; }
+  .seg button { border:0; background:#ede9fe; color:var(--ink); font-weight:800; padding:8px 12px; border-radius:10px; cursor:pointer; margin:2px; }
+  .seg button.on { background:#7c3aed; color:#fff; }
+  .seg button:disabled { opacity:.35; cursor:default; }
+  .go-btn { border:0; background:#facc15; color:var(--ink); font-weight:900; font-size:20px; padding:12px 22px; border-radius:16px; cursor:pointer; box-shadow:0 4px 0 #ca8a04; }
+  .go-btn.alt { background:#e5e7eb; box-shadow:0 4px 0 #9ca3af; font-size:16px; }
+  table.ctl { border-collapse:collapse; width:100%; font-size:14px; margin-top:8px; }
+  table.ctl td, table.ctl th { padding:5px 6px; border-bottom:1px solid #e9e1cf; text-align:left; }
+  kbd { background:#1f1633; color:#fff; border-radius:6px; padding:1px 6px; font-size:12px; font-weight:800; }
+  .note { font-size:13px; opacity:.75; margin-top:10px; }
+  .stars { font-size:36px; letter-spacing:6px; }
+  .res-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:14px 0; }
+  .res-grid div { background:#f3ecdc; border-radius:14px; padding:10px; font-weight:800; }
+  .res-grid small { display:block; opacity:.7; font-weight:700; }
+  @media (max-width:700px) { #h-center.big { font-size:72px } #h-players { display:none } #h-hint { display:none } }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="h-top">
+    <div class="pill" id="h-time">0:00.0</div>
+    <div class="pill" id="h-stages"></div>
+    <div class="pill" id="h-sofa"><div class="lbl"><span>Estado del sofá</span><span id="h-bar-txt">100%</span></div><div class="track"><div id="h-bar"></div></div></div>
+  </div>
+  <div id="h-center"></div>
+  <div id="h-warn"></div>
+  <div id="h-light"></div>
+  <div id="h-toasts"></div>
+  <div id="h-players"></div>
+  <div id="h-hint" class="pill"><kbd>Esc</kbd> pausa · <kbd>Retroceso</kbd> reiniciar · <kbd>M</kbd> sonido</div>
+</div>
+
+<div class="overlay" id="menu" style="display:flex">
+  <div class="card">
+    <h1>LA MUDANZA <span>IMPOSIBLE</span></h1>
+    <p class="sub">Demo jugable · Llevad el sofá desde la casa hasta el camión: calle con tráfico, puerta estrecha, escalera con giro y rampa sin barandilla.</p>
+    <div class="row"><label>Jugadores humanos</label><div class="seg" id="opt-humans"></div></div>
+    <div class="row"><label>Porteadores en total</label><div class="seg" id="opt-carriers"></div></div>
+    <div class="row"><label>Ayudantes de la máquina</label><div class="seg" id="opt-style"></div></div>
+    <div class="row" style="margin-top:16px"><button class="go-btn" id="btn-start">¡A mover! (Intro)</button><button class="go-btn alt" id="btn-demo">Ver demo automática</button></div>
+    <table class="ctl">
+      <tr><th></th><th>J1</th><th>J2</th><th>Mando (J1–J4)</th></tr>
+      <tr><td>Moverse</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>Flechas</td><td>Stick izquierdo</td></tr>
+      <tr><td>Agarrar / soltar</td><td><kbd>Espacio</kbd></td><td><kbd>Intro</kbd></td><td>A</td></tr>
+      <tr><td>Alzar (mantener)</td><td><kbd>Mayús izq.</kbd></td><td><kbd>Mayús dcha.</kbd></td><td>B / gatillos</td></tr>
+      <tr><td>Pedir giro a los ayudantes</td><td><kbd>Q</kbd> <kbd>E</kbd></td><td><kbd>,</kbd> <kbd>.</kbd></td><td>LB / RB</td></tr>
+      <tr><td>Enderezar el sofá volcado</td><td><kbd>R</kbd></td><td><kbd>-</kbd></td><td>Y</td></tr>
+    </table>
+    <p class="note">Los ayudantes de la máquina agarran un asa libre e imitan cómo te mueves cuando tú también cargas; con <kbd>Q</kbd>/<kbd>E</kbd> les pides que giren. No sustituyen a jugar con amigos: son para probar la física. Gana quien deja el sofá en la zona verde junto al camión antes de 3 minutos y sin destrozarlo.</p>
+    <p class="note" id="pads-note"></p>
+  </div>
+</div>
+
+<div class="overlay" id="pause">
+  <div class="card"><h1>Pausa</h1>
+    <div class="row" style="margin-top:16px"><button class="go-btn" id="btn-resume">Seguir (Esc)</button><button class="go-btn alt" id="btn-restart-p">Reiniciar</button><button class="go-btn alt" id="btn-menu-p">Menú</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="results">
+  <div class="card">
+    <h1 id="r-title"></h1>
+    <p class="sub" id="r-sub"></p>
+    <div class="stars" id="r-stars"></div>
+    <div class="res-grid" id="r-grid"></div>
+    <div class="row"><button class="go-btn" id="btn-again">Otra vez (Intro)</button><button class="go-btn alt" id="btn-menu">Menú (Esc)</button></div>
+  </div>
+</div>
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
