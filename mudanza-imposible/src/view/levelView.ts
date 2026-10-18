@@ -63,6 +63,8 @@ export function buildLevel(): LevelView {
     g.add(m);
     if (b.fade) {
       m.userData.fade = 1;
+      // Las paredes que arrancan del suelo (o del piso de arriba) se recortan; lo que cuelga (encima de la puerta), se oculta
+      m.userData.mode = b.kind === 'wall' || b.p[1] - b.h[1] < 0.05 ? 'cut' : 'hide';
       if (b.kind === 'facade') m.userData.fadeRule = NEAR_DOOR;
       if (b.kind === 'wall') m.userData.fadeRule = (_x: number, y: number) => y > 1.6;
       fadeables.push(m);
@@ -84,6 +86,11 @@ export function buildLevel(): LevelView {
   const zone = addZone(g);
   const beacon = addBeacon(g);
   // Lo que no se mueve ni cambia de opacidad se funde en una malla por material: muchas menos llamadas de dibujo
+  g.updateMatrixWorld(true);
+  for (const m of fadeables) {
+    m.userData.box = new THREE.Box3().setFromObject(m);
+    m.userData.mode ??= 'hide';
+  }
   const keep = new Set<THREE.Object3D>(fadeables);
   beacon.root.traverse((o) => keep.add(o));
   mergeStatic(g, keep);
@@ -108,12 +115,12 @@ export function buildLevel(): LevelView {
 function addBeacon(g: THREE.Group) {
   const root = new THREE.Group();
   const ringMat = new THREE.MeshBasicMaterial({ color: '#facc15', transparent: true, opacity: 0.8, depthWrite: false });
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.95, 40), ringMat);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.3, 40), ringMat);
   ring.rotation.x = -Math.PI / 2;
-  const ring2 = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.0, 40), ringMat.clone());
+  const ring2 = new THREE.Mesh(new THREE.RingGeometry(1.2, 1.32, 40), ringMat.clone());
   ring2.rotation.x = -Math.PI / 2;
   const arrowMat = new THREE.MeshStandardMaterial({ color: '#facc15', emissive: '#a16207', transparent: true, opacity: 0.9 });
-  const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.5, 4), arrowMat);
+  const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.7, 4), arrowMat);
   arrow.rotation.x = Math.PI;
   root.add(ring, ring2, arrow);
   g.add(root);
@@ -124,8 +131,8 @@ function addBeacon(g: THREE.Group) {
       if (!n) return;
       root.position.set(n[0], n[1] + 0.04, n[2]);
       const d = Math.hypot(sofa.x - n[0], sofa.z - n[2]);
-      const vis = THREE.MathUtils.clamp((d - 2.5) / 3, 0, 1);
-      ringMat.opacity = 0.75 * vis;
+      const vis = THREE.MathUtils.clamp((d - 1.5) / 1.5, 0, 1);
+      ringMat.opacity = 0.85 * vis;
       const k = (t * 0.8) % 1;
       ring2.scale.setScalar(1 + k * 1.2);
       (ring2.material as THREE.MeshBasicMaterial).opacity = (1 - k) * 0.6 * vis;
@@ -231,7 +238,7 @@ function addStairs(g: THREE.Group) {
   const n = 14;
   const run = (STAIRS.z0 - STAIRS.z1) / n, rise = STAIRS.top / n;
   const wood = mat('#ffffff', { map: TEX.planks(), rough: 0.7 });
-  const nose = mat('#7a4a2a');
+  const nose = mat('#fbe9c9');
   for (let i = 0; i < n; i++) {
     const h = rise * (i + 1);
     const geo = worldUV(new THREE.BoxGeometry(2.8, h, run), new THREE.Vector3(0, h / 2, STAIRS.z0 - run * (i + 0.5)), TEX.planksTile);
@@ -239,8 +246,8 @@ function addStairs(g: THREE.Group) {
     step.position.set(0, h / 2, STAIRS.z0 - run * (i + 0.5));
     step.castShadow = true; step.receiveShadow = true;
     // Canto oscuro de cada peldaño: se lee la escalera desde arriba
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.05, 0.08), nose);
-    edge.position.set(0, h + 0.005, STAIRS.z0 - run * i - 0.04);
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.03, 0.1), nose);
+    edge.position.set(0, h + 0.005, STAIRS.z0 - run * i - 0.05);
     g.add(step, edge);
   }
 }
@@ -277,7 +284,14 @@ function addFacadeDetails(g: THREE.Group, fadeables: THREE.Mesh[]) {
   }
   const top = new THREE.Mesh(new THREE.BoxGeometry(DOOR.x1 - DOOR.x0 + 0.32, 0.16, 0.5), frameMat);
   top.position.set(0, DOOR.top, DOOR.z);
-  g.add(top);
+  fadeWith(top);
+  // Jambas claras con contorno: marcan bien el hueco estrecho aunque la fachada esté recortada
+  for (const x of [DOOR.x0 - 0.08, DOOR.x1 + 0.08]) {
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(0.2, DOOR.top, 0.04), mat('#fde68a'));
+    trim.position.set(x, DOOR.top / 2, DOOR.z + 0.27);
+    trim.castShadow = true;
+    g.add(trim);
+  }
   // Felpudo
   const mat1 = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.02, 0.6), mat('#b45309'));
   mat1.position.set(0, 0.02, DOOR.z + 0.7);
@@ -432,19 +446,20 @@ function addTrees(g: THREE.Group) {
 }
 
 function addStreetProps(g: THREE.Group) {
-  const metal = mat('#374151', { rough: 0.5, metal: 0.4 });
-  // Farolas con brazo curvo
+  const metal = mat('#5f7391', { rough: 0.55, metal: 0.2 });
+  // Farolas pintadas con globo: en la acera cercana solo las de los extremos, para no cruzar la acción
   for (const x of [-12, -6, 6, 12]) {
     for (const [z, dir] of [[1.3, -1], [-9.4, 1]] as const) {
+      if (z > 0 && Math.abs(x) < 10) continue;
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 3.4, 8), metal);
       pole.position.set(x, 1.7, z);
       const arm = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.04, 6, 12, Math.PI / 2), metal);
       arm.position.set(x, 3.4, z + dir * 0.35);
       arm.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
-      const head = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.26, 0.2, 10), metal);
-      head.position.set(x, 3.68, z + dir * 0.4);
-      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 6), mat('#fff7cc', { emissive: '#fff1a8' }));
-      bulb.position.set(x, 3.56, z + dir * 0.4);
+      const head = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.12, 10), metal);
+      head.position.set(x, 3.62, z + dir * 0.4);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 8), mat('#fff7cc', { emissive: '#fde68a' }));
+      bulb.position.set(x, 3.84, z + dir * 0.4);
       pole.castShadow = head.castShadow = true;
       g.add(pole, arm, head, bulb);
     }
@@ -576,7 +591,7 @@ function addTruck(g: THREE.Group) {
   // Caja de carga x 28..34 (la colisión), abierta por detrás (hacia la zona de entrega); cabina hacia +x
   const t = new THREE.Group();
   const white = mat('#f8fafc', { rough: 0.5 });
-  const cz = -30.25, dz = 6.5, top = 3.4, bottom = 0.75;
+  const cz = -30.25, dz = 6.5, top = 3.4, bottom = 1.3;
   const panel = (w: number, h: number, d: number, x: number, y: number, z: number, m = white) => {
     const p = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
     p.position.set(x, y, z);
@@ -588,26 +603,27 @@ function addTruck(g: THREE.Group) {
   panel(6, top - bottom, 0.1, 31, (top + bottom) / 2, cz - dz / 2 + 0.05);
   panel(6, top - bottom, 0.1, 31, (top + bottom) / 2, cz + dz / 2 - 0.05);
   panel(0.1, top - bottom, dz, 33.95, (top + bottom) / 2, cz);
-  panel(6, 0.15, dz, 31, bottom, cz, mat('#57534e'));
-  // Interior oscuro y cajas de cartón ya cargadas
-  panel(0.05, top - bottom - 0.1, dz - 0.2, 33.85, (top + bottom) / 2, cz, mat('#3f3a36'));
+  panel(6, 0.15, dz, 31, bottom, cz, mat('#d9b98c'));
+  // Chasis bajo la caja
+  panel(5.6, 0.4, dz - 1.6, 31.2, bottom - 0.3, cz, mat('#374151'));
+  // Interior de contrachapado y cajas de cartón ya cargadas
+  panel(0.05, top - bottom - 0.1, dz - 0.2, 33.85, (top + bottom) / 2, cz, mat('#c69c6d'));
   const card = mat('#c8a26b');
-  for (const [x, y, z, s] of [[33, 1.2, -32.4, 0.9], [33, 1.2, -31.4, 0.9], [33.1, 2.05, -32, 0.8], [32.2, 1.1, -28.3, 0.7]] as const) {
+  for (const [x, y, z, s] of [[33, 1.83, -32.4, 0.9], [33, 1.83, -31.4, 0.9], [33.1, 2.68, -32, 0.8], [32.2, 1.73, -28.3, 0.7]] as const) {
     const b = panel(s, s, s, x, y, z, card);
     const tape = new THREE.Mesh(new THREE.BoxGeometry(s + 0.01, 0.08, 0.12), mat('#a07a46'));
     tape.position.copy(b.position).add(new THREE.Vector3(0, s / 2 - 0.03, 0));
     t.add(tape);
   }
   // Franja morada y rótulos pintados
-  for (const sz of [-1, 1]) panel(6.02, 0.45, 0.04, 31, 1.35, cz + sz * (dz / 2 + 0.01), mat('#7c3aed'));
-  panel(0.04, 0.45, dz + 0.02, 34.01, 1.35, cz, mat('#7c3aed'));
+  for (const sz of [-1, 1]) panel(6.02, 0.4, 0.04, 31, bottom + 0.35, cz + sz * (dz / 2 + 0.01), mat('#7c3aed'));
+  panel(0.04, 0.4, dz + 0.02, 34.01, bottom + 0.35, cz, mat('#7c3aed'));
   const logo = signTex('MUDANZAS PEPE', { bg: '#ffffff', color: '#7c3aed', w: 512, h: 128 });
-  const side = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 1.3), mat('#ffffff', { map: logo, rough: 0.5 }));
-  side.position.set(31, 2.4, cz + dz / 2 + 0.01);
-  const roofSign = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 1.35), mat('#ffffff', { map: logo, rough: 0.5 }));
-  roofSign.rotation.x = -Math.PI / 2;
-  roofSign.position.set(31, top + 0.01, cz);
-  t.add(side, roofSign);
+  const side = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.15), mat('#ffffff', { map: logo, rough: 0.5 }));
+  side.position.set(31.2, 2.55, cz + dz / 2 + 0.01);
+  // Techo: franja morada en el borde (sin un segundo rótulo cortado)
+  panel(6.02, 0.04, 0.5, 31, top + 0.02, cz + dz / 2 - 0.25, mat('#7c3aed'));
+  t.add(side);
   // Marco trasero de la caja abierta
   for (const s of [-1, 1]) panel(0.16, top - bottom, 0.16, 28.05, (top + bottom) / 2, cz + s * (dz / 2 - 0.08), mat('#d1d5db'));
   // Cabina

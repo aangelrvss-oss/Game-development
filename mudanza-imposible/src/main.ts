@@ -140,7 +140,7 @@ function handle(e: GameEvent, g: Game) {
     case 'gripBreak':
       sfx.play('slip');
       view.carriers[e.carrier]?.stumble();
-      if (cooled(`slip${e.carrier}`, 2)) view.fx.text(e.pos, '¡Se escapa!', '#fde68a', 36);
+      if (cooled(`slip${e.carrier}`, 2)) view.fx.text(e.pos, '¡Se escapa!', '#1f1a2e', 34, '#fde68a');
       break;
     case 'impact':
       sfx.play('impact', e.strength);
@@ -149,17 +149,17 @@ function handle(e: GameEvent, g: Game) {
       if (e.strength > 3) view.fx.ring(e.pos, '#fff7d6', Math.min(1.6, 0.6 + e.strength * 0.12));
       view.fx.shake = Math.min(0.8, view.fx.shake + e.strength * 0.05);
       // Tras un atropello, el «¡CATAPUM!» ya lo dice: el texto de daño pequeño se taparía con él
-      if (e.damage > 0 && simTime - (toastCooldown.get('carHit') ?? -99) > 0.8) view.fx.text(e.pos, `-${e.damage}%`, '#fca5a5', 42);
+      if (e.damage > 0 && g.phase === 'playing' && simTime - (toastCooldown.get('carHit') ?? -99) > 0.8) view.fx.text(e.pos, `-${e.damage}%`, '#fca5a5', 42);
       break;
     case 'carHit':
       toastCooldown.set('carHit', simTime);
       sfx.play('crash');
       view.fx.stars(e.pos, 8);
-      view.fx.ring(e.pos, '#fde047', 1.8);
+      view.fx.ring(e.pos, '#fde047', 1.4);
       view.fx.dust(e.pos, 8, 1.2);
       if (e.target === 'sofa') view.sofa.bump(10);
       view.fx.shake = Math.min(1, view.fx.shake + 0.6);
-      if (e.target === 'sofa') { view.fx.text(e.pos, '¡CATAPUM!', '#ffffff', 54); hud.toast(`¡Atropello al sofá! −${RULES.carDamage}%`, 'bad'); }
+      if (e.target === 'sofa') { view.fx.text(e.pos, '¡CATAPUM!', '#ffffff', 50, '#dc2626', 2.3); hud.toast(`¡Atropello al sofá! −${RULES.carDamage}%`, 'bad'); }
       else if (cooled(`run${e.carrier}`, 1.5)) hud.toast(`¡Han atropellado a ${who(e.carrier!).cast.name}!`, 'bad');
       break;
     case 'stun': sfx.play('stun'); view.fx.stars(e.pos, 5); break;
@@ -177,7 +177,7 @@ function handle(e: GameEvent, g: Game) {
     case 'win':
       sfx.play('win');
       view.fx.confetti(g.sofaPos, 70);
-      view.fx.text(g.sofaPos, '¡ENTREGADO!', '#bbf7d0', 60);
+      view.fx.text(g.sofaPos, '¡ENTREGADO!', '#ffffff', 56, '#16a34a', 2.2);
       pendingResults = { g, at: simTime + 1.2 }; break;
     case 'lose': sfx.play('lose'); pendingResults = { g, at: simTime + 1.2 }; break;
   }

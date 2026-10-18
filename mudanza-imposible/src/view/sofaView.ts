@@ -30,6 +30,7 @@ export class SofaView {
   private jiggleV = new THREE.Vector3();
   private squash = 0;
   private squashV = 0;
+  private primed = false;
 
   constructor() {
     const { half, back, arm } = SOFA;
@@ -55,16 +56,10 @@ export class SofaView {
       pipe.position.set(s * (half.x - arm.h.x), arm.y + 0.2, 0);
       this.inner.add(pipe);
     }
-    // Zócalo de madera y patas torneadas
-    add(half.x * 2 - 0.1, 0.07, half.z * 2 + 0.02, 0.02, mat(WOOD, { rough: 0.55 }), 0, -half.y + 0.02, 0);
-    for (const x of [-0.95, 0.95]) for (const z of [-0.35, 0.35]) {
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.03, 0.14, 10), mat(WOOD, { rough: 0.5 }));
-      leg.position.set(x, -half.y - 0.04, z);
-      leg.castShadow = true;
-      this.inner.add(leg);
-    }
+    // Zócalo de madera (dentro del volumen del colisionador: sin patas que se hundan en el suelo)
+    add(half.x * 2 - 0.1, 0.07, half.z * 2 + 0.02, 0.02, mat(WOOD, { rough: 0.55 }), 0, -half.y + 0.035, 0);
     // Cojines (se bambolean con las sacudidas) con botones capitoné en el respaldo
-    const button = mat(PIPING, { rough: 0.5 });
+    const button = mat('#e2c99a', { rough: 0.6 });
     for (let i = -1; i <= 1; i++) {
       const seat = new THREE.Group();
       seat.position.set(i * 0.63, half.y + 0.07, 0.07);
@@ -83,11 +78,11 @@ export class SofaView {
       this.cushions.push(bc);
     }
     // Dos cojines decorativos de color: le dan carácter y se ve hacia dónde mira el sofá
-    for (const [x, c, rz] of [[-0.82, '#14b8a6', 0.35], [0.82, '#fb7185', -0.35]] as const) {
+    for (const [x, c, rz] of [[-0.78, '#2bb3a3', 0.35], [0.78, '#f59e8b', -0.35]] as const) {
       const pg = new THREE.Group();
-      pg.position.set(x, half.y + 0.33, -0.16);
+      pg.position.set(x, half.y + 0.3, -0.16);
       pg.rotation.set(-0.35, 0, rz);
-      add(0.34, 0.32, 0.12, 0.06, mat(c, { rough: 0.9 }), 0, 0, 0, 0.02, pg);
+      add(0.27, 0.26, 0.1, 0.05, mat(c, { rough: 0.9 }), 0, 0, 0, 0.02, pg);
       this.inner.add(pg);
       this.cushions.push(pg);
     }
@@ -97,12 +92,12 @@ export class SofaView {
       const color = s.side === 'red' ? '#ef4444' : s.side === 'blue' ? '#3b82f6' : '#facc15';
       const out = new THREE.Vector3(s.out.x, s.out.y, s.out.z);
       const loop = new THREE.Group();
-      const strap = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.035, 8, 14, Math.PI), mat(color, { rough: 0.6 }));
+      const strap = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.05, 8, 14, Math.PI), mat(color, { rough: 0.6 }));
       const o = new THREE.Mesh(strap.geometry, inkMat);
       o.scale.setScalar(1.18);
       strap.add(o);
       loop.add(strap);
-      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.03, 0.12), mat(color, { rough: 0.6 }));
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.03, 0.16), mat(color, { rough: 0.6 }));
       loop.add(plate);
       loop.quaternion.setFromUnitVectors(UP, out);
       if (s.side === 'end') loop.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(UP, Math.PI / 2));
@@ -128,7 +123,14 @@ export class SofaView {
   get warning() { return this.warn; }
 
   /** Golpe: el sofá se aplasta y rebota un instante. */
-  bump(strength: number) { this.squashV -= Math.min(3, strength * 0.35); }
+  bump(strength: number) { this.squashV -= Math.min(2.2, strength * 0.3); }
+
+  /** Partida nueva: sin inercias heredadas de la anterior. */
+  reset() {
+    this.prevVel.set(0, 0, 0); this.jiggle.set(0, 0, 0); this.jiggleV.set(0, 0, 0);
+    this.squash = this.squashV = 0;
+    this.primed = false;
+  }
 
   sync(body: RAPIER.RigidBody, integrity: number, up: number, t: number, dt = 1 / 60) {
     const p = body.translation(), q = body.rotation();
@@ -136,10 +138,13 @@ export class SofaView {
     this.group.quaternion.set(q.x, q.y, q.z, q.w);
     dt = Math.min(dt, 0.1);
     // Inercia de los cojines: se desplazan al revés que la aceleración del sofá
+    // (solo cuando la física ha dado un paso: en pantallas de 120 Hz hay fotogramas sin paso)
     const v = body.linvel();
     const vel = new THREE.Vector3(v.x, v.y, v.z);
-    const acc = vel.clone().sub(this.prevVel).divideScalar(Math.max(dt, 1e-3));
-    this.prevVel.copy(vel);
+    const changed = !this.primed || !vel.equals(this.prevVel);
+    const acc = changed && this.primed ? vel.clone().sub(this.prevVel).divideScalar(Math.max(dt, 1e-3)) : new THREE.Vector3();
+    if (changed) this.prevVel.copy(vel);
+    this.primed = true;
     acc.applyQuaternion(this.group.quaternion.clone().invert());
     acc.clampLength(0, 40);
     const target = acc.multiplyScalar(-0.0025);
@@ -154,12 +159,15 @@ export class SofaView {
     // Rebote de aplastamiento
     this.squashV += (-this.squash * 140 - this.squashV * 10) * dt;
     this.squash += this.squashV * dt;
-    const sq = THREE.MathUtils.clamp(this.squash, -0.25, 0.25);
-    this.inner.scale.set(1 - sq * 0.4, 1 + sq, 1 - sq * 0.4);
+    // Poca deformación lateral y apoyada en la base, para no salirse del colisionador ni flotar
+    const sq = THREE.MathUtils.clamp(this.squash, -0.18, 0.18);
+    this.inner.scale.set(1 - sq * 0.25, 1 + sq, 1 - sq * 0.25);
+    this.inner.position.y = up > 0.8 ? SOFA.half.y * sq : 0;
     const broken = Math.floor((100 - integrity) / 22);
     this.patches.forEach((m, i) => (m.visible = i < broken));
     const danger = up < 0.8 ? Math.min(1, (0.8 - up) / 0.4) : 0;
     (this.warn.material as THREE.MeshBasicMaterial).opacity = danger * (0.5 + 0.5 * Math.sin(t * 14));
+    this.warn.visible = danger > 0;
     this.warn.position.set(p.x, Math.max(0.05, p.y - 0.6), p.z);
   }
 }

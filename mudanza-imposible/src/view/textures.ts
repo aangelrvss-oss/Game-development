@@ -112,18 +112,18 @@ export const TEX = {
   }, 7)),
   plasterTile: 2,
   roofTiles: () => get('roofTiles', () => canvas(256, (ctx, r, n) => {
-    ctx.fillStyle = '#8a5546'; ctx.fillRect(0, 0, n, n);
+    ctx.fillStyle = '#a8705e'; ctx.fillRect(0, 0, n, n);
     const rows = 8, h = n / rows, w = n / 8;
     for (let j = 0; j < rows; j++) for (let i = -1; i < 9; i++) {
       const x = i * w + (j % 2 ? w / 2 : 0), v = r();
       const g = ctx.createLinearGradient(0, j * h, 0, j * h + h);
-      g.addColorStop(0, `hsl(${14 + v * 6}, 38%, ${54 + v * 8}%)`);
-      g.addColorStop(1, `hsl(${12 + v * 6}, 38%, ${42 + v * 6}%)`);
+      g.addColorStop(0, `hsl(${14 + v * 6}, 28%, ${57 + v * 5}%)`);
+      g.addColorStop(1, `hsl(${12 + v * 6}, 28%, ${50 + v * 5}%)`);
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.roundRect(x + 1.5, j * h + 1, w - 3, h - 2, [0, 0, 8, 8]); ctx.fill();
     }
   }, 8)),
-  roofTilesTile: 2.2,
+  roofTilesTile: 3.5,
   metal: () => get('metal', () => canvas(128, (ctx, _r, n) => {
     ctx.fillStyle = '#9aa7b8'; ctx.fillRect(0, 0, n, n);
     // Chapa lagrimada

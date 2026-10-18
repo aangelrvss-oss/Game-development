@@ -81,7 +81,8 @@ export class Hud {
       if (game.sofaUp < 0.55) w = '¡Volcado! Pulsa R (o Y en el mando) para enderezarlo';
       else if (game.sofaUp < 0.8) w = '¡Que se vuelca!';
       else if (game.stuckTime > 1.5) w = '¿Atascados? Gira el sofá (Q/E) o soltad un asa';
-      else if (!game.carriers.some((c) => c.human !== null && c.holding)) w = 'Acércate al sofá y pulsa ESPACIO para agarrarlo';
+      // (no mientras el jugador sigue mareado: todavía no puede agarrar)
+      else if (!game.carriers.some((c) => c.human !== null && (c.holding || c.stunned > 0))) w = 'Acércate al sofá y pulsa ESPACIO para agarrarlo';
     }
     this.warn.textContent = w;
     this.warn.style.display = w ? 'block' : 'none';

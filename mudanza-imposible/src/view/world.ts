@@ -92,6 +92,10 @@ export class WorldView {
 
   /** Crea las vistas para una partida nueva. */
   attach(game: Game) {
+    // Libera las vistas de la partida anterior (reiniciar no debe ir acumulando memoria de vídeo)
+    for (const v of this.carriers) v.dispose();
+    for (const v of this.cars) v.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    this.sofa.reset();
     this.dynamic.clear();
     this.fx.clear();
     this.dynamic.add(this.sofa.group, this.sofa.warning);
@@ -111,7 +115,7 @@ export class WorldView {
     }
     for (const v of this.cars) v.sync(dt);
     // Atasco: aviso flotante una vez por atasco
-    if (game.phase === 'playing' && game.stuckTime > 1.5 && !this.jam) { this.jam = true; this.fx.text(game.sofaPos, '¡ATASCO!', '#fecaca', 46); }
+    if (game.phase === 'playing' && game.stuckTime > 1.5 && !this.jam) { this.jam = true; this.fx.text(game.sofaPos, '¡ATASCO!', '#ffffff', 42, '#ea580c', 2); }
     if (game.stuckTime < 0.2) this.jam = false;
     this.level.update(t, game.light, game.stage >= 5, game.stage, game.sofaPos);
     this.fx.update(dt);
@@ -140,41 +144,49 @@ export class WorldView {
     this.camDist += (want - this.camDist) * k;
     const shake = this.fx.shake;
     // Algo más baja y cerca que una vista cenital: se leen las siluetas y las caras de lado
-    const off = new THREE.Vector3(0, 8.4, 8.4).multiplyScalar(this.camDist);
+    // Unos 53° de inclinación: las cabezas tapan poco el sofá y aún se ven perfiles y caras de lado
+    const off = new THREE.Vector3(0, 8.5, 6.3).multiplyScalar(this.camDist);
     this.camera.position.copy(this.camTarget).add(off);
     if (shake > 0) this.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, 0));
     this.camera.lookAt(this.camTarget);
     // La luz del sol sigue a la acción para que las sombras sean nítidas
     this.sun.position.set(this.camTarget.x + 14, this.camTarget.y + 30, this.camTarget.z + 10);
     this.sun.target.position.copy(this.camTarget);
-    this.fadeOccluders(game);
+    this.fadeOccluders(game, dt);
   }
 
-  /** Vuelve translúcidas las paredes que quedan entre la cámara y el grupo. */
-  private fadeOccluders(game: Game) {
+  /**
+   * Corte de las paredes que tapan la acción (como una maqueta): la pared baja hasta un zócalo opaco
+   * en vez de volverse un fantasma translúcido. Ventanas, toldos y dinteles se ocultan.
+   * Se comprueba contra el volumen original de cada pieza, para que al recortarla no deje de «tapar» y oscile.
+   */
+  private fadeOccluders(game: Game, dt: number) {
     const pts = [game.sofaPos, ...game.carriers.filter((c) => c.human !== null).map((c) => c.pos)];
     const hit = new Set<THREE.Object3D>();
+    const from = this.camera.position;
+    const tmp = new THREE.Vector3();
     for (const p of pts) {
       const to = new THREE.Vector3(p.x, p.y + 0.4, p.z);
-      const from = this.camera.position.clone();
-      const dir = to.clone().sub(from);
-      const dist = dir.length();
-      this.ray.set(from, dir.normalize());
-      this.ray.far = dist - 0.3;
-      for (const h of this.ray.intersectObjects(this.level.fadeables, false)) hit.add(h.object);
+      const dist = to.distanceTo(from);
+      this.ray.ray.set(from, to.sub(from).normalize());
+      for (const m of this.level.fadeables) {
+        const box = m.userData.box as THREE.Box3;
+        if (this.ray.ray.intersectBox(box, tmp) && tmp.distanceTo(from) < dist - 0.3) hit.add(m);
+      }
     }
-    // Reglas fijas: la fachada se aclara al acercarse a la puerta; la pared sur del pasillo de arriba, al subir.
     const s = game.sofaPos;
+    const k = 1 - Math.exp(-Math.max(dt, 1 / 60) * 10);
     for (const m of this.level.fadeables) {
       const rule = m.userData.fadeRule as ((x: number, y: number, z: number) => boolean) | undefined;
       if (rule && rule(s.x, s.y, s.z)) hit.add(m);
-    }
-    for (const m of this.level.fadeables) {
-      const mm = (m as THREE.Mesh).material as THREE.MeshStandardMaterial;
-      const target = hit.has(m) ? 0.22 : 1;
-      mm.transparent = true;
-      mm.opacity += (target - mm.opacity) * 0.2;
-      mm.depthWrite = mm.opacity > 0.95;
+      const u = m.userData as { cut: number; mode: 'cut' | 'hide'; box: THREE.Box3 };
+      u.cut ??= 1;
+      u.cut += ((hit.has(m) ? 0 : 1) - u.cut) * k;
+      if (u.mode === 'hide') { m.visible = u.cut > 0.5; continue; }
+      const full = u.box.max.y - u.box.min.y, stub = Math.min(0.4, full);
+      const h = stub + (full - stub) * u.cut;
+      m.scale.y = h / full;
+      m.position.y = u.box.min.y + h / 2;
     }
   }
 }

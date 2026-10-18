@@ -14,6 +14,7 @@ export class Fx {
   private ringGeo = new THREE.RingGeometry(0.85, 1, 40);
   private confGeo = new THREE.PlaneGeometry(0.12, 0.2);
   private dropGeo = new THREE.SphereGeometry(0.05, 6, 5);
+  private starGeo = new THREE.OctahedronGeometry(0.1);
   shake = 0;
 
   dust(p: { x: number; y: number; z: number }, n = 6, strength = 1) {
@@ -30,14 +31,15 @@ export class Fx {
   /** Nubecilla de un paso a la carrera. */
   puff(p: { x: number; y: number; z: number }) {
     const m = new THREE.Mesh(this.dustGeo, this.dustMat.clone());
-    m.scale.setScalar(0.5);
+    (m.material as THREE.MeshBasicMaterial).opacity = 0.45;
+    m.scale.setScalar(0.4);
     m.position.set(p.x, p.y, p.z);
     this.add({ mesh: m, vel: new THREE.Vector3((Math.random() - 0.5) * 0.4, 0.5, (Math.random() - 0.5) * 0.4), life: 0, max: 0.4, grow: 1.2, gravity: 0 });
   }
 
   /** Onda en el suelo: golpes y caídas. */
   ring(p: { x: number; y: number; z: number }, color = '#ffffff', size = 1.5) {
-    const m = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }));
+    const m = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide }));
     m.rotation.x = -Math.PI / 2;
     m.position.set(p.x, Math.max(0.05, p.y), p.z);
     m.scale.setScalar(0.4);
@@ -46,7 +48,7 @@ export class Fx {
 
   stars(p: { x: number; y: number; z: number }, n = 6) {
     for (let i = 0; i < n; i++) {
-      const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.1), new THREE.MeshBasicMaterial({ color: '#fde047', transparent: true }));
+      const m = new THREE.Mesh(this.starGeo, new THREE.MeshBasicMaterial({ color: '#fde047', transparent: true }));
       m.position.set(p.x, p.y + 0.4, p.z);
       const a = (i / n) * Math.PI * 2;
       this.add({ mesh: m, vel: new THREE.Vector3(Math.cos(a) * 2.5, 2.5 + Math.random() * 1.5, Math.sin(a) * 2.5), life: 0, max: 0.7, spin: 8, gravity: 9 });
@@ -74,10 +76,11 @@ export class Fx {
     }
   }
 
-  text(p: { x: number; y: number; z: number }, s: string, color = '#ffffff', size = 46) {
-    const sp = textSprite(s, { size, color });
+  /** Texto flotante; con `bg` va sobre una placa de color (se lee bien sobre cualquier fondo). */
+  text(p: { x: number; y: number; z: number }, s: string, color = '#ffffff', size = 46, bg?: string, lift = 1.3) {
+    const sp = textSprite(s, { size, color, bg, pad: bg ? 12 : 10 });
     sp.scale.multiplyScalar(0.7);
-    sp.position.set(p.x, p.y + 1.3, p.z);
+    sp.position.set(p.x, p.y + lift, p.z);
     sp.userData.base = sp.scale.clone();
     this.add({ mesh: sp, vel: new THREE.Vector3(0, 1.1, 0), life: 0, max: 1.3, gravity: 0, fade: 0.6 });
   }
@@ -116,5 +119,6 @@ function disposeObj(o: THREE.Object3D) {
   const m = o as THREE.Mesh;
   const mat = m.material as THREE.Material & { map?: THREE.Texture };
   if (mat?.map) mat.map.dispose();
+  // Las geometrías son compartidas entre partículas: no se liberan aquí
   mat?.dispose?.();
 }

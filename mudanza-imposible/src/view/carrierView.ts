@@ -161,13 +161,13 @@ function buildRig(cast: Carrier['cast']['cast']): Rig {
   const S: Record<string, Spec> = {
     mono: { hipY: 0.38, legLen: 0.36, legR: 0.045, hipX: 0.1, tr: 0.23, tl: 0.2, tY: 0.3, tScale: [1, 1, 0.9], headR: 0.27, headY: 0.86, sh: [0.25, 0.52], shirt: '#8b5cf6', pants: SKIN, shoe: '#1f2937', skin: SKIN },
     rulos: { hipY: 0.36, legLen: 0.34, legR: 0.05, hipX: 0.11, tr: 0.26, tl: 0.16, tY: 0.3, tScale: [1, 1, 0.95], headR: 0.27, headY: 0.84, sh: [0.27, 0.5], shirt: '#ec4899', pants: SKIN, shoe: '#f9a8d4', skin: SKIN },
-    gordo: { hipY: 0.3, legLen: 0.28, legR: 0.075, hipX: 0.17, tr: 0.36, tl: 0.1, tY: 0.32, tScale: [1.18, 1, 1.12], headR: 0.25, headY: 0.82, sh: [0.42, 0.52], shirt: '#f8fafc', pants: '#2563eb', shoe: '#1f2937', skin: SKIN },
+    gordo: { hipY: 0.3, legLen: 0.28, legR: 0.075, hipX: 0.17, tr: 0.36, tl: 0.1, tY: 0.32, tScale: [1.18, 1, 1.12], headR: 0.25, headY: 0.82, sh: [0.42, 0.52], shirt: '#f8fafc', pants: '#2563eb', shoe: '#1f2937', skin: '#eea27c' },
     alien: { hipY: 0.3, legLen: 0.28, legR: 0.05, hipX: 0.1, tr: 0.21, tl: 0.16, tY: 0.26, tScale: [1, 1, 0.9], headR: 0.34, headY: 0.86, sh: [0.22, 0.42], shirt: '#c7d2fe', pants: '#4ade80', shoe: '#64748b', skin: '#4ade80' },
     enano: { hipY: 0.24, legLen: 0.22, legR: 0.06, hipX: 0.12, tr: 0.25, tl: 0.1, tY: 0.26, tScale: [1.05, 1, 1], headR: 0.28, headY: 0.72, sh: [0.27, 0.42], shirt: '#2563eb', pants: '#1e40af', shoe: '#78350f', skin: SKIN },
   };
   const s = S[cast];
   rig.headR = s.headR;
-  rig.armColor = cast === 'gordo' ? SKIN : cast === 'alien' ? s.skin : s.shirt;
+  rig.armColor = cast === 'gordo' || cast === 'alien' ? s.skin : s.shirt;
   rig.handColor = s.skin;
   rig.armR = cast === 'gordo' ? 0.075 : 0.055;
   for (const sx of [-1, 1]) rig.legs.push(leg(body, sx * s.hipX, s.hipY, s.legLen, s.legR, s.pants, s.shoe, cast === 'rulos' ? 1.25 : 1));
@@ -210,7 +210,7 @@ function buildRig(cast: Carrier['cast']['cast']): Rig {
     // Grandullón en camiseta de tirantes, barriga, calvo con bigote
     mesh(new THREE.SphereGeometry(0.3, 16, 12), s.shirt, torso, 0, 0.26, -0.16, 0.03);
     mesh(new THREE.CylinderGeometry(0.42, 0.4, 0.2, 18), s.pants, torso, 0, 0.02, 0, 0.03);
-    const ring = mesh(new THREE.TorusGeometry(R * 0.86, 0.06, 6, 18, Math.PI * 1.2), '#4a2c12', head, 0, 0.02, 0.02, 0);
+    const ring = mesh(new THREE.TorusGeometry(R * 0.86, 0.09, 6, 18, Math.PI * 1.2), '#4a2c12', head, 0, 0.02, 0.02, 0);
     ring.rotation.set(Math.PI / 2, 0, -Math.PI * 0.1 - Math.PI / 2 + Math.PI);
     face(head, R, rig);
     const ms = onSphere(R, 0, -0.22, -0.97);
@@ -292,7 +292,14 @@ export class CarrierView {
   private stepSide = 0;
   private blinkAt: number;
   private sweatT = 0;
-  private lag = new THREE.Vector3();
+  private blinkEnd = 0;
+  /** Velocidad suavizada: la cabeza reacciona a los cambios de velocidad, no a la velocidad. */
+  private vS = new THREE.Vector3();
+  /** Giro total de la pirueta de un atropello (siempre en el mismo sentido). */
+  private spinTarget = 0;
+  /** >0: el sofá tira de él (se echa atrás); <0: empuja (se echa hacia delante). */
+  private along = 0;
+  private stumbleDir = 1;
   label?: THREE.Sprite;
 
   constructor(readonly carrier: Carrier, playerIndex: number | null, private fx?: Fx) {
@@ -342,7 +349,15 @@ export class CarrierView {
   }
 
   /** Tirón que le arranca el asa de las manos: trastabilla hacia atrás. */
-  stumble() { this.stumbleT = 0.75; }
+  stumble() { this.stumbleT = 0.75; this.stumbleDir = this.along >= 0 ? 1 : -1; }
+
+  /** Libera geometrías y materiales propios (los materiales compartidos de la caché no). */
+  dispose() {
+    const own = new Set<THREE.Material>([this.ring.material as THREE.Material, this.grip.material as THREE.Material, this.shadow.material as THREE.Material]);
+    if (this.label) { const m = this.label.material; m.map?.dispose(); own.add(m); }
+    for (const root of [this.group, this.shadow, this.ring, this.grip]) root.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    for (const m of own) m.dispose();
+  }
 
   sync(sofaGrab: THREE.Vector3 | null, t: number, dt: number) {
     const c = this.carrier, rig = this.rig;
@@ -362,12 +377,29 @@ export class CarrierView {
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
 
     // Tensión del agarre: 0 = cómodo, 1 = a punto de soltarse
-    let strain = 0;
+    // y su dirección: a lo largo de la mirada (tirón o empuje) y de lado
+    let strain = 0, sideOff = 0;
     const hw = c.handWorld();
-    if (sofaGrab) strain = THREE.MathUtils.clamp(Math.hypot(sofaGrab.x - hw.x, sofaGrab.y - hw.y, sofaGrab.z - hw.z) / CARRIER.gripBreak, 0, 1);
+    if (sofaGrab) {
+      const ox = sofaGrab.x - hw.x, oy = sofaGrab.y - hw.y, oz = sofaGrab.z - hw.z;
+      strain = THREE.MathUtils.clamp(Math.hypot(ox, oy, oz) / CARRIER.gripBreak, 0, 1);
+      this.along = (ox * fwd.x + oz * fwd.z) / CARRIER.gripBreak;
+      sideOff = THREE.MathUtils.clamp((ox * right.x + oz * right.z) / CARRIER.gripBreak, -1, 1);
+    }
     const stunned = c.stunned > 0;
-    if (stunned && !this.wasStunned) this.stunAge = 0;
-    if (!stunned && this.wasStunned) { this.getUp = 1; this.squashV += 4.5; }
+    if (stunned && !this.wasStunned) {
+      // Atropello: pirueta en un solo sentido y cae de espaldas en la dirección en la que sale despedido
+      this.stunAge = 0;
+      let dy = speed > 2 ? Math.atan2(v.x, v.z) - this.yaw : 0;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      this.spinTarget = dy + Math.PI * 2 * (dy >= 0 ? 1 : -1);
+    }
+    if (!stunned && this.wasStunned) {
+      // Se levanta de un salto; el cuerpo vuelve a mirar al frente girando, sin saltos de orientación
+      this.getUp = 1; this.squashV += 4.5;
+      this.yaw += this.spinTarget;
+      this.spinTarget = 0;
+    }
     this.wasStunned = stunned;
     this.stunAge += dt;
     this.stumbleT = Math.max(0, this.stumbleT - dt);
@@ -385,10 +417,15 @@ export class CarrierView {
     this.prevVy = vy;
     const airborne = this.airT > 0.15;
 
-    // Ciclo de paso
+    // Ciclo de paso. Si quiere andar y no avanza (empuja contra algo), patalea en el sitio
+    const want = Math.hypot(c.wantVel.x, c.wantVel.z);
+    const scrabble = c.grounded && !stunned && want > 1 && speed < 0.6;
     const prevWalk = this.walk;
-    this.walk += speed * dt * (rig.quadruped ? 5 : 3.6);
-    if (c.grounded && speed > 3.2 && Math.floor(prevWalk / Math.PI) !== Math.floor(this.walk / Math.PI)) {
+    this.walk += (scrabble ? want * 2.2 : speed) * dt * (rig.quadruped ? 5 : 3.6);
+    // De lado: los que agarran por los costados avanzan en paso lateral
+    const vSide = speed > 0.3 ? (v.x * right.x + v.z * right.z) / speed : 0;
+    const side = Math.abs(vSide);
+    if (c.grounded && (speed > 3.2 || scrabble) && Math.floor(prevWalk / Math.PI) !== Math.floor(this.walk / Math.PI)) {
       this.stepSide ^= 1;
       if (this.stepSide) this.fx?.puff({ x: p.x - fwd.x * 0.2, y: p.y - CENTER_Y + 0.08, z: p.z - fwd.z * 0.2 });
     }
@@ -396,13 +433,17 @@ export class CarrierView {
     // Inclinación del cuerpo: hacia delante al andar, hacia atrás al tirar del sofá, tumbado si está mareado
     let wantPitch = -0.12 * sp, wantRoll = Math.sin(this.walk) * 0.06 * sp;
     if (sofaGrab) {
-      // Se echa hacia atrás para compensar el peso, más cuanto más tira el sofá
-      wantPitch = 0.08 + strain * 0.42 - 0.05 * sp;
+      // Si el sofá tira de él, se echa atrás; si empuja, se inclina hacia él (poco: la cabeza no debe meterse en el sofá).
+      // Un tirón de lado le hace ladearse en contra.
+      wantPitch = this.along >= 0 ? 0.08 + strain * 0.42 - 0.05 * sp : -Math.min(0.15, 0.3 * strain);
+      wantRoll += sideOff * 0.35;
       if (strain > 0.55) wantRoll += Math.sin(t * 26 + c.id) * 0.1 * strain;
     }
+    wantRoll += side * Math.sin(this.walk) * 0.08 * sp;
+    if (scrabble) wantPitch -= 0.12;
     if (this.stumbleT > 0) {
       const k = this.stumbleT / 0.75;
-      wantPitch = 0.55 * Math.sin(k * Math.PI);
+      wantPitch = 0.55 * this.stumbleDir * Math.sin(k * Math.PI);
       wantRoll = Math.sin(t * 18) * 0.25 * k;
     }
     if (airborne) { wantPitch = -0.25; wantRoll = Math.sin(t * 14) * 0.15; }
@@ -410,7 +451,7 @@ export class CarrierView {
     if (stunned) {
       // Pirueta y caída de espaldas; patalea en el suelo
       const fall = THREE.MathUtils.smoothstep(this.stunAge, 0.15, 0.55);
-      spin = (1 - fall) * this.stunAge * 14;
+      spin = this.spinTarget * THREE.MathUtils.smoothstep(this.stunAge, 0, 0.5);
       wantPitch = 1.35 * fall;
       wantRoll = Math.sin(t * 7) * 0.08 * fall;
     }
@@ -428,24 +469,36 @@ export class CarrierView {
     rig.body.scale.set(1 - sq * 0.5, 1 + sq + breathe, 1 - sq * 0.5);
 
     // Piernas
-    const legAmp = (rig.quadruped ? 0.7 : 0.75) * sp;
+    const legAmp = (rig.quadruped ? 0.7 : 0.75) * (scrabble ? 0.5 : sp);
     rig.legs.forEach((l, i) => {
-      let a: number;
+      let a: number, z = 0;
+      const ph = this.walk + i * Math.PI;
       if (stunned) a = Math.sin(t * 20 + i * 2) * 0.6 * (this.stunAge > 0.5 ? 1 : 0);
       else if (airborne) a = Math.sin(t * 16 + i * Math.PI) * 0.5;
       else if (rig.quadruped) a = Math.sin(this.walk + (i === 0 || i === 3 ? 0 : Math.PI)) * legAmp;
-      else if (sofaGrab && strain > 0.3 && speed < 0.8) a = (i ? -1 : 1) * 0.35 * strain - 0.25 * strain; // pies clavados, abiertos
-      else a = Math.sin(this.walk + i * Math.PI) * legAmp;
+      else if (sofaGrab && strain > 0.3 && speed < 0.8 && !scrabble) a = (i ? -1 : 1) * 0.35 * strain - 0.25 * strain; // pies clavados, abiertos
+      else {
+        // Paso hacia delante o lateral según hacia dónde se mueve respecto a donde mira
+        a = Math.sin(ph) * legAmp * (1 - side);
+        z = side * Math.sin(ph) * 0.35 * sp * Math.sign(vSide);
+      }
+      if (sofaGrab && !rig.quadruped) z += (i ? -1 : 1) * -0.12 * strain;
       l.rotation.x = damp(l.rotation.x, a, 18, dt);
-      l.rotation.z = damp(l.rotation.z, sofaGrab && !rig.quadruped ? (i ? -1 : 1) * -0.12 * strain : 0, 10, dt);
+      l.rotation.z = damp(l.rotation.z, z, 14, dt);
     });
 
     // Cabeza con retraso (se bambolea con los cambios de velocidad), adornos que se agitan
-    this.lag.x = damp(this.lag.x, -v.x * 0.03, 6, dt);
-    this.lag.z = damp(this.lag.z, -v.z * 0.03, 6, dt);
-    const lagLocalX = this.lag.x * right.x + this.lag.z * right.z;
-    const lagLocalZ = this.lag.x * fwd.x + this.lag.z * fwd.z;
-    rig.head.rotation.set(-lagLocalZ * 2 + (sofaGrab ? -0.1 * strain : 0), Math.sin(t * 0.7 + c.id * 2) * 0.15 * (1 - sp), lagLocalX * -2 + (stunned ? Math.sin(t * 9) * 0.3 : 0));
+    this.vS.x = damp(this.vS.x, v.x, 5, dt);
+    this.vS.z = damp(this.vS.z, v.z, 5, dt);
+    const lx = (this.vS.x - v.x) * 0.06, lz = (this.vS.z - v.z) * 0.06;
+    const lagLocalX = THREE.MathUtils.clamp(lx * right.x + lz * right.z, -0.15, 0.15);
+    const lagLocalZ = THREE.MathUtils.clamp(lx * fwd.x + lz * fwd.z, -0.15, 0.15);
+    // Mira a cámara cuando sufre (tirón fuerte, traspié, en el aire): así se le ve la cara
+    const lookCam = stunned ? 0 : strain > 0.6 || this.stumbleT > 0 || airborne ? 1 : sofaGrab ? 0.35 : 0.25;
+    let toCam = Math.PI - (this.yaw + spin);
+    toCam = THREE.MathUtils.clamp(Math.atan2(Math.sin(toCam), Math.cos(toCam)), -1.1, 1.1) * lookCam;
+    const headYaw = damp(rig.head.rotation.y, toCam + Math.sin(t * 0.7 + c.id * 2) * 0.15 * (1 - sp), 8, dt);
+    rig.head.rotation.set(-lagLocalZ * 2 + 0.2 * lookCam, headYaw, lagLocalX * -2 + (stunned ? Math.sin(t * 9) * 0.3 : 0));
     for (const w of rig.wobbly) {
       const base = (w.userData.base as number) ?? 0;
       w.rotation.z = base + Math.sin(t * 9 + c.id) * (0.08 + 0.25 * sp) + lagLocalX * 4;
@@ -468,8 +521,8 @@ export class CarrierView {
     rig.smile.visible = !scared && effort < 0.45 && c.cast.cast !== 'enano';
     rig.shout.visible = !rig.smile.visible;
     rig.shout.scale.y = 1.25 * (scared ? 1.4 : 0.6 + effort);
-    if (t > this.blinkAt) this.blinkAt = t + 2.2 + ((c.id * 1.37 + t) % 2);
-    const blink = this.blinkAt - t > 2.05 ? 0.12 : 1;
+    if (t > this.blinkAt) { this.blinkEnd = t + 0.12; this.blinkAt = t + 2.2 + ((c.id * 1.37 + t) % 2); }
+    const blink = t < this.blinkEnd ? 0.12 : 1;
     rig.eyes.forEach((e) => (e.scale.y = blink));
     rig.pupils.forEach((pu, i) => {
       if (stunned) pu.position.set(Math.cos(t * 12 + i * Math.PI) * 0.025, Math.sin(t * 12 + i * Math.PI) * 0.025, pu.position.z);
@@ -492,7 +545,8 @@ export class CarrierView {
         const shoulder = toLocal(rig.torso, rig.shoulders[i]);
         let hand: THREE.Vector3;
         if (sofaGrab) {
-          hand = sofaGrab.clone().sub(this.group.position).add(right.clone().multiplyScalar(s * 0.13));
+          // La mano se apoya en la superficie (no se hunde en el sofá)
+          hand = sofaGrab.clone().sub(this.group.position).addScaledVector(fwd, -this.rig.armR * 1.4).addScaledVector(right, s * 0.13);
         } else if (stunned || airborne || this.stumbleT > 0) {
           // Molinillo de brazos
           const a = t * 14 + i * Math.PI;
@@ -514,7 +568,7 @@ export class CarrierView {
     this.ring.position.set(p.x, footY + 0.04, p.z);
     this.grip.visible = !!sofaGrab;
     if (sofaGrab) this.grip.position.copy(sofaGrab);
-    if (this.label) this.label.position.set(p.x, p.y + 1.35, p.z);
+    if (this.label) this.label.position.set(p.x, p.y + 1.2, p.z);
     this.stars.visible = stunned;
     if (stunned) {
       const hp = toLocal(rig.head, new THREE.Vector3(0, rig.headR + 0.1, 0));
