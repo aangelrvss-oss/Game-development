@@ -16,7 +16,7 @@ export interface LevelView {
   group: THREE.Group;
   /** Mallas que se pueden volver translúcidas si tapan la acción. */
   fadeables: THREE.Mesh[];
-  update(t: number, light: { cars: string; ped: string; left: number }, zoneActive: boolean): void;
+  update(t: number, light: { cars: string; ped: string; left: number }, zoneActive: boolean, stage: number): void;
 }
 
 function boxMesh(b: Box, color: string, rounded = false): THREE.Mesh {
@@ -63,11 +63,27 @@ export function buildLevel(): LevelView {
   const lights = addTrafficLights(g);
   const truck = addTruck(g);
   const zone = addZone(g);
+  // Flecha que señala el siguiente objetivo
+  const arrow = new THREE.Group();
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.8, 4), mat('#facc15', { emissive: '#a16207' }));
+  cone.rotation.x = Math.PI;
+  arrow.add(cone);
+  g.add(arrow);
+  const NEXT: [number, number, number][] = [
+    [0, 0, 2], [0, 0, DOOR.z - 0.5], [0, 0, STAIRS.z0], [0, FLOOR2, -30.6], [RAMP.x0, FLOOR2, (RAMP.z0 + RAMP.z1) / 2],
+    [(ZONE.x0 + ZONE.x1) / 2, 0, (ZONE.z0 + ZONE.z1) / 2],
+  ];
 
   return {
     group: g,
     fadeables,
-    update(t, light, zoneActive) {
+    update(t, light, zoneActive, stage) {
+      const n = NEXT[stage];
+      arrow.visible = !!n;
+      if (n) {
+        arrow.position.set(n[0], n[1] + 2.4 + Math.abs(Math.sin(t * 3)) * 0.5, n[2]);
+        arrow.rotation.y = t * 1.5;
+      }
       lights.set(light.cars, light.ped);
       (zone.material as THREE.MeshBasicMaterial).opacity = 0.7 + 0.25 * Math.sin(t * 4) * (zoneActive ? 1 : 0.4);
       zone.position.y = 0.03;

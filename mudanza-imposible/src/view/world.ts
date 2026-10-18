@@ -76,7 +76,7 @@ export class WorldView {
       v.sync(g ? new THREE.Vector3(g.x, g.y, g.z) : null, t, dt);
     }
     for (const v of this.cars) v.sync(dt);
-    this.level.update(t, game.light, game.stage >= 5);
+    this.level.update(t, game.light, game.stage >= 5, game.stage);
     this.fx.update(dt);
     this.updateCamera(game, dt);
     this.renderer.render(this.scene, this.camera);

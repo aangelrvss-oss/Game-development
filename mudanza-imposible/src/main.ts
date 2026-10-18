@@ -101,8 +101,8 @@ function setPaused(p: boolean) {
   show('pause', p);
 }
 
-function start(auto: boolean) {
-  sfx.unlock();
+function start(auto: boolean, fromGesture = true) {
+  if (fromGesture) sfx.unlock();
   game?.dispose();
   const humans = auto ? 1 : opts.humans;
   game = new Game(RAPIER, { humans, carriers: Math.max(opts.carriers, humans), botStyle: opts.botStyle, seed: Math.floor(Math.random() * 1e9) });
@@ -232,7 +232,7 @@ function frame(now: number) {
 }
 requestAnimationFrame(frame);
 
-if (opts.auto) start(true);
+if (opts.auto) start(true, false);
 
 // Ganchos para las pruebas automáticas en navegador
 (window as unknown as { __mudanza: unknown }).__mudanza = {
@@ -240,4 +240,5 @@ if (opts.auto) start(true);
   get screen() { return screen; },
   start,
   fps: () => fpsSamples.length / fpsSamples.reduce((a, b) => a + b, 0),
+  renderInfo: () => ({ ...view.renderer.info.render, triangles: view.renderer.info.render.triangles }),
 };

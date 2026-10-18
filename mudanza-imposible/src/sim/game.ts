@@ -95,7 +95,10 @@ export class Game {
     for (const b of LEVEL) {
       if (!b.solid) continue;
       const body = this.world.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(...b.p).setRotation(eulerQuat(b.rx ?? 0, b.rz ?? 0)));
-      this.world.createCollider(R.ColliderDesc.cuboid(...b.h).setFriction(b.kind === 'stairs' || b.kind === 'ramp' ? 0.9 : 0.6), body);
+      // La rampa es de chapa: resbala. Si se suelta el sofá encima, baja deslizándose.
+      const cd = R.ColliderDesc.cuboid(...b.h).setFriction(b.kind === 'ramp' ? 0.15 : b.kind === 'stairs' ? 0.9 : 0.6);
+      if (b.kind === 'ramp') cd.setFrictionCombineRule(R.CoefficientCombineRule.Min);
+      this.world.createCollider(cd, body);
     }
     const s = createSofa(R, this.world, { x: SOFA_START.x, y: SOFA_START.y, z: SOFA_START.z }, SOFA_START.yaw);
     this.sofa = s.body;

@@ -26,6 +26,7 @@ const maxSec = Number(process.argv[4] || 120);
     }
     if (s.screen === 'results') { await p.waitForTimeout(600); await p.screenshot({ path: `${outDir}/s${String(shot++).padStart(2, '0')}-resultado.png` }); console.log('RESULT', JSON.stringify(s)); break; }
   }
+  console.log('RENDER', JSON.stringify(await p.evaluate(() => window.__mudanza.renderInfo())));
   console.log('ERRORS', errors.length); for (const e of errors.slice(0, 20)) console.log('  ', e.slice(0, 300));
   await b.close();
 })();

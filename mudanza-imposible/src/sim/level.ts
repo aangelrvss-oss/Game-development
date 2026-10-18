@@ -29,6 +29,9 @@ const boxes: Box[] = [];
 const add = (b: Box) => boxes.push(b);
 /** Caja a partir de sus límites. */
 function span(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, kind: Kind, solid = true, fade = false) {
+  [x0, x1] = [Math.min(x0, x1), Math.max(x0, x1)];
+  [y0, y1] = [Math.min(y0, y1), Math.max(y0, y1)];
+  [z0, z1] = [Math.min(z0, z1), Math.max(z0, z1)];
   add({ p: [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2], h: [(x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2], kind, solid, fade });
 }
 

@@ -195,3 +195,23 @@ describe('Partida completa', () => {
     expect(CARRIER.gripBreak).toBeGreaterThan(0.3);
   });
 });
+
+describe('Datos del nivel', () => {
+  it('todas las cajas tienen semiextensiones positivas', async () => {
+    const { LEVEL } = await import('../src/sim/level');
+    for (const b of LEVEL) for (const h of b.h) expect(h).toBeGreaterThan(0);
+  });
+});
+
+describe('Rampa', () => {
+  it('un sofá soltado en la rampa de chapa resbala hacia abajo', async () => {
+    const { RAMP, FLOOR2 } = await import('../src/sim/level');
+    const g = new Game(RAPIER, { humans: 0, carriers: 1, botStyle: 'atentos' });
+    place(g, RAMP.x0 + 2, (RAMP.z0 + RAMP.z1) / 2, 0, FLOOR2 + 0.2);
+    play(g, 0.3);
+    const x0 = g.sofaPos.x;
+    play(g, 3);
+    expect(g.sofaPos.x - x0).toBeGreaterThan(2.5);
+    g.dispose();
+  });
+});
