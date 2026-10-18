@@ -22,6 +22,9 @@ export class Hud {
   private players = $('h-players');
   private toastBox = $('h-toasts');
   private lastStage = -1;
+  private toasts: { el: HTMLElement; until: number }[] = [];
+  /** Reloj de la partida: los mensajes duran tiempo de juego, no tiempo real (así también en las grabaciones). */
+  constructor(private now: () => number) {}
 
   show(on: boolean) { this.root.style.display = on ? 'block' : 'none'; }
 
@@ -40,11 +43,13 @@ export class Hud {
     el.className = `toast ${kind}`;
     el.textContent = text;
     this.toastBox.prepend(el);
-    setTimeout(() => el.remove(), 2200);
+    this.toasts.push({ el, until: this.now() + 2.2 });
     while (this.toastBox.children.length > 4) this.toastBox.lastElementChild?.remove();
   }
 
   update(game: Game) {
+    const t = this.now();
+    this.toasts = this.toasts.filter((x) => (x.until > t ? true : (x.el.remove(), false)));
     const left = Math.max(0, RULES.timeLimit - game.time);
     this.time.textContent = fmt(game.time);
     this.time.classList.toggle('late', left < 30);

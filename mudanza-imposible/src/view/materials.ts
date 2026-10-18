@@ -3,16 +3,17 @@ import * as THREE from 'three';
 const cache = new Map<string, THREE.MeshStandardMaterial>();
 
 /** Material plano y mate, con caché por color. */
-export function mat(color: string, opts: { rough?: number; emissive?: string; transparent?: boolean } = {}): THREE.MeshStandardMaterial {
-  const key = `${color}|${opts.rough ?? 0.85}|${opts.emissive ?? ''}|${opts.transparent ? 1 : 0}`;
+export function mat(color: string, opts: { rough?: number; emissive?: string; transparent?: boolean; map?: THREE.Texture; metal?: number } = {}): THREE.MeshStandardMaterial {
+  const key = `${color}|${opts.rough ?? 0.85}|${opts.emissive ?? ''}|${opts.transparent ? 1 : 0}|${opts.map?.uuid ?? ''}|${opts.metal ?? 0}`;
   let m = cache.get(key);
   if (!m) {
     m = new THREE.MeshStandardMaterial({
       color,
       roughness: opts.rough ?? 0.85,
-      metalness: 0,
+      metalness: opts.metal ?? 0,
       emissive: opts.emissive ?? '#000000',
       transparent: opts.transparent ?? false,
+      map: opts.map ?? null,
     });
     cache.set(key, m);
   }
@@ -20,8 +21,8 @@ export function mat(color: string, opts: { rough?: number; emissive?: string; tr
 }
 
 /** Material propio (no compartido), para lo que cambia de opacidad o de color. */
-export function ownMat(color: string, opts: { rough?: number; emissive?: string } = {}) {
-  return new THREE.MeshStandardMaterial({ color, roughness: opts.rough ?? 0.85, metalness: 0, emissive: opts.emissive ?? '#000000' });
+export function ownMat(color: string, opts: { rough?: number; emissive?: string; map?: THREE.Texture } = {}) {
+  return new THREE.MeshStandardMaterial({ color, roughness: opts.rough ?? 0.85, metalness: 0, emissive: opts.emissive ?? '#000000', map: opts.map ?? null });
 }
 
 export const PALETTE = {
@@ -46,16 +47,3 @@ export const PALETTE = {
   sky: '#9fd8ff',
   outline: '#2a2140',
 };
-
-/** Contorno de dibujo animado: copia de la malla por la cara de atrás, un poco más grande. */
-export function outline(mesh: THREE.Mesh, thickness = 0.04): THREE.Mesh {
-  const o = new THREE.Mesh(mesh.geometry, new THREE.MeshBasicMaterial({ color: PALETTE.outline, side: THREE.BackSide }));
-  const s = mesh.geometry.boundingSphere ?? (mesh.geometry.computeBoundingSphere(), mesh.geometry.boundingSphere!);
-  const k = 1 + thickness / Math.max(0.05, s.radius);
-  o.scale.setScalar(k);
-  o.position.copy(mesh.position);
-  o.rotation.copy(mesh.rotation);
-  o.castShadow = false;
-  o.userData.outline = true;
-  return o;
-}

@@ -5,7 +5,8 @@ import type { BotStyle } from './sim/bots';
 import type { GameEvent, PlayerInput } from './sim/types';
 import { WorldView } from './view/world';
 import { InputManager } from './input/input';
-import { Sfx } from './audio/sfx';
+import { Sfx, renderTrack, type SfxName } from './audio/sfx';
+import { NO_INPUT } from './sim/types';
 import { Hud } from './ui/hud';
 
 const DT = 1 / 60;
@@ -18,6 +19,9 @@ const opts: GameOptions & { auto: boolean } = {
   botStyle: (params.get('style') === 'despistados' ? 'despistados' : 'atentos') as BotStyle,
   auto: params.get('auto') === '1',
 };
+/** Modo captura: la simulación solo avanza cuando lo pide el script de grabación (fotograma a fotograma). */
+const capture = params.get('capture') === '1';
+const soundLog: { t: number; name: SfxName; args: number[] }[] = [];
 
 function clampInt(v: string | null, lo: number, hi: number, def: number) {
   const n = v === null ? def : parseInt(v, 10);
@@ -28,7 +32,8 @@ await RAPIER.init();
 const view = new WorldView($('c') as HTMLCanvasElement);
 const input = new InputManager();
 const sfx = new Sfx();
-const hud = new Hud();
+sfx.onPlay = (name, args) => soundLog.push({ t: simTime, name, args });
+const hud = new Hud(() => simTime);
 
 let game: Game | null = null;
 let autopilot: Autopilot | null = null;
@@ -37,6 +42,7 @@ let screen: 'menu' | 'play' | 'results' = 'menu';
 let acc = 0;
 let last = performance.now();
 let simTime = 0;
+let pendingResults: { g: Game; at: number } | null = null;
 const fpsSamples: number[] = [];
 const toastCooldown = new Map<string, number>();
 
@@ -129,39 +135,49 @@ function cooled(key: string, s: number) {
 function handle(e: GameEvent, g: Game) {
   const who = (i: number) => g.carriers[i];
   switch (e.type) {
-    case 'grab': if (who(e.carrier).human !== null) sfx.grab(); break;
-    case 'release': if (who(e.carrier).human !== null) sfx.release(); break;
+    case 'grab': if (who(e.carrier).human !== null) sfx.play('grab'); break;
+    case 'release': if (who(e.carrier).human !== null) sfx.play('release'); break;
     case 'gripBreak':
-      sfx.slip();
+      sfx.play('slip');
+      view.carriers[e.carrier]?.stumble();
       if (cooled(`slip${e.carrier}`, 2)) view.fx.text(e.pos, '¡Se escapa!', '#fde68a', 36);
       break;
     case 'impact':
-      sfx.impact(e.strength);
+      sfx.play('impact', e.strength);
       view.fx.dust(e.pos, 5 + Math.min(8, Math.round(e.strength)), 0.8);
+      view.sofa.bump(e.strength);
+      if (e.strength > 3) view.fx.ring(e.pos, '#fff7d6', Math.min(1.6, 0.6 + e.strength * 0.12));
       view.fx.shake = Math.min(0.8, view.fx.shake + e.strength * 0.05);
       if (e.damage > 0) view.fx.text(e.pos, `-${e.damage}%`, '#fca5a5', 42);
       break;
     case 'carHit':
-      sfx.crash();
+      sfx.play('crash');
       view.fx.stars(e.pos, 8);
+      view.fx.ring(e.pos, '#fde047', 1.8);
+      view.fx.dust(e.pos, 8, 1.2);
+      if (e.target === 'sofa') view.sofa.bump(10);
       view.fx.shake = Math.min(1, view.fx.shake + 0.6);
       if (e.target === 'sofa') { view.fx.text(e.pos, '¡CATAPUM!', '#ffffff', 54); hud.toast(`¡Atropello al sofá! −${RULES.carDamage}%`, 'bad'); }
       else if (cooled(`run${e.carrier}`, 1.5)) hud.toast(`¡Han atropellado a ${who(e.carrier!).cast.name}!`, 'bad');
       break;
-    case 'stun': sfx.stun(); view.fx.stars(e.pos, 5); break;
+    case 'stun': sfx.play('stun'); view.fx.stars(e.pos, 5); break;
     case 'honk':
-      if (cooled(`honk${e.car}`, 1.5)) { sfx.honk(); view.fx.text({ ...e.pos, y: e.pos.y + 0.8 }, '¡PIIII!', '#fef08a', 40); }
+      if (cooled(`honk${e.car}`, 1.5)) { sfx.play('honk'); view.fx.text({ ...e.pos, y: e.pos.y + 0.8 }, '¡PIIII!', '#fef08a', 40); }
       break;
     case 'light': {
       const s = g.sofaPos;
-      if (e.ped === 'green' && s.z < 7 && s.z > -12) { hud.toast('Semáforo en verde: ¡cruzad!', 'good'); sfx.beep(true); }
+      if (e.ped === 'green' && s.z < 7 && s.z > -12) { hud.toast('Semáforo en verde: ¡cruzad!', 'good'); sfx.play('beep', 1); }
       break;
     }
-    case 'stage': sfx.checkpoint(); if (e.index > 0) hud.toast(`¡${e.label}!`, 'good'); break;
-    case 'righted': sfx.hop(); view.fx.dust(e.pos, 8, 1); hud.toast(`Sofá enderezado (−${RULES.rightCost}%)`); break;
+    case 'stage': sfx.play('checkpoint'); if (e.index > 0) hud.toast(`¡${e.label}!`, 'good'); break;
+    case 'righted': sfx.play('hop'); view.fx.dust(e.pos, 8, 1); hud.toast(`Sofá enderezado (−${RULES.rightCost}%)`); break;
     case 'respawnSofa': hud.toast(`El sofá vuelve al último punto (−${RULES.respawnCost}% y +5 s)`, 'bad'); break;
-    case 'win': sfx.win(); setTimeout(() => results(g), 900); break;
-    case 'lose': sfx.lose(); setTimeout(() => results(g), 900); break;
+    case 'win':
+      sfx.play('win');
+      view.fx.confetti(g.sofaPos, 70);
+      view.fx.text(g.sofaPos, '¡ENTREGADO!', '#bbf7d0', 60);
+      pendingResults = { g, at: simTime + 1.2 }; break;
+    case 'lose': sfx.play('lose'); pendingResults = { g, at: simTime + 1.2 }; break;
   }
 }
 
@@ -195,7 +211,10 @@ function results(g: Game) {
 function frame(now: number) {
   const dtReal = Math.min(0.1, (now - last) / 1000);
   last = now;
+  if (capture && screen !== 'menu') { requestAnimationFrame(frame); return; }
+  if (pendingResults && simTime >= pendingResults.at) { const r = pendingResults; pendingResults = null; results(r.g); }
   fpsSamples.push(dtReal);
+  view.adapt(dtReal);
   if (fpsSamples.length > 120) fpsSamples.shift();
   if (game && screen !== 'menu') {
     if (input.padStart()) { if (screen === 'play') setPaused(!paused); else if (screen === 'results') start(!!autopilot); }
@@ -216,7 +235,7 @@ function frame(now: number) {
         steps++;
       }
       if (steps === 5) acc = 0;
-      if (g.light.ped === 'green' && cooled('pedtick', 0.5) && g.sofaPos.z < 7 && g.sofaPos.z > -12) sfx.pedTick();
+      if (g.light.ped === 'green' && cooled('pedtick', 0.5) && g.sofaPos.z < 7 && g.sofaPos.z > -12) sfx.play('pedTick');
     } else {
       input.read(1);
     }
@@ -239,6 +258,34 @@ if (opts.auto) start(true, false);
   get game() { return game; },
   get screen() { return screen; },
   start,
+  /** Grabación: avanza n fotogramas de 1/fps s de juego cada uno y dibuja el último. */
+  advance(frames: number, fps = 30, script?: string) {
+    const g = game;
+    if (!g) return;
+    const fn = script ? (new Function('g', script) as (g: Game) => PlayerInput[]) : null;
+    for (let f = 0; f < frames; f++) {
+      const humans = g.carriers.filter((c) => c.human !== null).length;
+      let inputs: PlayerInput[] = fn ? fn(g) : input.read(Math.max(1, humans));
+      const steps = Math.round(60 / fps);
+      for (let i = 0; i < steps && screen === 'play'; i++) {
+        if (autopilot) inputs = [autopilot.input(g, DT)];
+        else if (fn && i > 0) inputs = (fn(g) ?? []).map((x) => ({ ...x, grab: false, right: false }));
+        g.step(DT, inputs.length ? inputs : [NO_INPUT]);
+        simTime += DT;
+        for (const e of g.out) handle(e, g);
+        inputs = inputs.map((x) => ({ ...x, grab: false, right: false }));
+      }
+      if (pendingResults && simTime >= pendingResults.at) { const r = pendingResults; pendingResults = null; results(r.g); }
+      if (g.light.ped === 'green' && cooled('pedtick', 0.5) && g.sofaPos.z < 7 && g.sofaPos.z > -12) sfx.play('pedTick');
+      hud.update(g);
+      view.render(g, simTime, 1 / fps);
+    }
+  },
+  get simTime() { return simTime; },
+  sound: (from: number, to: number) => renderTrack(soundLog.filter((e) => e.t >= from && e.t < to).map((e) => ({ ...e, t: e.t - from })), to - from),
+  setZoom: (k: number | null) => view.setZoomOverride(k),
   fps: () => fpsSamples.length / fpsSamples.reduce((a, b) => a + b, 0),
   renderInfo: () => ({ ...view.renderer.info.render, triangles: view.renderer.info.render.triangles }),
+  /** Solo para medir: acceso a la escena 3D. */
+  view,
 };

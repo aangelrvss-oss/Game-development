@@ -22,10 +22,19 @@ export class WorldView {
   private camTarget = new THREE.Vector3(0, 0, 8);
   private camDist = 1;
   private ray = new THREE.Raycaster();
+  private zoomOverride: number | null = null;
+  private jam = false;
+  private ratio: number;
+  private maxRatio: number;
+  private dtAvg = 1 / 60;
+  private adaptT = 0;
+  setZoomOverride(k: number | null) { this.zoomOverride = k; }
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.maxRatio = Math.min(window.devicePixelRatio, 2);
+    this.ratio = this.maxRatio;
+    this.renderer.setPixelRatio(this.ratio);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -33,8 +42,12 @@ export class WorldView {
     this.renderer.toneMappingExposure = 1.05;
     this.scene.background = new THREE.Color(PALETTE.sky);
     this.scene.fog = new THREE.Fog(PALETTE.sky, 45, 110);
-    this.scene.add(new THREE.HemisphereLight('#e8f6ff', '#7a8f5a', 1.25));
-    this.sun = new THREE.DirectionalLight('#fff4e0', 2.3);
+    this.scene.add(new THREE.HemisphereLight('#eaf4ff', '#8a7a5a', 1.15));
+    // Sol cálido de media tarde y un relleno frío desde el otro lado: volumen sin sombras negras
+    this.sun = new THREE.DirectionalLight('#ffe9c7', 2.6);
+    const fill = new THREE.DirectionalLight('#b9d7ff', 0.55);
+    fill.position.set(-20, 15, -10);
+    this.scene.add(fill);
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera;
@@ -45,6 +58,27 @@ export class WorldView {
     this.scene.add(this.level.group, this.dynamic, this.fx.group);
     this.resize();
     window.addEventListener('resize', () => this.resize());
+  }
+
+  /**
+   * Resolución adaptable: si los fotogramas tardan demasiado (móvil modesto, render por software),
+   * baja la densidad de píxeles hasta la mitad; si sobra margen, la vuelve a subir.
+   */
+  adapt(dtReal: number) {
+    this.dtAvg += (dtReal - this.dtAvg) * 0.1;
+    this.adaptT += dtReal;
+    if (this.adaptT < 1) return;
+    let r = this.ratio;
+    if (this.dtAvg > 1 / 28) r = Math.max(0.5, r - 0.25);
+    else if (this.dtAvg < 1 / 50) r = Math.min(this.maxRatio, r + 0.25);
+    this.adaptT = 0;
+    if (r !== this.ratio) {
+      // Tras subir, espera más antes de volver a decidir (evita oscilar)
+      if (r > this.ratio) this.adaptT = -3;
+      this.ratio = r;
+      this.renderer.setPixelRatio(r);
+      this.resize();
+    }
   }
 
   resize() {
@@ -61,7 +95,7 @@ export class WorldView {
     this.dynamic.clear();
     this.fx.clear();
     this.dynamic.add(this.sofa.group, this.sofa.warning);
-    this.carriers = game.carriers.map((c) => new CarrierView(c, c.human));
+    this.carriers = game.carriers.map((c) => new CarrierView(c, c.human, this.fx));
     for (const v of this.carriers) { this.dynamic.add(v.group, ...v.worldObjects()); }
     this.cars = game.cars.map((c) => new CarView(c));
     for (const v of this.cars) this.dynamic.add(v.group);
@@ -70,13 +104,16 @@ export class WorldView {
   }
 
   render(game: Game, t: number, dt: number) {
-    this.sofa.sync(game.sofa, game.integrity, game.sofaUp, t);
+    this.sofa.sync(game.sofa, game.integrity, game.sofaUp, t, dt);
     for (const v of this.carriers) {
       const g = v.carrier.grabWorld(game.sofa);
       v.sync(g ? new THREE.Vector3(g.x, g.y, g.z) : null, t, dt);
     }
     for (const v of this.cars) v.sync(dt);
-    this.level.update(t, game.light, game.stage >= 5, game.stage);
+    // Atasco: aviso flotante una vez por atasco
+    if (game.phase === 'playing' && game.stuckTime > 1.5 && !this.jam) { this.jam = true; this.fx.text(game.sofaPos, '¡ATASCO!', '#fecaca', 46); }
+    if (game.stuckTime < 0.2) this.jam = false;
+    this.level.update(t, game.light, game.stage >= 5, game.stage, game.sofaPos);
     this.fx.update(dt);
     this.updateCamera(game, dt);
     this.renderer.render(this.scene, this.camera);
@@ -93,16 +130,17 @@ export class WorldView {
     }
     for (const c of game.carriers) spread = Math.max(spread, Math.hypot(c.pos.x - s.x, c.pos.z - s.z));
     const tx = s.x * 0.75 + hx * 0.25 + v.x * 0.35;
-    const tz = s.z * 0.75 + hz * 0.25 + v.z * 0.35 - 1.2;
+    const tz = s.z * 0.75 + hz * 0.25 + v.z * 0.35 - 0.8;
     const ty = Math.max(0, s.y - 0.6);
     const k = 1 - Math.exp(-dt * 3);
     this.camTarget.x += (tx - this.camTarget.x) * k;
     this.camTarget.y += (ty - this.camTarget.y) * k;
     this.camTarget.z += (tz - this.camTarget.z) * k;
-    const want = 1 + Math.min(0.6, Math.max(0, spread - 3) * 0.08);
+    const want = this.zoomOverride ?? 1 + Math.min(0.6, Math.max(0, spread - 3) * 0.08);
     this.camDist += (want - this.camDist) * k;
     const shake = this.fx.shake;
-    const off = new THREE.Vector3(0, 11, 8.6).multiplyScalar(this.camDist);
+    // Algo más baja y cerca que una vista cenital: se leen las siluetas y las caras de lado
+    const off = new THREE.Vector3(0, 8.4, 8.4).multiplyScalar(this.camDist);
     this.camera.position.copy(this.camTarget).add(off);
     if (shake > 0) this.camera.position.add(new THREE.Vector3((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, 0));
     this.camera.lookAt(this.camTarget);
