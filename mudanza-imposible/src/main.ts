@@ -148,9 +148,11 @@ function handle(e: GameEvent, g: Game) {
       view.sofa.bump(e.strength);
       if (e.strength > 3) view.fx.ring(e.pos, '#fff7d6', Math.min(1.6, 0.6 + e.strength * 0.12));
       view.fx.shake = Math.min(0.8, view.fx.shake + e.strength * 0.05);
-      if (e.damage > 0) view.fx.text(e.pos, `-${e.damage}%`, '#fca5a5', 42);
+      // Tras un atropello, el «¡CATAPUM!» ya lo dice: el texto de daño pequeño se taparía con él
+      if (e.damage > 0 && simTime - (toastCooldown.get('carHit') ?? -99) > 0.8) view.fx.text(e.pos, `-${e.damage}%`, '#fca5a5', 42);
       break;
     case 'carHit':
+      toastCooldown.set('carHit', simTime);
       sfx.play('crash');
       view.fx.stars(e.pos, 8);
       view.fx.ring(e.pos, '#fde047', 1.8);
@@ -214,7 +216,7 @@ function frame(now: number) {
   if (capture && screen !== 'menu') { requestAnimationFrame(frame); return; }
   if (pendingResults && simTime >= pendingResults.at) { const r = pendingResults; pendingResults = null; results(r.g); }
   fpsSamples.push(dtReal);
-  view.adapt(dtReal);
+  if (!capture) view.adapt(dtReal);
   if (fpsSamples.length > 120) fpsSamples.shift();
   if (game && screen !== 'menu') {
     if (input.padStart()) { if (screen === 'play') setPaused(!paused); else if (screen === 'results') start(!!autopilot); }
