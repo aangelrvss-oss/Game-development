@@ -3,6 +3,7 @@ import type { Game } from '../sim/game';
 import { buildLevel, type LevelView } from './levelView';
 import { SofaView } from './sofaView';
 import { CarrierView } from './carrierView';
+import { DollView } from './doll/dollView';
 import { CarView } from './carView';
 import { Fx } from './fx';
 import { PALETTE } from './materials';
@@ -15,7 +16,8 @@ export class WorldView {
   level: LevelView;
   fx = new Fx();
   sofa = new SofaView();
-  carriers: CarrierView[] = [];
+  /** Jugadores humanos: muñeco del laboratorio; ayudantes de la máquina: el reparto original. */
+  carriers: (CarrierView | DollView)[] = [];
   cars: CarView[] = [];
   private dynamic = new THREE.Group();
   private sun: THREE.DirectionalLight;
@@ -99,7 +101,7 @@ export class WorldView {
     this.dynamic.clear();
     this.fx.clear();
     this.dynamic.add(this.sofa.group, this.sofa.warning);
-    this.carriers = game.carriers.map((c) => new CarrierView(c, c.human, this.fx));
+    this.carriers = game.carriers.map((c) => (c.human !== null ? new DollView(c, c.human, game.world, this.camera) : new CarrierView(c, c.human, this.fx)));
     for (const v of this.carriers) { this.dynamic.add(v.group, ...v.worldObjects()); }
     this.cars = game.cars.map((c) => new CarView(c));
     for (const v of this.cars) this.dynamic.add(v.group);

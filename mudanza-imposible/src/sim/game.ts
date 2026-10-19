@@ -279,6 +279,9 @@ export class Game {
     if (c.stunned > 0) return;
     c.stunned = CARRIER.stunTime;
     c.knock = 'car';
+    // Sale despedido hacia donde le lleva el golpe (o de espaldas si apenas se mueve)
+    const v = c.body.linvel(), sp = Math.hypot(v.x, v.z);
+    c.fallDir = sp > 1 ? { x: v.x / sp, z: v.z / sp } : { x: -c.facing.x, z: -c.facing.z };
     c.resetBalance();
     if (c.holding) c.release();
     this.emit({ type: 'stun', carrier: c.id, pos: c.pos });

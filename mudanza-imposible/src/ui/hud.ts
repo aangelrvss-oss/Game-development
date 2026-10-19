@@ -1,6 +1,7 @@
 import { RULES, type Game } from '../sim/game';
 import { STAGES } from '../sim/level';
 import { PLAYER_COLORS } from '../view/carrierView';
+import { carrierName } from '../view/doll/dollView';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -32,7 +33,7 @@ export class Hud {
     this.stages.innerHTML = STAGES.map((s, i) => `<span class="stage" data-i="${i}">${s.label}</span>`).join('<i>›</i>');
     this.players.innerHTML = game.carriers
       .filter((c) => c.human !== null)
-      .map((c) => `<div class="pl" style="--c:${PLAYER_COLORS[c.human!]}"><b>J${c.human! + 1}</b> ${c.cast.name}<span id="pl-${c.id}"></span><small>${keyboardHelp[c.human!] ?? 'Mando'}</small></div>`)
+      .map((c) => `<div class="pl" style="--c:${PLAYER_COLORS[c.human!]}"><b>J${c.human! + 1}</b> ${carrierName(c)}<span id="pl-${c.id}"></span><small>${keyboardHelp[c.human!] ?? 'Mando'}</small></div>`)
       .join('');
     this.lastStage = -1;
     this.toastBox.innerHTML = '';

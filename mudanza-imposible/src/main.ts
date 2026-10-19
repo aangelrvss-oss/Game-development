@@ -8,6 +8,7 @@ import { InputManager } from './input/input';
 import { Sfx, renderTrack, type SfxName } from './audio/sfx';
 import { NO_INPUT } from './sim/types';
 import { Hud } from './ui/hud';
+import { carrierName } from './view/doll/dollView';
 
 const DT = 1 / 60;
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -162,7 +163,7 @@ function handle(e: GameEvent, g: Game) {
       if (e.target === 'sofa') view.sofa.bump(10);
       view.fx.shake = Math.min(1, view.fx.shake + 0.6);
       if (e.target === 'sofa') { view.fx.text(e.pos, '¡CATAPUM!', '#ffffff', 50, '#dc2626', 2.3); hud.toast(`¡Atropello al sofá! −${RULES.carDamage}%`, 'bad'); }
-      else if (cooled(`run${e.carrier}`, 1.5)) hud.toast(`¡Han atropellado a ${who(e.carrier!).cast.name}!`, 'bad');
+      else if (cooled(`run${e.carrier}`, 1.5)) hud.toast(`¡Han atropellado a ${who(e.carrier!).human !== null ? `J${who(e.carrier!).human! + 1}` : carrierName(who(e.carrier!))}!`, 'bad');
       break;
     case 'stun': sfx.play('stun'); view.fx.stars(e.pos, 5); break;
     case 'wobble':
