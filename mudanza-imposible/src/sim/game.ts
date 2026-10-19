@@ -3,7 +3,7 @@
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { BotBrain, BOT, type BotStyle } from './bots';
 import { CAST, CARRIER, CENTER_Y, Carrier } from './carrier';
-import { LEVEL, SOFA_START, STAGES, ZONE, FLOOR2, RAMP } from './level';
+import { LEVEL, SOFA_START, STAGES, STAIRS, ZONE, FLOOR2, RAMP } from './level';
 import { SLOTS, createSofa, localToWorld, rotate, sofaUp, sofaYaw, yawQuat } from './sofa';
 import { Car, CAR_COLORS, lightAt, stepTraffic } from './traffic';
 import { NO_INPUT, type GameEvent, type PlayerInput, type Vec3 } from './types';
@@ -149,6 +149,18 @@ export class Game {
   get sofaYaw() { return sofaYaw(this.sofa); }
   get sofaUp() { return sofaUp(this.sofa); }
   get stageLabel() { return STAGES[this.stage].label; }
+
+  /**
+   * Al pie de la escalera (o ya en ella) con el sofá sin alzar. Con la física cooperativa no se puede arrastrar
+   * escaleras arriba: hay que alzarlo (Mayús). La interfaz lo avisa; si no, la pareja se quedaba atascada abajo.
+   */
+  get needsLiftAtStairs() {
+    if (!this.coop || this.phase !== 'playing') return false;
+    const s = this.sofaPos;
+    const atStairs = Math.abs(s.x) < 1.8 && s.z < STAIRS.z0 + 2.5 && s.z > STAIRS.z1 && s.y < STAIRS.top - 0.3;
+    const holders = this.carriers.filter((c) => c.human !== null && c.holding);
+    return atStairs && holders.length > 0 && holders.some((c) => c.handLift < 0.5);
+  }
 
   private emit(e: GameEvent) { this.out.push(e); }
 

@@ -247,6 +247,18 @@ describe('Dos jugadores sin ayudantes (física cooperativa)', () => {
     expect(both).toBeGreaterThan(2 * solo);
   });
 
+  it('empujar el sofá con el cuerpo, sin agarrarlo, no sirve para llevarlo solo', () => {
+    // Regresión: el límite de fuerza solo se aplicaba al agarrar, y uno solo empujando lo llevaba 14 m en 3 s
+    const g = duo();
+    g.carriers[1].teleport({ x: -6, y: 0.7, z: 14 });
+    g.carriers[0].teleport({ x: 0, y: 0.7, z: 11.2 });
+    play(g, 1.5, () => [inp({ mz: -1 }), NO_INPUT]); // el choque inicial puede moverlo algo
+    const s0 = g.sofaPos;
+    play(g, 4, (g) => [inp({ mz: -1, mx: Math.max(-1, Math.min(1, (g.sofaPos.x - g.carriers[0].pos.x) * 2)) }), NO_INPUT]);
+    expect(moved(g, s0)).toBeLessThan(0.5);
+    g.dispose();
+  });
+
   it('tirar en sentidos opuestos hace girar o estira el agarre, sin explotar la física', () => {
     const g = duo();
     g.step(DT, [inp({ grab: true }), inp({ grab: true })]);
@@ -304,6 +316,24 @@ describe('Dos jugadores sin ayudantes (física cooperativa)', () => {
     const ev2 = play(g2, 4, () => [inp({ mx: 1 }), NO_INPUT]);
     expect(ev2.filter((e) => e.type === 'wobble' || e.type === 'fall')).toEqual([]);
     g.dispose(); g2.dispose();
+  });
+
+  it('sin alzar no se sube la escalera, pero la interfaz lo avisa y alzando se sube', () => {
+    // Regresión: con la física cooperativa la pareja se quedaba atascada al pie de la escalera si no alzaba
+    // (Mayús), y el aviso de atasco recomendaba girar el sofá
+    const g = new Game(RAPIER, { humans: 2, carriers: 2, botStyle: 'atentos', seed: 1 });
+    const aps = [new Autopilot(0), new Autopilot(1)];
+    let warned = 0, lift = false;
+    for (let i = 0; i < 60 * 120 && g.stage < STAGES.findIndex((s) => s.label === 'Arriba'); i++) {
+      if (g.needsLiftAtStairs) warned += DT;
+      // Sin alzar hasta llevar 4 s avisados; después, alzan (lo que pide el aviso)
+      if (warned > 4) lift = true;
+      g.step(DT, aps.map((a) => ({ ...a.input(g, DT), lift: lift && g.sofaPos.z < -15 })));
+    }
+    expect(warned).toBeGreaterThan(4);
+    expect(lift).toBe(true);
+    expect(g.stageLabel).toBe('Arriba');
+    g.dispose();
   });
 
   it('dos jugadores (llevados por el piloto automático) completan el recorrido', () => {

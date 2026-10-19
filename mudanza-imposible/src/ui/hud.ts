@@ -81,6 +81,7 @@ export class Hud {
     if (game.phase === 'playing') {
       if (game.sofaUp < 0.55) w = '¡Volcado! Pulsa R (o Y en el mando) para enderezarlo';
       else if (game.sofaUp < 0.8) w = '¡Que se vuelca!';
+      else if (game.needsLiftAtStairs) w = 'Escalera: alzad el sofá para subir. Mantened Mayús (J1 la izquierda, J2 la derecha)';
       else if (game.coop && game.soloDrag > 1.2) w = '¡Uno solo apenas puede con él! Agarradlo los dos';
       else if (game.stuckTime > 1.5) w = '¿Atascados? Gira el sofá (Q/E) o soltad un asa';
       // (no mientras el jugador sigue mareado: todavía no puede agarrar)

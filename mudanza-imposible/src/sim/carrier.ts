@@ -194,6 +194,16 @@ export class Carrier {
     this.grabLocal = null;
   }
 
+  /** ¿Está tocando el cuerpo indicado (contacto activo, no solo cerca)? */
+  private touching(body: RAPIER.RigidBody) {
+    let touch = false;
+    this.world.contactPairsWith(this.collider, (other) => {
+      if (touch || other.parent()?.handle !== body.handle) return;
+      this.world.contactPair(this.collider, other, (m) => { if (m.numContacts() > 0) touch = true; });
+    });
+    return touch;
+  }
+
   /** Aplica el control de movimiento. Devuelve true si la mano se ha soltado por tirón. */
   control(input: PlayerInput, dt: number, sofa: RAPIER.RigidBody): boolean {
     const v = this.body.linvel();
@@ -209,8 +219,9 @@ export class Carrier {
     this.grounded = hit !== null;
     const mass = this.body.mass();
     let maxA = (this.grounded ? CARRIER.accel : CARRIER.airAccel) * (this.stunned > 0 ? 0.15 : 1);
-    if (this.coop && this.joint && this.grounded && this.stunned <= 0) {
-      // Cargando: la fuerza para el mueble es limitada. En pendiente, además, sostiene su propio peso.
+    if (this.coop && this.grounded && this.stunned <= 0 && (this.joint || this.touching(sofa))) {
+      // Cargando o empujando el sofá con el cuerpo: la fuerza para el mueble es limitada (si no, uno solo lo
+      // empujaba más rápido de lo que lo llevan dos). En pendiente, además, sostiene su propio peso.
       const n = hit!.normal;
       maxA = CARRIER.pullForce / mass + 9.81 * Math.abs(n.y) * Math.hypot(n.x, n.z) * 1.3;
     }

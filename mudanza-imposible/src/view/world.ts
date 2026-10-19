@@ -163,7 +163,14 @@ export class WorldView {
    * Se comprueba contra el volumen original de cada pieza, para que al recortarla no deje de «tapar» y oscile.
    */
   private fadeOccluders(game: Game, dt: number) {
-    const pts = [game.sofaPos, ...game.carriers.filter((c) => c.human !== null).map((c) => c.pos)];
+    const pts = [game.sofaPos];
+    for (const c of game.carriers) {
+      if (c.human === null) continue;
+      const p = c.pos;
+      pts.push(p);
+      // Tumbado, el cuerpo dibujado queda hasta ~0,7 m hacia donde cayó (la cápsula sigue de pie)
+      if (c.stunned > 0) pts.push({ x: p.x + c.fallDir.x * 0.7, y: p.y - 0.3, z: p.z + c.fallDir.z * 0.7 });
+    }
     const hit = new Set<THREE.Object3D>();
     const from = this.camera.position;
     const tmp = new THREE.Vector3();

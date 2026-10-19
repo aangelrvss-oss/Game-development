@@ -78,7 +78,7 @@ export function buildLevel(): LevelView {
   addFacadeDetails(g, fadeables);
   addHouse(g);
   addNeighbourhood(g);
-  addTrees(g);
+  addTrees(g, fadeables);
   addStreetProps(g);
   addRooftopProps(g);
   const lights = addTrafficLights(g);
@@ -419,9 +419,17 @@ function tree(x: number, z: number, s = 1, hue = 0) {
   return t;
 }
 
-function addTrees(g: THREE.Group) {
+function addTrees(g: THREE.Group, fadeables: THREE.Mesh[]) {
   const list: [number, number, number][] = [[-6, 7, 1.1], [6, 13, 1], [-6, 14.5, 0.9], [6.2, 6, 0.8], [-14, 5.5, 1.2], [14, 5.6, 1.1], [-15, -11, 1], [15, -11.5, 1], [18, -38, 1.2], [30, -26, 1], [16, -40, 0.9], [-22, 2.5, 1.1], [22, 2.5, 1.2], [-9, -11.6, 0.8], [9, -11.8, 0.8]];
-  list.forEach(([x, z, s], i) => g.add(tree(x, z, s, i)));
+  // Árboles junto al recorrido (patio, aceras y camión): su copa se oculta si tapa a un jugador o al sofá.
+  // En el patio los jugadores pasan por debajo (los árboles no tienen colisión) y desaparecían de la vista.
+  const nearRoute = new Set(['-6,7', '6,13', '-6,14.5', '6.2,6', '-9,-11.6', '9,-11.8', '30,-26']);
+  list.forEach(([x, z, s], i) => {
+    const t = tree(x, z, s, i);
+    g.add(t);
+    if (!nearRoute.has(`${x},${z}`)) return;
+    for (const crown of t.children.slice(1) as THREE.Mesh[]) { crown.userData.fade = 1; crown.userData.mode = 'hide'; fadeables.push(crown); }
+  });
   // Arriates con flores en el patio
   const flowers = ['#f472b6', '#facc15', '#ef4444', '#a78bfa', '#ffffff'];
   for (const sx of [-1, 1]) {
