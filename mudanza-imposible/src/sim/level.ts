@@ -1,3 +1,5 @@
+import { PROPS } from './props';
+
 // Recorrido del vertical slice. Datos compartidos por la simulación (colisiones) y la vista (mallas).
 // Ejes: x hacia la derecha (este), y arriba, z hacia la cámara (sur). El recorrido avanza hacia -z
 // y termina hacia +x. Unidades en metros.
@@ -5,7 +7,9 @@
 export type Kind =
   | 'ground' | 'grass' | 'sidewalk' | 'road' | 'stripe' | 'crosswalk'
   | 'wall' | 'facade' | 'block' | 'roof' | 'floor' | 'stairs' | 'ramp' | 'fence' | 'hedge'
-  | 'house' | 'truck' | 'zone' | 'invisible';
+  | 'house' | 'truck' | 'zone' | 'invisible'
+  /** Choque de un objeto de decoración (lo dibuja `decor.ts` a partir de `PROPS`). */
+  | 'prop';
 
 export interface Box {
   /** Centro. */
@@ -113,6 +117,9 @@ span(12, 12.4, 0, 1.4, -28.4, -24.4, 'hedge');
 export const ZONE = { x0: 23.5, x1: 28, z0: -34, z1: -26.5 };
 span(ZONE.x0, ZONE.x1, 0, 0.02, ZONE.z0, ZONE.z1, 'zone', false);
 span(28, 34, 0, 3.4, -33.5, -27, 'truck');
+
+// --- Objetos de decoración al alcance de los jugadores: solo su caja de choque ---
+for (const o of PROPS) if (o.hit) add({ p: [o.x, (o.y ?? 0) + o.hit[1], o.z], h: o.hit, kind: 'prop', solid: true });
 
 export const LEVEL: Box[] = boxes;
 

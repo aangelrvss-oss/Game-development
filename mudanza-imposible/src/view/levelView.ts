@@ -6,6 +6,7 @@ import { LANES } from '../sim/traffic';
 import type { Vec3 } from '../sim/types';
 import { mat, ownMat, PALETTE } from './materials';
 import { textSprite } from './text';
+import { addDecor } from './decor';
 import { TEX, worldUV, windowsTex, signTex, awningTex } from './textures';
 
 /** Material de cada tipo de caja: color (que tiñe la textura) y textura con su tamaño en metros. */
@@ -81,6 +82,7 @@ export function buildLevel(): LevelView {
   addTrees(g, fadeables);
   addStreetProps(g);
   addRooftopProps(g);
+  addDecor(g);
   const lights = addTrafficLights(g);
   addTruck(g);
   const zone = addZone(g);
