@@ -101,7 +101,7 @@ export class WorldView {
     this.dynamic.clear();
     this.fx.clear();
     this.dynamic.add(this.sofa.group, this.sofa.warning);
-    this.carriers = game.carriers.map((c) => (c.human !== null ? new DollView(c, c.human, game.world, this.camera, game.sofaColliders) : new CarrierView(c, c.human, this.fx)));
+    this.carriers = game.carriers.map((c) => (c.human !== null ? new DollView(c, c.human, game.world, this.camera) : new CarrierView(c, c.human, this.fx)));
     for (const v of this.carriers) { this.dynamic.add(v.group, ...v.worldObjects()); }
     this.cars = game.cars.map((c) => new CarView(c));
     for (const v of this.cars) this.dynamic.add(v.group);
@@ -168,8 +168,8 @@ export class WorldView {
       if (c.human === null) continue;
       const p = c.pos;
       pts.push(p);
-      // Tumbado, el cuerpo dibujado queda hasta ~0,7 m hacia donde cayó (la cápsula sigue de pie)
-      if (c.stunned > 0) pts.push({ x: p.x + c.fallDir.x * 0.7, y: p.y - 0.3, z: p.z + c.fallDir.z * 0.7 });
+      // Tumbado: el centro del collider tumbado, que es donde se dibuja el cuerpo
+      if (c.down) { const k = c.collider.translation(); pts.push({ x: k.x, y: k.y, z: k.z }); }
     }
     const hit = new Set<THREE.Object3D>();
     const from = this.camera.position;

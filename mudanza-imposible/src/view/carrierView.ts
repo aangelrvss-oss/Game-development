@@ -456,17 +456,10 @@ export class CarrierView {
     if (airborne) { wantPitch = -0.25; wantRoll = Math.sin(t * 14) * 0.15; }
     let spin = 0;
     if (stunned) {
-      // Pirueta y caída de espaldas; patalea en el suelo
-      const fall = THREE.MathUtils.smoothstep(this.stunAge, 0.15, 0.55);
+      // Pirueta al salir despedido; la caída la da el collider tumbado (ver abajo), no una pose inventada
       spin = this.spinTarget * THREE.MathUtils.smoothstep(this.stunAge, 0, 0.5);
-      wantPitch = 1.35 * fall;
-      wantRoll = Math.sin(t * 7) * 0.08 * fall;
-      if (c.knock === 'balance') {
-        // De bruces, de espaldas o de lado, según hacia dónde perdió el equilibrio
-        const ff = c.fallDir.x * fwd.x + c.fallDir.z * fwd.z, fr = c.fallDir.x * right.x + c.fallDir.z * right.z;
-        wantPitch = -1.35 * ff * fall;
-        wantRoll += -1.35 * fr * fall;
-      }
+      wantPitch = 0;
+      wantRoll = 0;
     }
     // Al levantarse, salta de golpe (más rápido que al caer)
     this.pitch = damp(this.pitch, wantPitch, this.getUp > 0 ? 16 : 10, dt);
@@ -475,7 +468,16 @@ export class CarrierView {
     this.squashV += (-this.squash * 120 - this.squashV * 9) * dt;
     this.squash += this.squashV * dt;
     const sq = THREE.MathUtils.clamp(this.squash, -0.35, 0.35);
-    rig.pivot.rotation.set(this.pitch, this.yaw + spin, this.roll, 'YXZ');
+    if (c.down) {
+      // En el suelo, el cuerpo va con la pose del collider tumbado: los pies en el extremo de abajo de su eje
+      const q = c.collider.rotation(), k = c.collider.translation();
+      const qt = new THREE.Quaternion(q.x, q.y, q.z, q.w);
+      const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(qt);
+      this.group.position.set(k.x, k.y + CENTER_Y, k.z).addScaledVector(axis, -CENTER_Y);
+      rig.pivot.quaternion.copy(qt).multiply(new THREE.Quaternion().setFromAxisAngle(UP, this.yaw + spin));
+      this.pitch = 0;
+      this.roll = 0;
+    } else rig.pivot.rotation.set(this.pitch, this.yaw + spin, this.roll, 'YXZ');
     const bob = c.grounded && !stunned ? Math.abs(Math.sin(this.walk)) * 0.07 * sp : 0;
     const breathe = Math.sin(t * 2.2 + c.id) * 0.015;
     rig.body.position.y = bob + (airborne ? 0.1 : 0);
@@ -575,10 +577,12 @@ export class CarrierView {
 
     // Sombra, anillo de jugador, punto de agarre, etiqueta y estrellas
     const footY = p.y - CENTER_Y;
-    this.shadow.position.set(p.x, footY + 0.03 - Math.min(0.5, this.airT), p.z);
+    // Bajo el cuerpo, de pie o tumbado
+    const under = c.down ? c.collider.translation() : p;
+    this.shadow.position.set(under.x, footY + 0.03 - Math.min(0.5, this.airT), under.z);
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = airborne ? 0.4 : 1;
     this.shadow.scale.setScalar(rig.quadruped ? 1.1 : 1);
-    this.ring.position.set(p.x, footY + 0.04, p.z);
+    this.ring.position.set(under.x, footY + 0.04, under.z);
     this.grip.visible = !!sofaGrab;
     if (sofaGrab) this.grip.position.copy(sofaGrab);
     if (this.label) this.label.position.set(p.x, p.y + 1.2, p.z);

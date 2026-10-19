@@ -366,7 +366,9 @@ describe('Mano blanda y física única (ciclo 1)', () => {
     g.countdown = 0;
     g.sofa.setTranslation({ x, y: 0.25, z }, true);
     g.sofa.setRotation(yawQuat(yaw), true);
-    g.carriers.forEach((c, i) => c.teleport({ x: x + 5 + i * 1.5, y: standY, z: z + 6 }));
+    // Aparcados en el descampado: junto a la escalera, (x + 5, z + 6) caía dentro de la fachada y del bloque del
+    // edificio, y al salir despedidos de la pared quedaban derribados y sin poder agarrar
+    g.carriers.forEach((c, i) => c.teleport({ x: OPEN.x + 5 + i * 1.5, y: standY, z: OPEN.z + 6 }));
     play(g, 0.5);
     return g;
   }

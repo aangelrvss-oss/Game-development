@@ -5,17 +5,54 @@ import type { PlayerInput, Vec3 } from './types';
 
 type R = typeof RAPIER;
 
+/**
+ * Medidas del muñeco de los jugadores tal como está modelado (`view/doll/dollRig.ts`), medidas sobre sus mallas: radio
+ * del tronco (el peto; la cabeza es de 0,332 y la gorra de 0,336–0,348) y altura de los pies al botón de la gorra.
+ * `tests/coherence.test.ts` comprueba que siguen siendo ciertas.
+ */
+export const DOLL_MODEL = { trunkRadius: 0.359, height: 1.55 };
+
+/**
+ * Cuerpo físico del porteador: una cápsula con el volumen del muñeco que lo dibuja. Antes la cápsula era de
+ * 0,32 × 1,30 m, el muñeco de 0,359 × 1,55 m, y la vista desplazaba el muñeco para esconder lo que se metía en el sofá.
+ * Ahora coinciden:
+ * - Ancho: se ajusta el muñeco a la cápsula, que conserva sus 0,32 m de radio. El muñeco se dibuja entero a escala
+ *   `DOLL_SCALE` (0,89), con las mismas proporciones. Ensanchar la cápsula al muñeco empeoraba el juego, medido con
+ *   el piloto y los ayudantes: con 0,36 m, uno a cada lado del sofá (0,9 m) ya no pasa con él por la puerta de 1,6 m
+ *   (2 · 0,36 + 0,9 = 1,62) y con 6 ayudantes despistados se entregaban 3–4 partidas de 8 (antes 7); con 0,34 m, con
+ *   4 ayudantes atentos había hasta 9 caídas por partida y recorridos de 84 s (con 0,32 m, como mucho 2 y 38–47 s).
+ * - Alto: la cápsula mide lo que el muñeco escalado (1,38 m; la dirección artística pide unos 1,3 m), también tumbada:
+ *   con 1,30 m, la gorra quedaría fuera de pie y la cabeza, tumbado. Efecto medido: el recorrido a dos con el piloto
+ *   tarda 43,8 s (39,4 con 1,30 m), todo en la rampa; con 4 ayudantes atentos, 41,4 s de media en 24 semillas (39,9
+ *   antes de este cambio) y las mismas caídas; con 6 despistados, apelotonados en la puerta, más caídas: 6,1 por
+ *   partida (3,5 con 1,30 m y la misma caída física; 2,9 antes de este cambio).
+ * Lo que sobresale del tronco y la cabeza (nariz, tirantes, visera) queda dentro del margen de 3 cm de las pruebas.
+ * Brazos y manos no cuentan: tocar algo con ellas es agarrarlo.
+ */
+const RADIUS = 0.32;
+/** Escala a la que se dibuja el muñeco: su tronco, con el radio de la cápsula. */
+export const DOLL_SCALE = RADIUS / DOLL_MODEL.trunkRadius;
+/** Altura del muñeco dibujado, de los pies a lo alto de la gorra (m): la de la cápsula. */
+export const DOLL_HEIGHT = DOLL_MODEL.height * DOLL_SCALE;
+const HALF_HEIGHT = DOLL_HEIGHT / 2 - RADIUS;
+/** Altura del centro de la cápsula sobre los pies. */
+export const CENTER_Y = HALF_HEIGHT + RADIUS;
+
 export const CARRIER = {
-  radius: 0.32,
-  halfHeight: 0.33,
+  radius: RADIUS,
+  halfHeight: HALF_HEIGHT,
   mass: 70,
   walkSpeed: 5.2,
   carrySpeed: 3.4,
   accel: 32,
   airAccel: 6,
-  handForward: 0.42,
-  /** Altura de la mano libre (sobre el centro del porteador): también la de la sonda que busca qué agarrar. */
-  handY: 0.22,
+  /** Distancia del centro a la mano que agarra: 10 cm por delante del cuerpo. */
+  handForward: RADIUS + 0.1,
+  /**
+   * Altura de la mano libre (sobre el centro del porteador): también la de la sonda que busca qué agarrar. Las alturas
+   * de la mano se dan desde los pies (0,87 m; agarrando, de 0,55 a 1,35 m) para que no dependan de la cápsula.
+   */
+  handY: 0.87 - CENTER_Y,
   /**
    * Alzado automático: al agarrar, cada mano sube sola hasta dejar el centro del objeto a esta altura sobre los
    * pies, con el objeto nivelado (la mano va a `carryCom` más la altura local del punto agarrado). Así todas las
@@ -23,8 +60,8 @@ export const CARRIER = {
    */
   carryCom: 0.7,
   /** Límites de la mano agarrando (sobre el centro del porteador): de las caderas a los hombros. */
-  handMin: -0.1,
-  handMax: 0.7,
+  handMin: 0.55 - CENTER_Y,
+  handMax: 1.35 - CENTER_Y,
   grabReach: 1.05,
   /** Velocidad a la que la mano lleva el punto agarrado a su sitio y a la altura de carga (m/s). */
   handSpeed: 1.4,
@@ -70,9 +107,21 @@ export const CARRIER = {
   stumbleMaxTime: 1.4,
   /** Tiempo en el suelo tras perder el equilibrio (s). */
   fallTime: 1.3,
+  // Caída física: el collider se tumba de verdad (`Carrier.stepDown`)
+  /** Tiempo que tarda en quedar tumbado (s). */
+  fallSwing: 0.35,
+  /** Lo que dura levantarse, al final del tiempo en el suelo (s). */
+  riseTime: 0.6,
+  /**
+   * Solape tolerado al comprobar si una pose cabe (m): el mismo margen que la prueba de penetración. Tumbado en
+   * llano, la cápsula toca el suelo; en la escalera (20°), se mete en ella 2,2 cm.
+   */
+  fitTol: 0.03,
+  /** Si al levantarse no hay sitio, se aparta a rastras a esta velocidad (m/s) hacia un hueco cercano. */
+  crawlSpeed: 0.8,
+  /** Tras esperar esto sin sitio ni hueco al que apartarse (s), se levanta igualmente (lo empuja la física). */
+  maxWaitRoom: 4,
 };
-
-export const CENTER_Y = CARRIER.halfHeight + CARRIER.radius;
 
 export type Cast = 'mono' | 'rulos' | 'gordo' | 'alien' | 'enano' | 'perro';
 export const CAST: { cast: Cast; name: string; color: string }[] = [
@@ -86,6 +135,23 @@ export const CAST: { cast: Cast; name: string; color: string }[] = [
 
 type V2 = { x: number; z: number };
 const len2 = (v: V2) => Math.hypot(v.x, v.z);
+const smooth = (t: number) => { const x = Math.min(1, Math.max(0, t)); return x * x * (3 - 2 * x); };
+
+/**
+ * Pose del collider (local al cuerpo) inclinado `a` rad hacia la dirección horizontal `d`. Gira alrededor del centro
+ * de la esfera de abajo de la cápsula (a un radio sobre los pies), que no se mueve ni se hunde en el suelo.
+ */
+export function tiltPose(d: V2, a: number) {
+  const h = Math.sin(a / 2), hh = CARRIER.halfHeight, s = Math.sin(a) * hh;
+  return {
+    // Giro alrededor del eje horizontal perpendicular a `d` (Y × d): el eje de la cápsula se va hacia `d`
+    rot: { x: d.z * h, y: 0, z: -d.x * h, w: Math.cos(a / 2) },
+    off: { x: d.x * s, y: (Math.cos(a) - 1) * hh, z: d.z * s },
+  };
+}
+
+/** Direcciones de caída que se prueban, por orden de preferencia (giro respecto a la pedida, rad). */
+const FALL_TRY = [0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2, 2.6, -2.6, Math.PI];
 
 /** Resultado del equilibrio en un paso, para los sucesos de la partida. */
 export type BalanceEvent = 'wobble' | 'fall' | 'steady' | null;
@@ -136,8 +202,26 @@ export class Carrier implements HandOwner {
   falls = 0;
   /** Cómo cayó la última vez: atropello o equilibrio (la vista anima distinto cada caso). */
   knock: 'car' | 'balance' = 'car';
-  /** Dirección de la caída por equilibrio. */
+  /**
+   * Dirección de la caída: la pedida (hacia donde perdió el equilibrio o le lanzó el golpe) y, al empezar a caer, la
+   * elegida con consultas de forma (`planFall`), que es hacia donde se tumba de verdad el collider.
+   */
   fallDir: V2 = { x: 0, z: 1 };
+  /**
+   * Caída física. `down` es la fase (null: de pie) y `tilt`, el ángulo del eje de la cápsula con la vertical (0 de pie,
+   * unos π/2 tumbado), hacia `fallDir`. El collider se gira de verdad (`tiltPose`) y la vista dibuja el cuerpo con su
+   * pose: lo que se ve tumbado es lo que choca.
+   */
+  down: 'falling' | 'lying' | 'rising' | null = null;
+  tilt = 0;
+  private tiltGoal = 0;
+  private riseFrom = 0;
+  private downTime = 0;
+  /** Tiempo esperando sitio para levantarse, y hacia dónde se aparta a rastras mientras tanto (o null). */
+  private waitRoom = 0;
+  private crawl: V2 | null = null;
+  /** Forma con la que se comprueba si una pose cabe: la cápsula, menos el solape tolerado (`fitTol`). */
+  private probe: RAPIER.Capsule;
   /** Fuerza horizontal medida sobre el cuerpo (N, suavizada) y la que espera (con retraso). */
   private force: V2 = { x: 0, z: 0 };
   private forceExp: V2 = { x: 0, z: 0 };
@@ -170,6 +254,7 @@ export class Carrier implements HandOwner {
         .setActiveEvents(R.ActiveEvents.COLLISION_EVENTS),
       this.body,
     );
+    this.probe = new R.Capsule(CARRIER.halfHeight, CARRIER.radius - CARRIER.fitTol);
   }
 
   get pos(): Vec3 { return this.body.translation(); }
@@ -313,6 +398,8 @@ export class Carrier implements HandOwner {
     if (this.stunned > 0) { mx = 0; mz = 0; }
     const speed = this.holding ? CARRIER.carrySpeed : CARRIER.walkSpeed;
     let tx = mx * speed, tz = mz * speed;
+    // En el suelo sin sitio para levantarse: se aparta a rastras hacia un hueco (`stepDown`)
+    if (this.crawl) { tx = this.crawl.x * CARRIER.crawlSpeed; tz = this.crawl.z * CARRIER.crawlSpeed; }
     // Suelo debajo
     const ray = new this.R.Ray(this.pos, { x: 0, y: -1, z: 0 });
     const hit = this.world.castRayAndGetNormal(ray, CENTER_Y + 0.12, true, undefined, undefined, undefined, this.body);
@@ -410,6 +497,146 @@ export class Carrier implements HandOwner {
     return false;
   }
 
+  /**
+   * Se cae (pierde el equilibrio o le derriban) hacia `dir` y pasa `time` s en el suelo: suelta lo que agarra y, en el
+   * paso siguiente, `stepDown` tumba el collider hacia `dir` o, si no cabe, hacia el sitio libre más parecido.
+   */
+  knockDown(dir: V2, time: number, knock: 'car' | 'balance') {
+    this.fallDir = { x: dir.x, z: dir.z };
+    this.knock = knock;
+    this.stunned = time;
+    this.release();
+    this.resetBalance();
+  }
+
+  /**
+   * Caída física, antes de `world.step`: cuenta el tiempo en el suelo y mueve el collider. Al empezar elige hacia
+   * dónde tumbarse (`planFall`) y se tumba en `fallSwing` s; al final se levanta en `riseTime` s, pero solo si cabe
+   * de pie y en todo el giro. Si no cabe, sigue en el suelo y se aparta a rastras hacia el hueco más cercano.
+   */
+  stepDown(dt: number) {
+    if (this.stunned <= 0 && !this.down) return;
+    if (!this.down) this.planFall();
+    if (this.down === 'falling') {
+      this.downTime += dt;
+      const u = Math.min(1, this.downTime / CARRIER.fallSwing);
+      this.tilt = this.tiltGoal * u * u; // cae acelerando
+      if (u >= 1) this.down = 'lying';
+    }
+    if (this.down !== 'rising') {
+      // El tiempo en el suelo no baja de lo que dura levantarse hasta que empieza a levantarse
+      this.stunned = Math.max(CARRIER.riseTime, this.stunned - dt);
+      if (this.down === 'lying' && this.stunned <= CARRIER.riseTime) {
+        if (this.roomToRise() || this.waitRoom > CARRIER.maxWaitRoom) {
+          this.down = 'rising';
+          this.riseFrom = this.tilt;
+          this.crawl = null;
+        } else {
+          this.waitRoom += dt;
+          this.crawl = this.findRoom();
+        }
+      }
+    }
+    if (this.down === 'rising') {
+      this.stunned = Math.max(0, this.stunned - dt);
+      this.tilt = this.riseFrom * smooth(this.stunned / CARRIER.riseTime);
+      if (this.stunned <= 0) { this.down = null; this.tilt = 0; }
+    }
+    this.applyTilt();
+  }
+
+  /** Pone el collider en la pose de `tilt` hacia `fallDir` (con `tilt` 0, la cápsula de pie de siempre). */
+  private applyTilt() {
+    const { rot, off } = tiltPose(this.fallDir, this.tilt);
+    this.collider.setRotationWrtParent(rot);
+    this.collider.setTranslationWrtParent(off);
+  }
+
+  /**
+   * Elige hacia dónde se tumba, con consultas de forma contra todo (sofá, paredes, otros porteadores, coches): la
+   * dirección pedida si la cápsula cabe tumbada en ella y en todo el giro; si no, la libre más parecida. Si no cabe
+   * tumbada en ninguna (acorralado), la que más deja inclinarse: queda recostado contra lo que tiene al lado.
+   */
+  private planFall() {
+    const d0 = this.fallDir;
+    let best: { d: V2; a: number; score: number } | null = null;
+    for (const t of FALL_TRY) {
+      const c = Math.cos(t), s = Math.sin(t);
+      const d = { x: d0.x * c - d0.z * s, z: d0.x * s + d0.z * c };
+      const goal = this.lieAngle(d);
+      const a = this.freeTilt(d, goal ?? Math.PI / 2);
+      if (goal !== null && a >= goal - 1e-6) { best = { d, a, score: Infinity }; break; }
+      // Sin sitio para tumbarse del todo, o sobre un borde (quedaría colgando): vale menos
+      const score = a - (goal === null ? 1 : 0);
+      if (!best || score > best.score + 0.05) best = { d, a, score };
+    }
+    this.fallDir = best!.d;
+    this.tiltGoal = best!.a;
+    this.down = 'falling';
+    this.downTime = 0;
+    this.waitRoom = 0;
+    this.crawl = null;
+  }
+
+  /** ¿Cabe la cápsula inclinada `a` rad hacia `d`, con el cuerpo en `at`, sin solaparse más de `fitTol` con nada? */
+  private fits(d: V2, a: number, at: Vec3 = this.pos): boolean {
+    const { rot, off } = tiltPose(d, a);
+    let hit = false;
+    const c = { x: at.x + off.x, y: at.y + off.y, z: at.z + off.z };
+    this.world.intersectionsWithShape(c, rot, this.probe, () => { hit = true; return false; }, undefined, undefined, this.collider);
+    return !hit;
+  }
+
+  /** Mayor inclinación hacia `d` (hasta `goal`) a la que llega sin chocar con nada en todo el giro (rad). */
+  private freeTilt(d: V2, goal: number): number {
+    const n = Math.max(2, Math.ceil(goal / 0.2));
+    let free = 0;
+    for (let i = 1; i <= n; i++) {
+      const a = (goal * i) / n;
+      if (!this.fits(d, a)) break;
+      free = a;
+    }
+    return free;
+  }
+
+  /**
+   * Inclinación con la que queda tumbado hacia `d`, apoyado en el suelo (en pendiente, con la cabeza más alta o más
+   * baja que los pies), o null si ahí no hay suelo a su altura (un borde, un escalón hacia abajo).
+   */
+  private lieAngle(d: V2): number | null {
+    const p = this.pos, hh = CARRIER.halfHeight, feet = p.y - CENTER_Y;
+    // Suelo fijo bajo los pies y bajo la cabeza (puede caer en el aire: cuenta dónde quedará apoyado)
+    const ground = (x: number, z: number) => {
+      const hit = this.world.castRay(new this.R.Ray({ x, y: feet + 1, z }, { x: 0, y: -1, z: 0 }), 2.5, true, this.R.QueryFilterFlags.ONLY_FIXED);
+      return hit ? feet + 1 - hit.timeOfImpact : null;
+    };
+    const g0 = ground(p.x, p.z), g1 = ground(p.x + d.x * 2 * hh, p.z + d.z * 2 * hh);
+    if (g0 === null || g1 === null || g1 < g0 - 0.45) return null;
+    // Las dos esferas de la cápsula, a un radio de su suelo
+    const cos = (g1 - g0) / (2 * hh);
+    return Math.acos(Math.max(-0.45, Math.min(0.6, cos)));
+  }
+
+  /** ¿Cabe de pie donde está, y en todo el giro desde el suelo? */
+  private roomToRise() {
+    for (const k of [0.7, 0.35, 0]) if (!this.fits(this.fallDir, this.tilt * k)) return false;
+    return true;
+  }
+
+  /** Hueco más cercano (hasta 1,2 m) donde cabe de pie y hay suelo: hacia dónde apartarse a rastras, o null. */
+  private findRoom(): V2 | null {
+    const p = this.pos;
+    const down = new this.R.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 });
+    for (const r of [0.4, 0.8, 1.2]) for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2, d = { x: Math.cos(a), z: Math.sin(a) };
+      const at = { x: p.x + d.x * r, y: p.y, z: p.z + d.z * r };
+      if (!this.fits(d, 0, at)) continue;
+      down.origin = at;
+      if (this.world.castRay(down, CENTER_Y + 0.3, true, this.R.QueryFilterFlags.ONLY_FIXED)) return d;
+    }
+    return null;
+  }
+
   teleport(p: Vec3) {
     this.release();
     this.body.setTranslation(p, true);
@@ -482,11 +709,7 @@ export class Carrier implements HandOwner {
       this.wobbleTime += dt;
       this.calmTime = l < CARRIER.regainBelow ? this.calmTime + dt : 0;
       if ((l > CARRIER.fallAt && this.wobbleTime > CARRIER.stumbleMin) || l > 1.1 || (this.wobbleTime > CARRIER.stumbleMaxTime && l > CARRIER.loseAt)) {
-        this.fallDir = { x: D.x / l, z: D.z / l };
-        this.knock = 'balance';
-        this.stunned = CARRIER.fallTime;
-        this.release();
-        this.resetBalance();
+        this.knockDown({ x: D.x / l, z: D.z / l }, CARRIER.fallTime, 'balance');
         this.falls++;
         return 'fall';
       }

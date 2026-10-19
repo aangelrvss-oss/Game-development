@@ -26,7 +26,8 @@ function setup(n: number, x = OPEN.x, z = OPEN.z, yaw = 0) {
   g.phase = 'playing'; g.countdown = 0;
   g.sofa.setTranslation({ x, y: 0.25, z }, true);
   g.sofa.setRotation(yawQuat(yaw), true);
-  g.carriers.forEach((c, i) => c.teleport({ x: x + 5 + i * 1.5, y: standY, z: z + 6 }));
+  // Aparcados en el descampado (junto a la escalera, (x + 5, z + 6) caía dentro del edificio)
+  g.carriers.forEach((c, i) => c.teleport({ x: OPEN.x + 5 + i * 1.5, y: standY, z: OPEN.z + 6 }));
   play(g, 0.5);
   return g;
 }

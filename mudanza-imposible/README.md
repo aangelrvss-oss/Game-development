@@ -47,7 +47,7 @@ Cuando todos los porteadores son humanos (por defecto, 2 de 2), se activa la fí
 
 Con ayudantes de la máquina se mantiene la física original (sofá ligero, fuerza sin límite y sin pérdidas de equilibrio). Los ayudantes y el piloto automático están ajustados a ella; con la física cooperativa los ayudantes sueltan y reagarran para desatascarse y se caían una y otra vez.
 
-**Por qué esta ruta.** El juego ya tenía partida completa, dos jugadores en un teclado, cronómetro, victoria, reinicio, sonido y pruebas; faltaba que hiciera falta cooperar y que hubiera tropiezos y caídas. Del laboratorio se trajo primero el modelo de equilibrio (la física) y después el muñeco (ver [Personajes](#personajes-el-muñeco-del-laboratorio)). La caída reutiliza el estado «tumbado» del juego, ya estable, en lugar de volcar la cápsula física como en el laboratorio.
+**Por qué esta ruta.** El juego ya tenía partida completa, dos jugadores en un teclado, cronómetro, victoria, reinicio, sonido y pruebas; faltaba que hiciera falta cooperar y que hubiera tropiezos y caídas. Del laboratorio se trajo primero el modelo de equilibrio (la física) y después el muñeco (ver [Personajes](#personajes-el-muñeco-del-laboratorio)). Al principio la caída solo se dibujaba; desde el ciclo 1 la cápsula física se tumba de verdad (ver [Coherencia entre dibujo y física](#coherencia-entre-dibujo-y-física-ciclo-1)).
 
 ## Personajes: el muñeco del laboratorio
 
@@ -64,8 +64,9 @@ Los jugadores humanos usan el muñeco desarrollado en `../mudanza-imposible-char
 | Física del personaje del laboratorio (cápsula que se vuelca, control propio, agarre) | **No** | Habría sustituido la física cooperativa que ya funciona. El muñeco del laboratorio solo lee datos; no mueve nada físico |
 | Equilibrio, caer y levantarse | Ya estaba (simplificado) en `carrier.ts` | El muñeco lo dibuja con sus propios gestos |
 
-**Adaptador** (`src/view/doll/dollView.ts`). Traduce el porteador del juego a lo que lee el muñeco (`DollSource`): estado, velocidad, orientación, desequilibrio, agarre y esfuerzo (sale de la tensión del agarre). Dos diferencias con el laboratorio:
-- **Caída.** En el juego, la cápsula sigue de pie mientras el porteador está en el suelo. El giro del cuerpo tumbado (hacia donde perdió el equilibrio, o hacia donde le lanzó un coche) y el levantarse se sintetizan aquí, girando alrededor de los pies y sin bajar del suelo.
+**Adaptador** (`src/view/doll/dollView.ts`). Traduce el porteador del juego a lo que lee el muñeco (`DollSource`): estado, velocidad, orientación, desequilibrio, agarre y esfuerzo (sale de la tensión del agarre). Diferencias con el laboratorio:
+- **Escala.** El muñeco se dibuja a escala 0,89 (`DOLL_SCALE`): su tronco tiene el radio de la cápsula física (0,32 m) y su altura, la de la cápsula (1,38 m).
+- **Caída.** El collider del porteador se tumba de verdad (`Carrier.stepDown`) y el muñeco se dibuja con su pose, sin inventarla.
 - **Altura del suelo.** El laboratorio la tenía como función; aquí es un rayo de Rapier solo contra la geometría fija (ni el sofá ni otros porteadores).
 
 **Identificación.** J1 conserva los colores originales (peto y gorra rojos). J2 lleva peto y gorra turquesa y pelo oscuro; J3 y J4 tienen variantes rosa y verde. Además, cada uno tiene su aro y su etiqueta de color, y su nombre en la interfaz («Porteador rojo», «Porteador turquesa»).
@@ -79,8 +80,7 @@ Los jugadores humanos usan el muñeco desarrollado en `../mudanza-imposible-char
 
 **Límites del muñeco en el juego:**
 - **La cara se ve poco con la cámara del juego.** La cámara es alta y desde el sur, y al llevar el sofá hacia el norte se les ve sobre todo de espaldas y desde arriba: se les reconoce por la gorra, el color del peto, el aro y la etiqueta. Solo giran la cabeza hacia la cámara (hasta 1 rad) cuando hacen mucha fuerza o se tambalean.
-- **El muñeco es unos 4 cm más ancho que su cápsula.** Desde el 19-10-2026, si el tronco o la cabeza entran en el sofá, el dibujo se aparta lo justo (ver [Colisiones con el sofá](#colisiones-con-el-sofá-corregido-el-19-10-2026)). Contra paredes y otros objetos puede rozar unos centímetros.
-- **El cuerpo tumbado es dibujo:** la cápsula física sigue de pie. Desde el 19-10-2026 se dibuja hacia una dirección libre de sofá y paredes. Si no hay ninguna libre (un rincón), puede seguir entrando en una pared.
+- **Lo dibujado es el cuerpo físico** (desde el ciclo 1; antes el muñeco era 4 cm más ancho que la cápsula y el dibujo se apartaba del sofá para esconderlo). Ver [Coherencia entre dibujo y física](#coherencia-entre-dibujo-y-física-ciclo-1).
 - **No lleva contorno de dibujo animado** como el resto del juego. Es un diseño provisional.
 - **Coste de dibujo.** Con los materiales físicos del laboratorio (capa transparente y brillo de tela), dos muñecos dejaban el render por software de este contenedor en 3,7 fotogramas por segundo. Las pruebas en tiempo real empezaron a fallar porque algunas pulsaciones cortas caían entre dos fotogramas.
   - En el juego, el muñeco usa materiales estándar, como el resto de la escena, y solo sus piezas grandes proyectan sombra.
@@ -171,6 +171,7 @@ En el gameplay, los porteadores parecían atravesar el sofá. Se midió antes de
 3. **En la vista, el dibujo se distingue de la cápsula de forma explícita** (`DollView`):
    - Si el tronco o la cabeza dibujados entran en el sofá, el muñeco se aparta lo justo y de forma suave: hasta 20 cm de pie y 60 cm tumbado. Nunca mientras agarra, para que las manos sigan en el asa.
    - Al caer, el cuerpo se dibuja hacia la dirección del golpe si cabe; si no, hacia la dirección libre más parecida, comprobando el sofá y las paredes.
+   - *Retirado en el ciclo 1:* apartar el dibujo escondía los solapes en vez de evitarlos. Ver [Coherencia entre dibujo y física](#coherencia-entre-dibujo-y-física-ciclo-1).
 
 **En el modo con ayudantes no se activó el choque al agarrar.** Se probó y su fuerza sin límite empujaba y lanzaba el sofá: 4 de 8 partidas de prueba acababan con el sofá roto, y 6 de 10 aun limitando su empuje. Además, la mano que sigue al sofá arrastraba a los cuatro ayudantes a su alrededor. Ese modo queda exactamente como antes: mismos resultados en las simulaciones de referencia. En él, el jugador humano puede seguir solapando el sofá al girarlo agarrado.
 
@@ -194,6 +195,29 @@ En el gameplay, los porteadores parecían atravesar el sofá. Se midió antes de
 - Soltar tirando: 36 de 42 caídas ahora, 37 antes; tambaleo en los 42 casos en las dos versiones.
 - Girar primero y soltar después: 16 de 24 caídas en las dos versiones.
 - El recorrido a dos con el piloto automático se completa (42,4 s, antes 46,4 s).
+
+## Coherencia entre dibujo y física (ciclo 1)
+
+Objetivos T-coh-1 y T-coh-2 de `docs/quality/cycles/ciclo-1.md`. Ya no hay desplazamiento del dibujo (`visOff`): lo que se ve es lo que choca.
+
+**Anchura y altura.** El muñeco medía 0,359 m de tronco y 1,55 m con la gorra; la cápsula, 0,32 × 1,30 m.
+- Se ajusta el muñeco a la cápsula: se dibuja entero a escala 0,89, con las mismas proporciones (`DOLL_MODEL` y `DOLL_SCALE` en `carrier.ts`). La cápsula conserva su radio y pasa a medir lo que el muñeco escalado, 1,38 m (la dirección artística pide unos 1,3 m).
+- Ensanchar la cápsula al muñeco empeoraba el juego. Con 0,36 m, uno a cada lado del sofá ya no pasa con él por la puerta de 1,6 m (2 · 0,36 + 0,9 = 1,62 m), y con 6 ayudantes despistados se entregaban 3 o 4 partidas de 8. Con 0,34 m, con 4 ayudantes atentos había partidas con 9 caídas y 84 s.
+- La nariz, la visera y los tirantes se han recortado un poco: sobresalen de la cápsula 1,5 cm como mucho. Aplastado, el tronco se acorta sin ensancharse.
+- Lo que cuesta la cápsula más alta: el recorrido a dos con el piloto pasa de 39,4 s a 43,8 s (todo en la rampa); con 4 ayudantes atentos, de 39,9 s a 41,4 s de media (24 semillas). Con 6 ayudantes despistados se entregan las mismas partidas (23 de 24), pero hay más caídas: 6,1 por partida frente a 2,9.
+
+**Inclinarse sin atravesar.** El muñeco se inclina (desequilibrio, tirar), se mece al andar y cabecea alrededor de los pies, pero la cápsula de pie no. Antes de dibujarlo, pregunta qué parte de esa inclinación cabe (`fitTilt`, una consulta de forma con bisección) y se queda en eso. Contra una pared o el sofá se inclina menos; nunca se desplaza.
+
+**Caída física** (`Carrier.stepDown`).
+- Al caer o ser derribado, el collider se tumba de verdad (`setRotationWrtParent` y `setTranslationWrtParent`) en 0,35 s, girando alrededor de la esfera de los pies.
+- La dirección se elige con consultas de forma contra todo (sofá, paredes, otros porteadores): la del golpe si la cápsula cabe tumbada y en todo el giro; si no, la libre más parecida; acorralado, la que más deja inclinarse, y queda recostado.
+- Al levantarse, vuelve a la cápsula de pie solo si cabe. Si no, espera en el suelo y se aparta a rastras hacia el hueco más cercano.
+- El muñeco (y el dibujo de los ayudantes) se pinta con la pose del collider; la cámara despeja las paredes que tapan el cuerpo tumbado.
+
+**Medidas** (`tests/coherence.test.ts`, Node):
+- Tronco y cabeza dibujados, metidos en algo: 0,1 cm empujando el sofá, 0 llevándolo y girándolo, 0 tambaleándose hacia él (0,7 rad), 1,5 cm andando contra una pared y 1,1 cm pegado a ella.
+- Caídas en 6 direcciones junto al sofá (respaldo y extremo), una pared y otro porteador: el collider se solapa 1,2 cm como mucho, queda tumbado (1,57 rad) y de pie a los 1,27 s. Acorralado en una celda de 1,1 m: recostado 0,37 rad, solape 0,6 cm. Con una balda encima: espera 1,2 s, se aparta y se levanta a 0,96 m.
+- En el navegador (`scripts/sofa-contact-check.cjs`), el cuerpo dibujado ya no entra en el sofá más que la cápsula (como mucho 5,7 cm frente a 6,1 cm de la cápsula, al chocar a la carrera).
 
 ## Escenario: decoración por zonas
 
@@ -351,7 +375,7 @@ mudanza-imposible/
   src/view/             dibujo con Three.js (escena, sofá, personajes, coches, efectos, cámara)
     textures.ts         texturas procedurales (asfalto, baldosa, ladrillo, tablas, tejas, chapa, tela, fachadas)
     decor.ts            decoración por zonas: objetos de props.ts y detalles sin choque
-    doll/               muñeco del laboratorio adaptado a los jugadores (dibujo separado de la cápsula física)
+    doll/               muñeco del laboratorio adaptado a los jugadores (dibuja la cápsula física: anchura, altura y pose)
   src/input/inputCore.ts  entradas sin DOM: teclas de J1–J4, mandos por Gamepad.index, pulsaciones retenidas y paso fijo
   src/input/input.ts    conexión con los eventos de teclado y la Gamepad API del navegador
   src/audio/sfx.ts      sonidos sintetizados
@@ -661,7 +685,7 @@ Ninguno contiene recursos 3D utilizables. Del segundo solo se tomó como referen
 - Las constantes de la física cooperativa (`CARRIER.pullForce`, `releaseKick`, `deadZone`, `shoveGain`, `SOFA.coopMass`, `coopFriction`): ajustadas con simulaciones y con el piloto automático, **no con personas**. Pueden resultar demasiado blandas o demasiado castigadoras.
 - La ayuda de muñecas y sus constantes: `RULES.wristK`, `wristDamp` y los umbrales de daño, sin ajustar con jugadores.
 - Los mandos están implementados con la asignación estándar, pero **no se han probado con un mando físico**. Las pruebas automáticas solo usan teclado.
-- Las animaciones son procedurales (ver [Pase visual](#pase-visual-y-de-animación)). No hay animación esquelética ni caídas tipo muñeco de trapo: el porteador sigue siendo una cápsula física y el cuerpo dibujado reacciona a su estado.
+- Las animaciones son procedurales (ver [Pase visual](#pase-visual-y-de-animación)). No hay animación esquelética ni caídas tipo muñeco de trapo: el porteador es una cápsula física que se tumba al caer, y el cuerpo dibujado la sigue.
 - La escalera física es una rampa lisa con peldaños dibujados encima.
 
 **No existe todavía**
@@ -697,7 +721,7 @@ Las comprobaciones de arriba son técnicas. Que la demo sea divertida es una **h
   - **No la ha jugado ninguna persona.** Todo lo de arriba son pulsaciones enviadas por scripts y el piloto automático.
   - **Teclados que no registran tantas teclas a la vez.** Algunos teclados no admiten más de unas pocas pulsaciones simultáneas (por ejemplo, WASD, flechas y las dos Mayús). Es una limitación del teclado, no del juego. Con un mando para cada uno no pasa.
   - **Velocidad del piloto con dos.** Con dos porteadores y la física cooperativa, el piloto automático tarda 42,4 s (46,4 s antes de corregir las colisiones; 34 s sin el límite de fuerza). La escalera es el tramo más lento.
-  - **Las caídas no usan física de cuerpo.** La cápsula sigue de pie y el muñeco dibujado cae hacia donde se desequilibró, o hacia la dirección libre más parecida si ahí hay sofá o pared. Es la solución estable más sencilla.
+  - **Las caídas son de cápsula, no de muñeco de trapo.** Desde el ciclo 1 el collider se tumba hacia una dirección libre y el muñeco se dibuja con su pose; brazos y piernas siguen siendo solo dibujo.
   - **Chocar a la carrera con el sofá** mete la cápsula de 5 a 8 cm durante 1–3 pasos de física; el motor lo resuelve enseguida.
   - **Agarrar y girar el sofá ya no lo atraviesa, pero el giro se siente distinto.** Quien agarra se queda frente a su punto de agarre y el sofá le arrastra al girar. Las medidas de giro, tirones y caídas no cambian, pero falta comprobar con personas si se entiende.
 

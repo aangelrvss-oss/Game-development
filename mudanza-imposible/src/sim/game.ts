@@ -236,7 +236,8 @@ export class Game {
           else if (c.tryGrabAny(this.grabbables)) this.emit({ type: 'grab', carrier: c.id, pos: c.handWorld() });
         }
       }
-      if (c.stunned > 0) c.stunned = Math.max(0, c.stunned - dt);
+      // En el suelo: el collider se tumba de verdad y se levanta cuando hay sitio
+      c.stepDown(dt);
       c.control(inp, dt, this.isLoad);
     }
 
@@ -318,13 +319,9 @@ export class Game {
 
   private stun(c: Carrier) {
     if (c.stunned > 0) return;
-    c.stunned = CARRIER.stunTime;
-    c.knock = 'car';
     // Sale despedido hacia donde le lleva el golpe (o de espaldas si apenas se mueve)
     const v = c.body.linvel(), sp = Math.hypot(v.x, v.z);
-    c.fallDir = sp > 1 ? { x: v.x / sp, z: v.z / sp } : { x: -c.facing.x, z: -c.facing.z };
-    c.resetBalance();
-    if (c.holding) c.release();
+    c.knockDown(sp > 1 ? { x: v.x / sp, z: v.z / sp } : { x: -c.facing.x, z: -c.facing.z }, CARRIER.stunTime, 'car');
     this.emit({ type: 'stun', carrier: c.id, pos: c.pos });
   }
 
