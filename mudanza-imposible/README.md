@@ -1,6 +1,6 @@
 # La Mudanza Imposible · vertical slice físico
 
-Demo jugable en el navegador **para dos personas en el mismo teclado**. Entre los dos hay que llevar un sofá desde una casa hasta un camión de mudanzas. Por el camino hay una calle con tráfico, una puerta estrecha, una escalera con giro de 90° y una rampa de chapa sin barandilla. El sofá pesa: uno solo lo arrastra por un extremo a menos de la mitad de velocidad y no puede subirlo por la escalera. Si uno suelta mientras tira, se tambalea y puede acabar en el suelo.
+Demo jugable en el navegador **para 1 a 4 personas, en el mismo teclado o con mandos** (por defecto, dos en un teclado). Entre los dos hay que llevar un sofá desde una casa hasta un camión de mudanzas. Por el camino hay una calle con tráfico, una puerta estrecha, una escalera con giro de 90° y una rampa de chapa sin barandilla. El sofá pesa: uno solo lo arrastra por un extremo a menos de la mitad de velocidad y no puede subirlo por la escalera. Si uno suelta mientras tira, se tambalea y puede acabar en el suelo.
 
 Todo lo que ocurre sale de la simulación física (Rapier). No hay animaciones prefabricadas que muevan el sofá.
 
@@ -22,10 +22,10 @@ npm ci               # instala las versiones exactas del package-lock
 npm run dev          # abre http://localhost:5173
 ```
 
-1. En el menú ya están elegidos **2 jugadores y 2 porteadores** (sin ayudantes). Pulsa **Intro** o «¡A mover!».
-2. **J1** (muñeco de peto y gorra rojos, aro amarillo): **WASD** para moverse, **Espacio** para agarrar o soltar y **Mayús izquierda** para alzar.
-3. **J2** (muñeco de peto y gorra turquesa, aro azul claro): **flechas** para moverse, **Intro** para agarrar o soltar y **Mayús derecha** para alzar.
-4. Cada uno se pone en un extremo del sofá, lo agarran y lo llevan hacia arriba de la pantalla. El aro amarillo en el suelo marca el siguiente objetivo. **En la escalera hay que alzarlo** (mantener Mayús); la pantalla lo recuerda al llegar.
+1. En el menú ya están elegidos **2 jugadores y 2 porteadores** (sin ayudantes). Pulsa **Intro**, «¡A mover!» o **A**/**Start** en un mando. Las flechas o la cruceta del mando cambian las opciones.
+2. **J1** (muñeco de peto y gorra rojos, aro amarillo): **WASD** para moverse y **Espacio** para agarrar o soltar.
+3. **J2** (muñeco de peto y gorra turquesa, aro azul claro): **flechas** para moverse e **Intro** para agarrar o soltar. **J3** usa **IJKL** y **U**; **J4**, el teclado numérico (**8 4 5 6** y **0**). Con mandos, el teclado lleva a los primeros jugadores y los mandos, a los últimos.
+4. Cada uno se pone en un extremo del sofá, lo agarran y lo llevan hacia arriba de la pantalla. El aro amarillo en el suelo marca el siguiente objetivo. **No hay tecla de alzar:** al agarrar, las manos suben el sofá solas. Uno solo apenas lo arrastra por un extremo; entre dos va en el aire y sube la escalera.
 5. **Objetivo:** dejar el sofá en la zona verde junto al camión en menos de 3 minutos sin destrozarlo. **Retroceso** reinicia en cualquier momento; en la pantalla final, **Intro** vuelve a empezar.
 
 Para ver una partida completa sin tocar nada, usa «Ver demo automática» o abre `http://localhost:5173/?auto=1` (1 jugador con ayudantes).
@@ -260,16 +260,20 @@ No se ha construido nada de esta arquitectura todavía: no hacía falta para cor
 
 ## Controles
 
-| Acción | J1 (teclado) | J2 (teclado) | Mando (J1–J4) |
-|---|---|---|---|
-| Moverse | W A S D | Flechas | Stick izquierdo o cruceta |
-| Agarrar / soltar | Espacio | Intro | A |
-| Alzar (mantener) | Mayús izq. | Mayús dcha. | B o gatillos |
-| Girar el sofá (rodeándolo; también tus ayudantes) | Q / E | , / . | LB / RB |
-| Enderezar el sofá volcado | R | - | Y |
-| Pausa | Esc | | Start |
-| Reiniciar | Retroceso | | Start (en resultados) |
-| Silenciar | M | | |
+| Acción | J1 | J2 | J3 | J4 | Mando |
+|---|---|---|---|---|---|
+| Moverse | W A S D | Flechas | I J K L | Numérico 8 4 5 6 | Stick izquierdo o cruceta |
+| Agarrar / soltar (la carga sube sola) | Espacio | Intro | U | Numérico 0 | A |
+| Enderezar el sofá volcado | R | - | O | Numérico + | Y |
+| Pedir un giro a los ayudantes (opcional; quien lo pide rodea el sofá) | Q / E | , / . | H / Ñ | Numérico 7 / 9 | LB / RB |
+| Pausa | Esc | | | | Start (cualquier mando) |
+| Reiniciar | Retroceso | | | | Start o A (en resultados) |
+| Silenciar | M | | | | |
+
+- **Mandos.** Se identifican por `Gamepad.index`. Al empezar la partida, el teclado lleva a los primeros jugadores y los mandos, por orden de índice, a los últimos: con 4 jugadores y 2 mandos, J1 y J2 juegan con el teclado y J3 y J4 con mando; con 2 jugadores y 2 mandos, uno cada uno. El menú muestra el reparto antes de empezar.
+- Durante la partida nadie cambia de mando. Si uno se desconecta, al volver recupera su jugador; un mando nuevo va a quien se quedó sin el suyo o al último jugador sin mando. El botón con el que el navegador descubre un mando no cuenta como pulsación.
+- **Pulsaciones.** Agarrar y enderezar se guardan hasta el siguiente paso de física: no se pierden en pantallas de más de 60 Hz, donde hay fotogramas sin ningún paso. La lógica está en `src/input/inputCore.ts`, sin DOM, y la prueban `tests/input.test.ts`.
+- Cuatro personas en un mismo teclado pueden saturarlo (fantasmas de teclas, según el teclado). Con mandos no pasa.
 
 **Objetivo:** dejar el sofá en la zona amarilla junto al camión en menos de 3 minutos, sin que su estado llegue a 0 %.
 
@@ -348,10 +352,12 @@ mudanza-imposible/
     textures.ts         texturas procedurales (asfalto, baldosa, ladrillo, tablas, tejas, chapa, tela, fachadas)
     decor.ts            decoración por zonas: objetos de props.ts y detalles sin choque
     doll/               muñeco del laboratorio adaptado a los jugadores (dibujo separado de la cápsula física)
-  src/input/input.ts    teclado (2 jugadores) y mandos (hasta 4)
+  src/input/inputCore.ts  entradas sin DOM: teclas de J1–J4, mandos por Gamepad.index, pulsaciones retenidas y paso fijo
+  src/input/input.ts    conexión con los eventos de teclado y la Gamepad API del navegador
   src/audio/sfx.ts      sonidos sintetizados
   src/ui/hud.ts         interfaz durante la partida
   tests/sim.test.ts     pruebas de la física sin navegador (Vitest)
+  tests/input.test.ts   pruebas de las entradas sin navegador (Vitest)
   scripts/              simulación por consola, rendimiento, pruebas en Chromium, capturas y vídeo
     stills.cjs          capturas fijas en momentos fijos de una partida automática (?capture=1)
     record.cjs          graba la partida real fotograma a fotograma con su sonido

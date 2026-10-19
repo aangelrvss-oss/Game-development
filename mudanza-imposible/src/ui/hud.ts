@@ -1,3 +1,4 @@
+import { playerControls, type PlayerControls } from '../input/inputCore';
 import { RULES, type Game } from '../sim/game';
 import { STAGES } from '../sim/level';
 import { PLAYER_COLORS } from '../view/carrierView';
@@ -10,17 +11,36 @@ function fmt(t: number) {
   return `${m}:${s.toFixed(1).padStart(4, '0')}`;
 }
 
-/** Tecla (o botón) de agarrar de cada jugador, para los avisos. */
-const GRAB_KEYS = ['ESPACIO', 'INTRO'];
+/** Controles por defecto (solo teclado), para los avisos cuando no se ha dicho otra cosa. */
+const KEYBOARD_ONLY: PlayerControls[] = [0, 1, 2, 3].map((p) => playerControls(p, null, false));
+
+/** Tecla o botón de un jugador para los avisos («ESPACIO», «U», «A»…). */
+const key = (s: string | undefined) => (s ?? 'A').toUpperCase();
 
 /**
  * Aviso cuando uno solo arrastra algo que pesa demasiado para una persona: falta alguien en el otro extremo.
- * Si hay otros jugadores sin agarrar, dice con qué tecla pueden echar una mano.
+ * Si hay otros jugadores sin agarrar, dice con qué tecla o botón pueden echar una mano.
  */
-export function heavyAloneHint(game: Game): string {
+export function heavyAloneHint(game: Game, controls: readonly PlayerControls[] = KEYBOARD_ONLY): string {
   const free = game.carriers.filter((c) => c.human !== null && !c.holding && c.stunned <= 0);
-  const keys = free.map((c) => `J${c.human! + 1} con ${GRAB_KEYS[c.human!] ?? 'A en el mando'}`);
+  const keys = free.map((c) => `J${c.human! + 1} con ${key(controls[c.human!]?.grab)}`);
   return `Pesa mucho: falta alguien en el otro extremo${keys.length ? ` (${keys.join(', ')})` : ''}`;
+}
+
+/** Avisos con los controles de cada jugador humano: cómo agarrar, enderezar y, si hay ayudantes, pedir giro. */
+export function controlHints(game: Game, controls: readonly PlayerControls[] = KEYBOARD_ONLY) {
+  const humans = game.carriers.filter((c) => c.human !== null).map((c) => c.human!);
+  const list = (f: (c: PlayerControls | undefined) => string) => humans.map((h) => `J${h + 1} con ${f(controls[h])}`).join(', ');
+  const one = humans.length <= 1 ? controls[humans[0] ?? 0] : undefined;
+  const helpers = game.carriers.some((c) => c.human === null);
+  return {
+    grab: one ? `Acércate al sofá y pulsa ${key(one.grab)} para agarrarlo` : `Acercaos al sofá y agarradlo: ${list((c) => key(c?.grab))}`,
+    fix: one ? `¡Volcado! Pulsa ${key(one.fix)} para enderezarlo` : `¡Volcado! Enderezadlo: ${list((c) => key(c?.fix ?? 'Y'))}`,
+    // Girar es opcional: sirve para pedírselo a los ayudantes. Sin ellos, el sofá gira tirando hacia lados opuestos
+    stuck: helpers
+      ? `¿Atascados? Pedid un giro a los ayudantes (${humans.map((h) => controls[h]?.turn ?? 'LB/RB').join(' · ')}) o soltad un asa`
+      : '¿Atascados? Tirad hacia lados opuestos para girar el sofá, o soltad un asa',
+  };
 }
 
 /** Interfaz durante la partida: tiempo, etapas, estado del sofá, avisos y mensajes cortos. */
@@ -37,19 +57,27 @@ export class Hud {
   private toastBox = $('h-toasts');
   private lastStage = -1;
   private toasts: { el: HTMLElement; until: number }[] = [];
+  /** Controles de cada jugador humano (por índice de jugador), según su teclado o su mando. */
+  private controls: PlayerControls[] = KEYBOARD_ONLY;
   /** Reloj de la partida: los mensajes duran tiempo de juego, no tiempo real (así también en las grabaciones). */
   constructor(private now: () => number) {}
 
   show(on: boolean) { this.root.style.display = on ? 'block' : 'none'; }
 
-  setup(game: Game, keyboardHelp: string[]) {
+  setup(game: Game, controls: PlayerControls[]) {
     this.stages.innerHTML = STAGES.map((s, i) => `<span class="stage" data-i="${i}">${s.label}</span>`).join('<i>›</i>');
-    this.players.innerHTML = game.carriers
-      .filter((c) => c.human !== null)
-      .map((c) => `<div class="pl" style="--c:${PLAYER_COLORS[c.human!]}"><b>J${c.human! + 1}</b> ${carrierName(c)}<span id="pl-${c.id}"></span><small>${keyboardHelp[c.human!] ?? 'Mando'}</small></div>`)
-      .join('');
+    this.setControls(game, controls);
     this.lastStage = -1;
     this.toastBox.innerHTML = '';
+  }
+
+  /** Panel de jugadores con los controles de cada uno (también cuando un mando se conecta o se va a media partida). */
+  setControls(game: Game, controls: PlayerControls[]) {
+    this.controls = controls;
+    this.players.innerHTML = game.carriers
+      .filter((c) => c.human !== null)
+      .map((c) => `<div class="pl" style="--c:${PLAYER_COLORS[c.human!]}"><b>J${c.human! + 1}</b> ${carrierName(c)}<span id="pl-${c.id}"></span><small>${controls[c.human!]?.line ?? ''}</small></div>`)
+      .join('');
   }
 
   toast(text: string, kind: 'bad' | 'good' | 'info' = 'info') {
@@ -92,14 +120,13 @@ export class Hud {
     // Avisos de estado del sofá
     let w = '';
     if (game.phase === 'playing') {
-      if (game.sofaUp < 0.55) w = '¡Volcado! Pulsa R (o Y en el mando) para enderezarlo';
+      const hints = controlHints(game, this.controls);
+      if (game.sofaUp < 0.55) w = hints.fix;
       else if (game.sofaUp < 0.8) w = '¡Que se vuelca!';
-      else if (game.heavyAlone) w = heavyAloneHint(game);
-      else if (game.stuckTime > 1.5) w = '¿Atascados? Gira el sofá (Q/E) o soltad un asa';
+      else if (game.heavyAlone) w = heavyAloneHint(game, this.controls);
+      else if (game.stuckTime > 1.5) w = hints.stuck;
       // (no mientras el jugador sigue mareado: todavía no puede agarrar)
-      else if (!game.carriers.some((c) => c.human !== null && (c.holding || c.stunned > 0))) {
-        w = game.carriers.filter((c) => c.human !== null).length > 1 ? 'Acercaos al sofá y agarradlo: J1 con ESPACIO, J2 con INTRO' : 'Acércate al sofá y pulsa ESPACIO para agarrarlo';
-      }
+      else if (!game.carriers.some((c) => c.human !== null && (c.holding || c.stunned > 0))) w = hints.grab;
     }
     this.warn.textContent = w;
     this.warn.style.display = w ? 'block' : 'none';
