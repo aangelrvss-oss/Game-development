@@ -18,14 +18,15 @@ export class FlexTube {
     const idx: number[] = [];
     for (let i = 0; i < segments; i++) for (let j = 0; j < radial; j++) {
       const a = i * radial + j, b = i * radial + ((j + 1) % radial), c = a + radial, d = b + radial;
-      idx.push(a, c, b, b, c, d);
+      // Caras hacia fuera: (b − a) × (c − a) apunta según la normal del anillo
+      idx.push(a, b, c, b, d, c);
     }
     // Tapas redondeadas aproximadas con un abanico (los extremos quedan dentro de hombro, mano, cadera o bota)
     const s0 = rings * radial, s1 = s0 + 1;
     for (let j = 0; j < radial; j++) {
-      idx.push(s0, j, (j + 1) % radial);
+      idx.push(s0, (j + 1) % radial, j);
       const last = segments * radial;
-      idx.push(s1, last + ((j + 1) % radial), last + j);
+      idx.push(s1, last + j, last + ((j + 1) % radial));
     }
     this.geometry = new THREE.BufferGeometry();
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));

@@ -142,6 +142,7 @@ requestAnimationFrame(frame);
 (window as unknown as { __lab: unknown }).__lab = {
   lab,
   stage,
+  rig,
   run: (t: TestId) => runTest(t),
   /** Avanza `frames` fotogramas de 1/fps s de simulación, dibujando cada uno. */
   advance(frames: number, fps = 30) {

@@ -36,7 +36,7 @@ export class Stage {
     this.scene.background = bg;
     this.scene.fog = new THREE.Fog(bg, 18, 42);
 
-    this.scene.add(new THREE.HemisphereLight('#fff8f0', '#a89c94', 1.1));
+    this.scene.add(new THREE.HemisphereLight('#fff8f0', '#b3a69c', 1.35));
     this.key = new THREE.DirectionalLight('#ffe7cc', 2.6);
     this.key.castShadow = true;
     this.key.shadow.mapSize.set(2048, 2048);
@@ -51,6 +51,12 @@ export class Stage {
     const fill = new THREE.DirectionalLight('#ffd9e8', 0.35);
     fill.position.set(8, 3, 6);
     this.scene.add(fill);
+    // Relleno suave desde la cámara (sin sombra): las piernas y la cara se leen desde cualquier ángulo
+    const camFill = new THREE.DirectionalLight('#fff1e6', 0.55);
+    camFill.position.set(0.4, 0.6, 1);
+    camFill.target.position.set(0, 0, -1);
+    this.camera.add(camFill, camFill.target);
+    this.scene.add(this.camera);
 
     this.buildFloor();
     this.camera.position.set(4.2, 2.6, 5.2);
