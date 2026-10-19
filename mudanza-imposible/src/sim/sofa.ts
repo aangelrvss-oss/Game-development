@@ -11,11 +11,13 @@ export const SOFA = {
   half: { x: 1.1, y: 0.2, z: 0.45 },
   back: { p: { x: 0, y: 0.42, z: -0.36 }, h: { x: 1.1, y: 0.24, z: 0.09 } },
   arm: { h: { x: 0.11, y: 0.15, z: 0.45 }, y: 0.33 },
-  mass: 45,
-  /** Física cooperativa (todos los porteadores humanos): más pesado y con más roce a rastras. */
-  coopMass: 90,
-  friction: 0.7,
-  coopFriction: 1.0,
+  /**
+   * Una sola física para cualquier número de humanos y ayudantes: pesa más de lo que una persona sostiene
+   * (`HAND.maxV`), así que uno solo levanta un extremo y lo arrastra, y entre dos lo llevan en el aire.
+   */
+  mass: 90,
+  /** Roce a rastras (se promedia con el del suelo): uno solo, con un extremo en alto, apenas puede con él. */
+  friction: 1.0,
 };
 
 /** Asas donde se colocan los ayudantes: punto local en la superficie y dirección hacia fuera. */
@@ -28,7 +30,7 @@ export const SLOTS: { p: Vec3; out: Vec3; side: 'end' | 'red' | 'blue' }[] = [
   { p: { x: 0.55, y: 0.05, z: -0.45 }, out: { x: 0, y: 0, z: -1 }, side: 'red' },
 ];
 
-export function createSofa(R: R, world: RAPIER.World, pos: Vec3, yaw: number, coop = false) {
+export function createSofa(R: R, world: RAPIER.World, pos: Vec3, yaw: number) {
   const q = yawQuat(yaw);
   const body = world.createRigidBody(
     R.RigidBodyDesc.dynamic()
@@ -41,8 +43,8 @@ export function createSofa(R: R, world: RAPIER.World, pos: Vec3, yaw: number, co
   );
   const { half, back, arm } = SOFA;
   const vol = 8 * (half.x * half.y * half.z + back.h.x * back.h.y * back.h.z + 2 * arm.h.x * arm.h.y * arm.h.z);
-  const density = (coop ? SOFA.coopMass : SOFA.mass) / vol;
-  const friction = coop ? SOFA.coopFriction : SOFA.friction;
+  const density = SOFA.mass / vol;
+  const friction = SOFA.friction;
   const colliders: RAPIER.Collider[] = [];
   const mk = (d: RAPIER.ColliderDesc) => colliders.push(world.createCollider(d.setDensity(density).setFriction(friction).setRestitution(0.05), body));
   mk(R.ColliderDesc.roundCuboid(half.x - 0.05, half.y - 0.05, half.z - 0.05, 0.05));

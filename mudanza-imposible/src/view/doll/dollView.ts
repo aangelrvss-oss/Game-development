@@ -119,11 +119,12 @@ export class DollView {
     }
     this.wasStunned = stunned;
     const speed = Math.hypot(v.x, v.z), want = Math.hypot(c.wantVel.x, c.wantVel.z);
-    // Esfuerzo: tensión del agarre (la mano se separa del punto agarrado) y empujar sin avanzar
+    // Esfuerzo: lo que tira la mano (`strain`: arrastrar solo algo pesado lo pone al límite), que el punto agarrado
+    // se le separe de la mano, y empujar sin avanzar
     let strain = 0;
     if (sofaGrab) {
       const h = c.handWorld();
-      strain = Math.min(1, Math.hypot(sofaGrab.x - h.x, sofaGrab.y - h.y, sofaGrab.z - h.z) / CARRIER.gripBreak);
+      strain = Math.max(c.strain, Math.min(1, Math.hypot(sofaGrab.x - h.x, sofaGrab.y - h.y, sofaGrab.z - h.z) / CARRIER.gripBreak));
     }
     const effortGoal = c.holding ? Math.min(1, 0.35 + strain * 0.9 + (want > 0.3 && speed < want * 0.6 ? 0.45 : 0)) : 0;
     this.effort += (effortGoal - this.effort) * Math.min(1, dt * 4);

@@ -21,25 +21,34 @@ export class Autopilot {
   lastProgress = 0;
   lastDist = Infinity;
   private grabCooldown = 0;
+  /** Tiempo intentando llegar a un asa sin conseguirlo, y asas descartadas un rato (tapadas por una pared). */
+  private tryTime = 0;
+  private skip = new Map<number, number>();
+  /** Maniobras de desatasco seguidas sin llegar al punto de paso. */
+  private wiggles = 0;
   constructor(readonly carrierIndex = 0) {}
 
   input(g: Game, dt: number): PlayerInput {
-    const inp: PlayerInput = { mx: 0, mz: 0, grab: false, lift: false, turn: 0, right: false };
+    const inp: PlayerInput = { mx: 0, mz: 0, grab: false, turn: 0, right: false };
     if (g.phase !== 'playing') return inp;
     const me = g.carriers[this.carrierIndex];
     if (g.sofaUp < 0.4) { inp.right = true; return inp; }
     this.grabCooldown -= dt;
+    for (const [k, t] of this.skip) if (t - dt <= 0) this.skip.delete(k); else this.skip.set(k, t - dt);
     if (!me.holding) {
-      // Ve al asa libre más cercana y agárrala
-      let best = Infinity, goal = { x: 0, z: 0 }, face = { x: 0, z: 0 };
-      for (const s of SLOTS) {
+      // Ve al asa libre más cercana y agárrala (si en 3 s no llega a ella, prueba otra)
+      let best = Infinity, goal = { x: 0, z: 0 }, face = { x: 0, z: 0 }, pick = -1;
+      for (const [i, s] of SLOTS.entries()) {
+        if (this.skip.has(i)) continue;
         const a = localToWorld(g.sofa, s.p);
         const out = rotate(g.sofa.rotation(), s.out);
         const gx = a.x + out.x * 0.6, gz = a.z + out.z * 0.6;
-        const occupied = g.carriers.some((c) => c !== me && c.holding && c.grabLocal && Math.hypot(c.grabLocal.x - s.p.x, c.grabLocal.z - s.p.z) < 0.4);
+        const occupied = g.carriers.some((c) => c !== me && c.heldBody === g.sofa && c.grabLocal && Math.hypot(c.grabLocal.x - s.p.x, c.grabLocal.z - s.p.z) < 0.4);
         const d = Math.hypot(gx - me.pos.x, gz - me.pos.z) + (occupied ? 5 : 0);
-        if (d < best) { best = d; goal = { x: gx, z: gz }; face = { x: -out.x, z: -out.z }; }
+        if (d < best) { best = d; goal = { x: gx, z: gz }; face = { x: -out.x, z: -out.z }; pick = i; }
       }
+      this.tryTime += dt;
+      if (this.tryTime > 3 && pick >= 0) { this.skip.set(pick, 5); this.tryTime = 0; }
       const dx = goal.x - me.pos.x, dz = goal.z - me.pos.z;
       const d = Math.hypot(dx, dz);
       if (d < 0.4 && this.grabCooldown <= 0) {
@@ -52,6 +61,7 @@ export class Autopilot {
       }
       return inp;
     }
+    this.tryTime = 0;
     const target = ROUTE[Math.min(this.wp, ROUTE.length - 1)];
     const p = g.sofaPos;
     const dx = target.x - p.x, dz = target.z - p.z;
@@ -64,10 +74,15 @@ export class Autopilot {
       if (Math.abs(yawErr) > 0.08) inp.turn = yawErr > 0 ? -1 : 1;
       return inp;
     }
-    if (dist < 0.8 && Math.abs(yawErr) < (target.tol ?? 0.3) && this.wp < ROUTE.length - 1) this.wp++;
+    if (dist < 0.8 && Math.abs(yawErr) < (target.tol ?? 0.3) && this.wp < ROUTE.length - 1) { this.wp++; this.wiggles = 0; }
     // Atasco: maniobra corta hacia atrás girando
     if (dist < this.lastDist - 0.05) { this.lastDist = dist; this.stuck = 0; } else this.stuck += dt;
-    if (this.stuck > 2.5) { this.wiggle = 1.0; this.stuck = 0; this.lastDist = Infinity; }
+    if (this.stuck > 2.5) {
+      this.wiggle = 1.0; this.stuck = 0; this.lastDist = Infinity;
+      // Si tras tres maniobras no se acerca (el sofá se ha caído fuera del camino, p. ej. por el borde de la
+      // rampa), prueba el siguiente punto de paso
+      if (++this.wiggles >= 3 && this.wp < ROUTE.length - 1) { this.wp++; this.wiggles = 0; }
+    }
     if (this.wiggle > 0) {
       this.wiggle -= dt;
       inp.mx = -dx / Math.max(dist, 1e-3) * 0.6; inp.mz = -dz / Math.max(dist, 1e-3) * 0.6;
@@ -79,7 +94,7 @@ export class Autopilot {
     if (dist > 0.05) { inp.mx = (dx / dist) * s; inp.mz = (dz / dist) * s; }
     // Pedir giro: el juego hace que el propio jugador también lo acompañe.
     if (Math.abs(yawErr) > 0.08) inp.turn = yawErr > 0 ? -1 : 1;
-    inp.lift = target.label === 'Escalera';
+    // Sin alzar: al agarrar, la mano sube sola a la altura de carga (también en la escalera)
     return inp;
   }
 }

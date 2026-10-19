@@ -112,7 +112,7 @@ export class WorldView {
   render(game: Game, t: number, dt: number) {
     this.sofa.sync(game.sofa, game.integrity, game.sofaUp, t, dt);
     for (const v of this.carriers) {
-      const g = v.carrier.grabWorld(game.sofa);
+      const g = v.carrier.grabWorld();
       v.sync(g ? new THREE.Vector3(g.x, g.y, g.z) : null, t, dt);
     }
     for (const v of this.cars) v.sync(dt);

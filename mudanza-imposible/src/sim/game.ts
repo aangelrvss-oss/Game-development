@@ -2,8 +2,9 @@
 // se puede ejecutar en Node para las pruebas.
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { BotBrain, BOT, type BotStyle } from './bots';
-import { CAST, CARRIER, CENTER_Y, Carrier } from './carrier';
-import { LEVEL, SOFA_START, STAGES, STAIRS, ZONE, FLOOR2, RAMP } from './level';
+import { CAST, CARRIER, CENTER_Y, Carrier, type Grabbable } from './carrier';
+import { HAND, solveHands } from './hand';
+import { LEVEL, SOFA_START, STAGES, ZONE, FLOOR2, RAMP } from './level';
 import { SLOTS, createSofa, localToWorld, rotate, sofaUp, sofaYaw, yawQuat } from './sofa';
 import { Car, CAR_COLORS, lightAt, stepTraffic } from './traffic';
 import { NO_INPUT, type GameEvent, type PlayerInput, type Vec3 } from './types';
@@ -24,6 +25,11 @@ export const RULES = {
   /** Par estabilizador por mano (N·m por unidad de inclinación) y amortiguación del balanceo. */
   wristK: 22,
   wristDamp: 5,
+  /**
+   * Amortiguación del giro horizontal por mano (N·m·s): quien agarra no deja que el objeto gire solo porque los
+   * tirones estén descompensados (dos de un lado y uno del otro), aunque sí deja girarlo cuando el grupo lo gira.
+   */
+  wristYawDamp: 30,
 };
 
 export interface GameOptions {
@@ -32,14 +38,6 @@ export interface GameOptions {
   botStyle: BotStyle;
   seed?: number;
 }
-
-/**
- * Física cooperativa: cuando todos los porteadores son humanos (sin ayudantes de la máquina), cada uno tira
- * con fuerza limitada, el sofá pesa más y roza más a rastras (uno solo apenas lo mueve) y los porteadores
- * pierden el equilibrio. Con ayudantes se mantiene la física original: los ayudantes y el piloto automático
- * están ajustados a ella.
- */
-export const isCoop = (o: GameOptions) => o.humans >= 2 && o.carriers <= o.humans;
 
 export type Phase = 'countdown' | 'playing' | 'won' | 'lost';
 
@@ -79,10 +77,17 @@ export class Game {
   stage = 0;
   inZone = 0;
   stuckTime = 0;
-  /** Física cooperativa (todos humanos): ver `isCoop`. */
-  readonly coop: boolean;
-  /** Tiempo que lleva uno solo intentando mover el sofá sin conseguirlo (para el aviso). */
+  /**
+   * Objetos que se pueden agarrar: el sofá y los que se añadan con `addGrabbable`. Una sola física para todos
+   * (humanos y ayudantes): la mano blanda de `hand.ts` y la fuerza de las piernas de `CARRIER`.
+   */
+  grabbables: Grabbable[] = [];
+  /**
+   * Tiempo que lleva uno solo arrastrando un objeto que pesa más de lo que una persona sostiene (para el aviso
+   * «Pesa mucho: falta alguien en el otro extremo»), y quién es.
+   */
   soloDrag = 0;
+  soloDragCarrier: number | null = null;
   loseReason: 'broken' | 'time' | null = null;
   out: GameEvent[] = [];
   private prevSofaVel: Vec3 = { x: 0, y: 0, z: 0 };
@@ -92,13 +97,24 @@ export class Game {
   private rng: () => number;
   private handleOwner = new Map<number, { kind: 'sofa' } | { kind: 'carrier'; i: number } | { kind: 'car'; i: number }>();
   /** Velocidad media pedida por los humanos que cargan (la usan los ayudantes). */
-  lead = { x: 0, z: 0, w: 0, active: false, lift: false };
+  lead = { x: 0, z: 0, w: 0, active: false };
+  private loads = new Set<number>();
 
   constructor(private R: R, readonly opts: GameOptions) {
     this.rng = mulberry32(opts.seed ?? 12345);
-    this.coop = isCoop(opts);
     this.build();
   }
+
+  /** Registra un cuerpo dinámico como objeto agarrable (misma mano y misma física que el sofá). */
+  addGrabbable(body: RAPIER.RigidBody, colliders: RAPIER.Collider[]): Grabbable {
+    const g = { body, colliders };
+    this.grabbables.push(g);
+    this.loads.add(body.handle);
+    return g;
+  }
+
+  /** ¿Es un objeto movible (agarrable)? Empujarlo con el cuerpo cuenta como cargar. */
+  private isLoad = (b: RAPIER.RigidBody) => this.loads.has(b.handle);
 
   private build() {
     const R = this.R;
@@ -113,10 +129,10 @@ export class Game {
       if (b.kind === 'ramp') cd.setFrictionCombineRule(R.CoefficientCombineRule.Min);
       this.world.createCollider(cd, body);
     }
-    const coop = this.coop;
-    const s = createSofa(R, this.world, { x: SOFA_START.x, y: SOFA_START.y, z: SOFA_START.z }, SOFA_START.yaw, coop);
+    const s = createSofa(R, this.world, { x: SOFA_START.x, y: SOFA_START.y, z: SOFA_START.z }, SOFA_START.yaw);
     this.sofa = s.body;
     this.sofaColliders = s.colliders;
+    this.addGrabbable(s.body, s.colliders);
     for (const c of s.colliders) this.handleOwner.set(c.handle, { kind: 'sofa' });
     const n = Math.max(1, Math.min(6, this.opts.carriers));
     const humans = Math.max(0, Math.min(n, this.opts.humans));
@@ -126,7 +142,7 @@ export class Game {
       const a = localToWorld(this.sofa, slot.p);
       const out = rotate(this.sofa.rotation(), slot.out);
       const p = { x: a.x + out.x * 1.3, y: CENTER_Y + 0.05, z: a.z + out.z * 1.3 };
-      const c = new Carrier(R, this.world, i, CAST[i], i < humans ? i : null, p, coop);
+      const c = new Carrier(R, this.world, i, CAST[i], i < humans ? i : null, p);
       c.facing = { x: -out.x, z: -out.z };
       this.carriers.push(c);
       this.handleOwner.set(c.collider.handle, { kind: 'carrier', i });
@@ -150,16 +166,9 @@ export class Game {
   get sofaUp() { return sofaUp(this.sofa); }
   get stageLabel() { return STAGES[this.stage].label; }
 
-  /**
-   * Al pie de la escalera (o ya en ella) con el sofá sin alzar. Con la física cooperativa no se puede arrastrar
-   * escaleras arriba: hay que alzarlo (Mayús). La interfaz lo avisa; si no, la pareja se quedaba atascada abajo.
-   */
-  get needsLiftAtStairs() {
-    if (!this.coop || this.phase !== 'playing') return false;
-    const s = this.sofaPos;
-    const atStairs = Math.abs(s.x) < 1.8 && s.z < STAIRS.z0 + 2.5 && s.z > STAIRS.z1 && s.y < STAIRS.top - 0.3;
-    const holders = this.carriers.filter((c) => c.human !== null && c.holding);
-    return atStairs && holders.length > 0 && holders.some((c) => c.handLift < 0.5);
+  /** Uno solo lleva un rato arrastrando algo que pesa demasiado para una persona: hay que avisar. */
+  get heavyAlone(): Carrier | null {
+    return this.soloDrag > 0.6 && this.soloDragCarrier !== null ? this.carriers[this.soloDragCarrier] : null;
   }
 
   private emit(e: GameEvent) { this.out.push(e); }
@@ -178,28 +187,34 @@ export class Game {
     const sofa = this.sofa;
 
     // Mando de los humanos y lo que deben imitar los ayudantes
-    let lx = 0, lz = 0, lw = 0, nl = 0, lift = false;
+    let lx = 0, lz = 0, lw = 0, nl = 0;
     const humanInputs = new Map<number, PlayerInput>();
     for (const c of this.carriers) {
       if (c.human === null) continue;
       const inp = playing ? inputs[c.human] ?? NO_INPUT : NO_INPUT;
       humanInputs.set(c.id, inp);
       if (inp.turn !== 0) lw += inp.turn * BOT.turnRate;
-      if (inp.lift) lift = true;
       if (c.holding) { lx += inp.mx * CARRIER.carrySpeed; lz += inp.mz * CARRIER.carrySpeed; nl++; }
       if (inp.right) this.tryRight();
     }
-    this.lead = { x: nl ? lx / nl : 0, z: nl ? lz / nl : 0, w: lw, active: nl > 0, lift };
+    this.lead = { x: nl ? lx / nl : 0, z: nl ? lz / nl : 0, w: lw, active: nl > 0 };
 
+    // Asas ocupadas: las de los ayudantes que cargan y las que tienen al lado los humanos que agarran el sofá
     const taken = new Set<number>();
     for (const [i, b] of this.bots) if (this.carriers[i].holding) taken.add(b.slot);
+    for (const c of this.carriers) {
+      if (c.human === null || c.heldBody !== sofa || !c.grabLocal) continue;
+      const gl = c.grabLocal;
+      SLOTS.forEach((s, i) => { if (Math.hypot(s.p.x - gl.x, s.p.z - gl.z) < 0.6) taken.add(i); });
+    }
 
     for (const c of this.carriers) {
       let inp: PlayerInput;
       const brain = this.bots.get(c.id);
       if (brain) {
         const wasHolding = c.holding;
-        inp = playing ? brain.think(c, sofa, this.lead, taken, dt) : NO_INPUT;
+        const others = this.carriers.filter((o) => o !== c).map((o) => o.pos);
+        inp = playing ? brain.think(c, sofa, this.lead, taken, dt, others) : NO_INPUT;
         if (inp.grab && wasHolding) {
           c.release();
           this.emit({ type: 'release', carrier: c.id, pos: c.handWorld() });
@@ -209,7 +224,6 @@ export class Game {
             this.emit({ type: 'grab', carrier: c.id, pos: c.handWorld() });
           }
         }
-        inp = { ...inp, lift: this.lead.lift };
       } else {
         inp = humanInputs.get(c.id) ?? NO_INPUT;
         if (c.holding && inp.turn !== 0) {
@@ -219,12 +233,19 @@ export class Game {
         }
         if (inp.grab) {
           if (c.holding) { c.release(); this.emit({ type: 'release', carrier: c.id, pos: c.handWorld() }); }
-          else if (c.tryGrab(sofa, this.sofaColliders)) this.emit({ type: 'grab', carrier: c.id, pos: c.handWorld() });
+          else if (c.tryGrabAny(this.grabbables)) this.emit({ type: 'grab', carrier: c.id, pos: c.handWorld() });
         }
       }
       if (c.stunned > 0) c.stunned = Math.max(0, c.stunned - dt);
-      if (c.control(inp, dt, sofa)) this.emit({ type: 'gripBreak', carrier: c.id, pos: c.handWorld() });
+      c.control(inp, dt, this.isLoad);
     }
+
+    // Manos blandas: cada una tira de su punto con fuerza limitada; si no da abasto y se le escapa, suelta
+    const hands = solveHands(this.carriers, dt);
+    this.carriers.forEach((c, i) => {
+      const r = hands[i];
+      if (r && c.handResult(r, dt)) this.emit({ type: 'gripBreak', carrier: c.id, pos: c.handWorld() });
+    });
 
     this.wristAssist(dt);
 
@@ -237,7 +258,7 @@ export class Game {
     if (ped !== this.lastPed) { this.lastPed = ped; this.emit({ type: 'light', ped }); }
 
     this.world.step(this.events);
-    this.clampSofa();
+    this.clampLoads();
 
     this.events.drainCollisionEvents((h1, h2, started) => {
       if (!started) return;
@@ -264,27 +285,35 @@ export class Game {
   }
 
   /**
-   * Las manos de quien carga no son rótulas perfectas: con las muñecas evitan que el sofá gire sin control.
-   * Par que tiende a ponerlo derecho y amortigua el balanceo, proporcional al número de manos.
-   * Permite inclinarlo (alzar a destiempo sigue inclinándolo), pero no voltearlo con facilidad.
+   * Las manos de quien carga no son puntos perfectos: con las muñecas evitan que el objeto gire sin control.
+   * Par que tiende a ponerlo derecho y amortigua el balanceo, proporcional al número de manos que lo agarran.
+   * Permite inclinarlo, pero no voltearlo con facilidad.
    */
   private wristAssist(dt: number) {
-    const holders = this.carriers.filter((c) => c.holding).length;
-    if (!holders) return;
-    const up = rotate(this.sofa.rotation(), { x: 0, y: 1, z: 0 });
-    const w = this.sofa.angvel();
-    const k = RULES.wristK * holders, c = RULES.wristDamp * holders;
-    // up × Y = (-up.z, 0, up.x)
-    const tx = -up.z * k - w.x * c, tz = up.x * k - w.z * c;
-    this.sofa.applyTorqueImpulse({ x: tx * dt, y: 0, z: tz * dt }, true);
+    for (const it of this.grabbables) {
+      const holders = this.carriers.filter((c) => c.heldBody === it.body).length;
+      if (!holders) continue;
+      const b = it.body;
+      const up = rotate(b.rotation(), { x: 0, y: 1, z: 0 });
+      const w = b.angvel();
+      // El par se aplica de forma explícita: con objetos ligeros (poca inercia) se limita para que sea estable
+      const pi = b.principalInertia(), im = Math.min(pi.x, pi.y, pi.z);
+      const k = Math.min(RULES.wristK * holders, (0.25 * im) / (dt * dt));
+      const c = Math.min(RULES.wristDamp * holders, (0.5 * im) / dt), cy = Math.min(RULES.wristYawDamp * holders, (0.5 * im) / dt);
+      // up × Y = (-up.z, 0, up.x)
+      const tx = -up.z * k - w.x * c, tz = up.x * k - w.z * c, ty = -w.y * cy;
+      b.applyTorqueImpulse({ x: tx * dt, y: ty * dt, z: tz * dt }, true);
+    }
   }
 
-  /** Evita que un conflicto entre articulaciones y contactos lance el sofá a velocidades absurdas. */
-  private clampSofa() {
-    const v = this.sofa.linvel(), w = this.sofa.angvel();
-    const sv = Math.hypot(v.x, v.y, v.z), sw = Math.hypot(w.x, w.y, w.z);
-    if (sv > 11) this.sofa.setLinvel({ x: (v.x * 11) / sv, y: (v.y * 11) / sv, z: (v.z * 11) / sv }, true);
-    if (sw > 6) this.sofa.setAngvel({ x: (w.x * 6) / sw, y: (w.y * 6) / sw, z: (w.z * 6) / sw }, true);
+  /** Evita que un conflicto entre manos y contactos lance un objeto a velocidades absurdas. */
+  private clampLoads() {
+    for (const { body } of this.grabbables) {
+      const v = body.linvel(), w = body.angvel();
+      const sv = Math.hypot(v.x, v.y, v.z), sw = Math.hypot(w.x, w.y, w.z);
+      if (sv > 11) body.setLinvel({ x: (v.x * 11) / sv, y: (v.y * 11) / sv, z: (v.z * 11) / sv }, true);
+      if (sw > 6) body.setAngvel({ x: (w.x * 6) / sw, y: (w.y * 6) / sw, z: (w.z * 6) / sw }, true);
+    }
   }
 
   private stun(c: Carrier) {
@@ -323,7 +352,7 @@ export class Game {
       const cv = c.body.linvel();
       const cdv = Math.hypot(cv.x - c.prevVel.x, cv.y - c.prevVel.y + 9.81 * dt, cv.z - c.prevVel.z);
       if (cdv > CARRIER.stunDv) this.stun(c);
-      else if (c.coop) {
+      else {
         const b = c.balance(dt, c.prevVel, this.touchesWall(c));
         if (b === 'wobble') this.emit({ type: 'wobble', carrier: c.id, pos: c.pos });
         else if (b === 'fall') this.emit({ type: 'fall', carrier: c.id, pos: c.pos });
@@ -346,9 +375,16 @@ export class Game {
     const speed = Math.hypot(v.x, v.z);
     const pushing = this.lead.active && Math.hypot(this.lead.x, this.lead.z) > 1;
     this.stuckTime = pushing && speed < 0.25 ? this.stuckTime + dt : Math.max(0, this.stuckTime - dt * 2);
-    const holders = this.carriers.filter((c) => c.holding);
-    const soloPush = holders.length === 1 && Math.hypot(holders[0].wantVel.x, holders[0].wantVel.z) > 1 && speed < 1.2;
-    this.soloDrag = soloPush ? this.soloDrag + dt : Math.max(0, this.soloDrag - dt * 2);
+    // Uno solo arrastra (o intenta mover) algo que pesa más de lo que una persona sostiene
+    let solo: Carrier | null = null;
+    for (const it of this.grabbables) {
+      const hs = this.carriers.filter((c) => c.heldBody === it.body);
+      const heavy = it.body.mass() * 9.81 > HAND.maxV;
+      if (hs.length === 1 && heavy && Math.hypot(hs[0].wantVel.x, hs[0].wantVel.z) > 0.3) solo = hs[0];
+    }
+    this.soloDrag = solo ? this.soloDrag + dt : Math.max(0, this.soloDrag - dt * 2);
+    if (solo) this.soloDragCarrier = solo.id;
+    else if (this.soloDrag === 0) this.soloDragCarrier = null;
     if (this.phase !== 'playing') return;
     // Entrega
     const inZone = sp.x > ZONE.x0 && sp.x < ZONE.x1 && sp.z > ZONE.z0 && sp.z < ZONE.z1 && sp.y < 1.6;
@@ -373,7 +409,7 @@ export class Game {
   /** Enderezar el sofá cuando está volcado. Suelta a todos y lo deja de pie con un pequeño salto. */
   tryRight(): boolean {
     if (this.sofaUp > 0.55 || this.phase !== 'playing') return false;
-    for (const c of this.carriers) c.release();
+    for (const c of this.carriers) if (c.heldBody === this.sofa) c.release(true);
     const p = this.sofaPos;
     this.sofa.setTranslation({ x: p.x, y: p.y + 0.6, z: p.z }, true);
     this.sofa.setRotation(yawQuat(this.sofaYaw), true);
@@ -387,7 +423,7 @@ export class Game {
 
   private respawnSofa() {
     const cp = CHECKPOINTS[Math.min(this.stage, CHECKPOINTS.length - 1)];
-    for (const c of this.carriers) c.release();
+    for (const c of this.carriers) if (c.heldBody === this.sofa) c.release(true);
     this.sofa.setTranslation(cp.p, true);
     this.sofa.setRotation(yawQuat(cp.yaw), true);
     this.sofa.setLinvel({ x: 0, y: 0, z: 0 }, true);

@@ -10,6 +10,19 @@ function fmt(t: number) {
   return `${m}:${s.toFixed(1).padStart(4, '0')}`;
 }
 
+/** Tecla (o botón) de agarrar de cada jugador, para los avisos. */
+const GRAB_KEYS = ['ESPACIO', 'INTRO'];
+
+/**
+ * Aviso cuando uno solo arrastra algo que pesa demasiado para una persona: falta alguien en el otro extremo.
+ * Si hay otros jugadores sin agarrar, dice con qué tecla pueden echar una mano.
+ */
+export function heavyAloneHint(game: Game): string {
+  const free = game.carriers.filter((c) => c.human !== null && !c.holding && c.stunned <= 0);
+  const keys = free.map((c) => `J${c.human! + 1} con ${GRAB_KEYS[c.human!] ?? 'A en el mando'}`);
+  return `Pesa mucho: falta alguien en el otro extremo${keys.length ? ` (${keys.join(', ')})` : ''}`;
+}
+
 /** Interfaz durante la partida: tiempo, etapas, estado del sofá, avisos y mensajes cortos. */
 export class Hud {
   private root = $('hud');
@@ -81,8 +94,7 @@ export class Hud {
     if (game.phase === 'playing') {
       if (game.sofaUp < 0.55) w = '¡Volcado! Pulsa R (o Y en el mando) para enderezarlo';
       else if (game.sofaUp < 0.8) w = '¡Que se vuelca!';
-      else if (game.needsLiftAtStairs) w = 'Escalera: alzad el sofá para subir. Mantened Mayús (J1 la izquierda, J2 la derecha)';
-      else if (game.coop && game.soloDrag > 1.2) w = '¡Uno solo apenas puede con él! Agarradlo los dos';
+      else if (game.heavyAlone) w = heavyAloneHint(game);
       else if (game.stuckTime > 1.5) w = '¿Atascados? Gira el sofá (Q/E) o soltad un asa';
       // (no mientras el jugador sigue mareado: todavía no puede agarrar)
       else if (!game.carriers.some((c) => c.human !== null && (c.holding || c.stunned > 0))) {

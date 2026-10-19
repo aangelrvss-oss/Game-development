@@ -117,7 +117,7 @@ function start(auto: boolean, fromGesture = true) {
   game = new Game(RAPIER, { humans, carriers: Math.max(opts.carriers, humans), botStyle: opts.botStyle, seed: Math.floor(Math.random() * 1e9) });
   autopilot = auto ? new Autopilot(0) : null;
   view.attach(game);
-  hud.setup(game, auto ? ['Piloto automático'] : ['WASD · agarrar Espacio · alzar Mayús izq. · girar Q/E', 'Flechas · agarrar Intro · alzar Mayús dcha. · girar , .', 'Mando 3', 'Mando 4']);
+  hud.setup(game, auto ? ['Piloto automático'] : ['WASD · agarrar Espacio · girar Q/E', 'Flechas · agarrar Intro · girar , .', 'Mando 3', 'Mando 4']);
   hud.show(true);
   show('menu', false); show('results', false); show('pause', false);
   screen = 'play';

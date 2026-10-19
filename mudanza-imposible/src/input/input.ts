@@ -2,8 +2,8 @@ import type { PlayerInput } from '../sim/types';
 
 /** Esquemas de teclado. J1 y J2 comparten teclado; J1–J4 pueden usar mandos. */
 const KEYS = [
-  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], grab: ['Space'], lift: ['ShiftLeft'], ccw: ['KeyQ'], cw: ['KeyE'], fix: ['KeyR'] },
-  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], grab: ['Enter', 'NumpadEnter'], lift: ['ShiftRight'], ccw: ['Comma'], cw: ['Period'], fix: ['Slash'] },
+  { up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'], grab: ['Space'], ccw: ['KeyQ'], cw: ['KeyE'], fix: ['KeyR'] },
+  { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'], grab: ['Enter', 'NumpadEnter'], ccw: ['Comma'], cw: ['Period'], fix: ['Slash'] },
 ];
 
 export class InputManager {
@@ -37,13 +37,12 @@ export class InputManager {
     const pads = this.pads();
     const out: PlayerInput[] = [];
     for (let i = 0; i < n; i++) {
-      let mx = 0, mz = 0, grab = false, lift = false, turn: -1 | 0 | 1 = 0, fix = false;
+      let mx = 0, mz = 0, grab = false, turn: -1 | 0 | 1 = 0, fix = false;
       const k = KEYS[i];
       if (k) {
         mx += (this.any(k.right) ? 1 : 0) - (this.any(k.left) ? 1 : 0);
         mz += (this.any(k.down) ? 1 : 0) - (this.any(k.up) ? 1 : 0);
         grab ||= this.once(k.grab);
-        lift ||= this.any(k.lift);
         if (this.any(k.ccw)) turn = 1;
         if (this.any(k.cw)) turn = -1;
         fix ||= this.once(k.fix);
@@ -56,7 +55,6 @@ export class InputManager {
         const prev = this.prevPad[i] ?? [];
         const edge = (j: number) => b(j) && !prev[j];
         grab ||= edge(0);
-        lift ||= b(1) || b(7) || b(6);
         if (b(4)) turn = 1;
         if (b(5)) turn = -1;
         fix ||= edge(3);
@@ -67,7 +65,7 @@ export class InputManager {
       }
       const m = Math.hypot(mx, mz);
       if (m > 1) { mx /= m; mz /= m; }
-      out.push({ mx, mz, grab, lift, turn, right: fix });
+      out.push({ mx, mz, grab, turn, right: fix });
       this.prevEdge[i] = { grab, fix };
     }
     this.pressedOnce.clear();
