@@ -215,26 +215,31 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   let releaseWob = false;
   await hold([], 1.0, async (n) => { if (n.cs[0].wob || n.cs[0].stun > 0) releaseWob = true; });
   for (let i = 0; i < 60 && ((await st()).cs[0].wob || (await st()).cs[0].stun > 0); i++) await p.waitForTimeout(100);
-  // Corre hacia el este hasta que algo fijo le para: la valla del patio (x 7,8), el seto junto a la salida
-  // (desde x 8,2, z 3,6–4,4) o, en la acera, el límite de la calle (x 18). Si se queda antes, la prueba no vale.
-  const free = !(await st()).cs[0].h;
-  let wallFall = false, lastX = -Infinity, still = 0;
-  const tWall = (await st()).t;
-  await p.keyboard.down('KeyD');
+  // Corre hacia el lado contrario al sofá (para que el sofá no le corte el paso) hasta que algo fijo le para: la
+  // valla del patio (x ±7,8), el seto junto a la salida (desde x ±8,2, z 3,6–4,4) o, en la acera, el límite de la
+  // calle (x ±18). Si se queda antes, la prueba no vale y se anota qué tenía cerca.
+  const s0 = await st();
+  const free = !s0.cs[0].h;
+  const dir = s0.cs[0].x >= s0.sofa[0] ? 1 : -1;
+  const runKey = dir > 0 ? 'KeyD' : 'KeyA';
+  let wallFall = false, lastX = null, still = 0;
+  const tWall = s0.t;
+  await p.keyboard.down(runKey);
   for (;;) {
     await tick();
     const n = await st();
     if (n.cs[0].stun > 0 || n.cs[0].wob) wallFall = true;
-    still = n.cs[0].x - lastX < 0.02 ? still + 1 : 0;
+    still = lastX !== null && (n.cs[0].x - lastX) * dir < 0.02 ? still + 1 : 0;
     lastX = n.cs[0].x;
     if (still >= 5 || n.t - tWall > 6) break;
   }
-  await p.keyboard.up('KeyD');
+  await p.keyboard.up(runKey);
   s = await st();
-  const wx = s.cs[0].x, wz = s.cs[0].z;
-  const atWall = (wz > 3.3 && wz < 17 && Math.abs(wx - 7.8) < 0.6) || Math.abs(wx - 18) < 0.6;
+  const wx = s.cs[0].x, wz = s.cs[0].z, ax = Math.abs(wx);
+  const atWall = (wz > 3.3 && wz < 17 && Math.abs(ax - 7.8) < 0.6) || Math.abs(ax - 18) < 0.6;
+  const near = `sofá (${s.sofa[0].toFixed(2)}, ${s.sofa[2].toFixed(2)}), J2 (${s.cs[1].x.toFixed(2)}, ${s.cs[1].z.toFixed(2)})`;
   ok(free && atWall && !wallFall, 'correr contra la pared frena sin tumbar',
-    `J1 se para en x=${wx.toFixed(2)}, z=${wz.toFixed(2)}${free ? '' : ' (J1 seguía agarrado)'}${atWall ? '' : ' (no llegó a una pared)'}${releaseWob ? ' (al soltar antes de correr se tambaleó: tensión del sofá)' : ''}`);
+    `J1 corre con ${runKey} y se para en x=${wx.toFixed(2)}, z=${wz.toFixed(2)}${free ? '' : ' (J1 seguía agarrado)'}${atWall ? '' : ` (no llegó a una pared; ${near})`}${releaseWob ? ' (al soltar antes de correr se tambaleó: tensión del sofá)' : ''}`);
 
   // 7. Reiniciar con Retroceso
   await p.keyboard.press('Backspace');

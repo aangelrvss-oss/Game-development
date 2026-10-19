@@ -15,6 +15,8 @@ const OUT = path.resolve(__dirname, '../shots/video-duo');
 const FPS = 30;
 // Versión grabada, para el rótulo inicial (p. ej. REC_VERSION="commit abc1234 · 19-10-2026")
 const VERSION = process.env.REC_VERSION || '';
+// Cámara más cerca en el tramo de teclado (p. ej. REC_ZOOM=0.65), para ver el contacto con el sofá
+const ZOOM = process.env.REC_ZOOM ? Number(process.env.REC_ZOOM) : null;
 
 (async () => {
   fs.rmSync(OUT, { recursive: true, force: true });
@@ -61,6 +63,7 @@ const VERSION = process.env.REC_VERSION || '';
 
   // --- Tramo 1: teclado ---
   open('teclado');
+  if (ZOOM) await p.evaluate((k) => window.__mudanza.setZoom(k), ZOOM);
   let s;
   // Se guardan los 2 últimos segundos de la cuenta atrás: los dos personajes, quietos, antes de empezar
   do { s = await frame(false); } while (s.phase === 'countdown' && s.cd > 2);
@@ -85,6 +88,7 @@ const VERSION = process.env.REC_VERSION || '';
 
   // --- Tramo 2: piloto automático para J1 y J2 (se cortan las esperas en rojo) ---
   await keys([]);
+  if (ZOOM) await p.evaluate(() => window.__mudanza.setZoom(null));
   open('piloto');
   let wait = 0, cut = false;
   for (let i = 0; i < FPS * 200; i++) {
