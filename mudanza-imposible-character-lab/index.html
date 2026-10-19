@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧢</text></svg>">
+<title>Mudanza Imposible · laboratorio de personaje</title>
+<style>
+  :root { --ink: #231d2e; --muted: #6b6178; --panel: rgba(255,252,248,0.92); --line: #e3dbe6; --red: #d7392d; --gold: #f3c24f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #ece6f1; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; color: var(--ink); }
+  canvas#c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #panel { position: fixed; top: 14px; left: 14px; width: 300px; max-height: calc(100% - 28px); overflow: auto; background: var(--panel); backdrop-filter: blur(6px); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 10px 30px rgba(40,20,60,0.12); }
+  h1 { font-size: 17px; margin: 0; line-height: 1.2; }
+  h1 small { display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+  .tests { display: grid; grid-template-columns: 1fr; gap: 6px; }
+  .tests button { text-align: left; display: grid; grid-template-columns: 30px 1fr; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: #fff; cursor: pointer; font: inherit; color: inherit; }
+  .tests button b { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: var(--red); color: #fff; font-size: 15px; }
+  .tests button span { font-size: 13px; font-weight: 700; }
+  .tests button span small { display: block; font-weight: 500; color: var(--muted); font-size: 11.5px; }
+  .tests button.on { border-color: var(--red); box-shadow: 0 0 0 2px rgba(215,57,45,0.18); }
+  .tests button:focus-visible, .row button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .row button { flex: 1 1 auto; padding: 7px 8px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font: 600 12.5px/1.2 system-ui, sans-serif; cursor: pointer; color: inherit; }
+  .row button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+  label.slider { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; font-size: 12.5px; font-weight: 600; }
+  label.slider input { grid-column: 1 / -1; width: 100%; accent-color: var(--red); }
+  #state { border-radius: 14px; padding: 10px 12px; background: var(--ink); color: #fff; display: grid; gap: 4px; }
+  #state .now { font-size: 20px; font-weight: 800; letter-spacing: 0.01em; }
+  #state .meters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 11px; opacity: 0.9; font-variant-numeric: tabular-nums; }
+  #state .meters b { display: block; font-size: 14px; }
+  #log { font-size: 11.5px; color: var(--muted); min-height: 3.6em; font-variant-numeric: tabular-nums; }
+  .keys { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+  kbd { font: 700 10.5px ui-monospace, monospace; background: #fff; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 4px; color: var(--ink); }
+  #panel.hide { display: none; }
+  #chip { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-radius: 999px; background: #231d2e; color: #fff; font-weight: 600; font-size: 14px; box-shadow: 0 6px 18px rgba(40,20,60,0.2); pointer-events: none; white-space: nowrap; }
+  #chip span { opacity: 0.75; font-size: 12.5px; }
+  #chip b { font-size: 17px; }
+  #chip[data-state="walking"] { background: #2f5d8a; } #chip[data-state="grabbing"] { background: #6a4c93; } #chip[data-state="pulling"] { background: #9a3d8c; }
+  #chip[data-state="losingBalance"] { background: #c46a12; } #chip[data-state="falling"] { background: #c0392b; } #chip[data-state="recovering"] { background: #2e7d4f; }
+  @media (min-width: 641px) { #panel:not(.hide) ~ #chip { left: calc(50% + 157px); } }
+  @media (max-width: 640px) {
+    #panel { top: auto; bottom: 10px; left: 10px; right: 10px; width: auto; max-height: 46%; }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="panel">
+  <h1>Laboratorio de personaje<small>La Mudanza Imposible · física y movimiento</small></h1>
+  <div class="tests" role="group" aria-label="Pruebas">
+    <button data-test="A"><b>A</b><span>Caminar torpemente<small>Recto, giro, parada y media vuelta</small></span></button>
+    <button data-test="B"><b>B</b><span>Tirar del sofá<small>Apenas se mueve… hasta que sale de la alfombra</small></span></button>
+    <button data-test="C"><b>C</b><span>Tropiezo y caída<small>Corre contra un bordillo y se levanta</small></span></button>
+    <button data-test="D"><b>D</b><span>Física imprevisible<small>El sofá baja por una rampa encerada</small></span></button>
+    <button data-test="libre"><b>✋</b><span>Prueba libre<small>Teclado: tú controlas al muñeco</small></span></button>
+  </div>
+  <div class="row">
+    <button id="restart">↺ Repetir</button>
+    <button id="pause" aria-pressed="false">Pausa</button>
+    <button id="slow" aria-pressed="false">Cámara lenta</button>
+    <button id="view" aria-pressed="false">Vista de juego</button>
+  </div>
+  <div class="row">
+    <button id="reactions" aria-pressed="true">Reacciones físicas</button>
+    <button id="sofaphys" aria-pressed="true">Física del sofá</button>
+  </div>
+  <label class="slider" for="intensity">Intensidad de las reacciones <output id="intval">1,00</output>
+    <input id="intensity" type="range" min="0.5" max="1.5" step="0.05" value="1" />
+  </label>
+  <div id="state" aria-live="polite">
+    <div class="now" id="now">Quieto</div>
+    <div class="meters">
+      <span>Inclinación<b id="m-lean">0°</b></span>
+      <span>Fuerza manos<b id="m-force">0 N</b></span>
+      <span>Esfuerzo<b id="m-effort">0 %</b></span>
+    </div>
+  </div>
+  <div id="log"></div>
+  <div class="keys"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> mover · <kbd>Mayús</kbd> correr · <kbd>Espacio</kbd> agarrar/soltar · <kbd>R</kbd> repetir · <kbd>P</kbd> pausa · <kbd>H</kbd> ocultar panel · arrastra para girar la cámara</div>
+</div>
+<div id="chip" data-state="idle"><span id="chip-test">Prueba A</span><b id="chip-state">Quieto</b></div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
