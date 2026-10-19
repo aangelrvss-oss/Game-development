@@ -3,7 +3,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Autopilot } from '../src/sim/autopilot';
 import { CARRIER } from '../src/sim/carrier';
-import { Game, RULES } from '../src/sim/game';
+import { Game, RULES, isCoop } from '../src/sim/game';
 import { DOOR, STAGES } from '../src/sim/level';
 import { SLOTS, localToWorld, yawQuat } from '../src/sim/sofa';
 import { LIGHT, lightAt, LIGHT_PERIOD } from '../src/sim/traffic';
@@ -212,6 +212,110 @@ describe('Rampa', () => {
     const x0 = g.sofaPos.x;
     play(g, 3);
     expect(g.sofaPos.x - x0).toBeGreaterThan(2.5);
+    g.dispose();
+  });
+});
+
+describe('Dos jugadores sin ayudantes (física cooperativa)', () => {
+  const inp = (o: Partial<PlayerInput>): PlayerInput => ({ ...NO_INPUT, ...o });
+  /** Partida a dos, ya en juego, con los dos frente a los extremos del sofá. */
+  function duo() {
+    const g = new Game(RAPIER, { humans: 2, carriers: 2, botStyle: 'atentos', seed: 1 });
+    play(g, RULES.countdown + 0.2, () => [NO_INPUT, NO_INPUT]);
+    return g;
+  }
+  const moved = (g: Game, s: { x: number; z: number }) => Math.hypot(g.sofaPos.x - s.x, g.sofaPos.z - s.z);
+
+  it('es cooperativa solo cuando todos los porteadores son humanos', () => {
+    expect(isCoop({ humans: 2, carriers: 2, botStyle: 'atentos' })).toBe(true);
+    expect(isCoop({ humans: 2, carriers: 4, botStyle: 'atentos' })).toBe(false);
+    expect(isCoop({ humans: 1, carriers: 4, botStyle: 'atentos' })).toBe(false);
+  });
+
+  it('uno solo apenas arrastra el sofá; entre los dos lo llevan más del doble de lejos', () => {
+    const dist = (both: boolean) => {
+      const g = duo();
+      g.step(DT, [inp({ grab: true }), inp({ grab: both })]);
+      const s0 = g.sofaPos;
+      play(g, 3, () => [inp({ mz: -1 }), inp({ mz: both ? -1 : 0 })]);
+      const d = moved(g, s0);
+      g.dispose();
+      return d;
+    };
+    const solo = dist(false), both = dist(true);
+    expect(solo).toBeLessThan(3.2);
+    expect(both).toBeGreaterThan(2 * solo);
+  });
+
+  it('tirar en sentidos opuestos hace girar o estira el agarre, sin explotar la física', () => {
+    const g = duo();
+    g.step(DT, [inp({ grab: true }), inp({ grab: true })]);
+    const yaw0 = g.sofaYaw;
+    play(g, 2, () => [inp({ mz: -1 }), inp({ mz: 1 })]);
+    expect(Math.abs(g.sofaYaw - yaw0)).toBeGreaterThan(0.5);
+    const v = g.sofa.linvel();
+    expect(Math.hypot(v.x, v.y, v.z)).toBeLessThan(6);
+    g.dispose();
+  });
+
+  it('soltar mientras se tira con fuerza: se tambalea, cae, y al rato vuelve a poder agarrar', () => {
+    const g = duo();
+    g.step(DT, [inp({ grab: true }), inp({ grab: true })]);
+    play(g, 1.5, () => [inp({ mx: 1 }), inp({ mx: -1 })]);
+    const ev = play(g, 1, (g) => [inp({ mx: 1 }), inp({ mx: -1, grab: g.carriers[1].holding })]);
+    const types = ev.filter((e) => 'carrier' in e && e.carrier === 1).map((e) => e.type);
+    expect(types).toContain('wobble');
+    expect(types).toContain('fall');
+    const j2 = g.carriers[1];
+    expect(j2.stunned).toBeGreaterThan(0);
+    expect(j2.knock).toBe('balance');
+    play(g, CARRIER.fallTime + 0.2, () => [NO_INPUT, NO_INPUT]);
+    expect(j2.stunned).toBe(0);
+    expect(j2.wobbling).toBe(false);
+    g.dispose();
+  });
+
+  it('llevar el sofá juntos no hace perder el equilibrio a nadie', () => {
+    const g = duo();
+    g.step(DT, [inp({ grab: true }), inp({ grab: true })]);
+    const ev = play(g, 4, (g) => [inp({ mz: -1, lift: g.time > 2 }), inp({ mz: -1, lift: g.time > 2 })]);
+    expect(ev.filter((e) => e.type === 'wobble' || e.type === 'fall')).toEqual([]);
+    g.dispose();
+  });
+
+  it('agarrar el sofá llegando a la carrera no hace tambalearse', () => {
+    const g = duo();
+    // Se alejan y vuelven corriendo hacia su extremo; agarran sin frenar
+    g.carriers[0].teleport({ x: 5.5, y: 0.7, z: 10 });
+    g.carriers[1].teleport({ x: -5.5, y: 0.7, z: 10 });
+    const ev = play(g, 2.5, (g) => g.carriers.map((c, i) => inp({ mx: c.holding ? 0 : i ? 1 : -1, grab: !c.holding && Math.abs(c.pos.x) < 2.3 })));
+    expect(g.carriers.every((c) => c.holding)).toBe(true);
+    expect(ev.filter((e) => e.type === 'wobble' || e.type === 'fall')).toEqual([]);
+    g.dispose();
+  });
+
+  it('chocar a la carrera con el compañero desequilibra a los dos; chocar con una pared, no', () => {
+    const g = duo();
+    g.carriers[0].teleport({ x: 0, y: 0.7, z: 14 });
+    g.carriers[1].teleport({ x: 4, y: 0.7, z: 14 });
+    const ev = play(g, 1.5, () => [NO_INPUT, inp({ mx: -1 })]);
+    expect(ev.filter((e) => e.type === 'wobble').map((e) => (e as { carrier: number }).carrier).sort()).toEqual([0, 1]);
+    const g2 = duo();
+    const ev2 = play(g2, 4, () => [inp({ mx: 1 }), NO_INPUT]);
+    expect(ev2.filter((e) => e.type === 'wobble' || e.type === 'fall')).toEqual([]);
+    g.dispose(); g2.dispose();
+  });
+
+  it('dos jugadores (llevados por el piloto automático) completan el recorrido', () => {
+    const g = new Game(RAPIER, { humans: 2, carriers: 2, botStyle: 'atentos', seed: 1 });
+    const aps = [new Autopilot(0), new Autopilot(1)];
+    const stages: number[] = [];
+    for (let i = 0; i < 60 * (RULES.timeLimit + 5) && (g.phase === 'countdown' || g.phase === 'playing'); i++) {
+      g.step(DT, aps.map((a) => a.input(g, DT)));
+      for (const e of g.out) if (e.type === 'stage') stages.push(e.index);
+    }
+    expect(g.phase).toBe('won');
+    expect(stages).toEqual(STAGES.map((_, i) => i).slice(1));
     g.dispose();
   });
 });

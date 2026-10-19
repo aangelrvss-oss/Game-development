@@ -14,8 +14,9 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 const params = new URLSearchParams(location.search);
 const opts: GameOptions & { auto: boolean } = {
-  humans: clampInt(params.get('humans'), 1, 4, 1),
-  carriers: clampInt(params.get('carriers'), 2, 6, 4),
+  // Por defecto, dos jugadores en el mismo teclado y sin ayudantes (física cooperativa)
+  humans: clampInt(params.get('humans'), 1, 4, 2),
+  carriers: clampInt(params.get('carriers'), 2, 6, 2),
   botStyle: (params.get('style') === 'despistados' ? 'despistados' : 'atentos') as BotStyle,
   auto: params.get('auto') === '1',
 };
@@ -45,6 +46,7 @@ let simTime = 0;
 let pendingResults: { g: Game; at: number } | null = null;
 const fpsSamples: number[] = [];
 const toastCooldown = new Map<string, number>();
+let testPilots: { game: Game | null; list: Autopilot[] } = { game: null, list: [] };
 
 // --- Menú ---
 function seg(id: string, values: (number | string)[], get: () => number | string, set: (v: number | string) => void, label = (v: number | string) => String(v)) {
@@ -114,7 +116,7 @@ function start(auto: boolean, fromGesture = true) {
   game = new Game(RAPIER, { humans, carriers: Math.max(opts.carriers, humans), botStyle: opts.botStyle, seed: Math.floor(Math.random() * 1e9) });
   autopilot = auto ? new Autopilot(0) : null;
   view.attach(game);
-  hud.setup(game, auto ? ['Piloto automático'] : ['WASD · Espacio · Mayús · Q/E', 'Flechas · Intro · Mayús dcha.', 'Mando 3', 'Mando 4']);
+  hud.setup(game, auto ? ['Piloto automático'] : ['WASD · agarrar Espacio · alzar Mayús izq. · girar Q/E', 'Flechas · agarrar Intro · alzar Mayús dcha. · girar , .', 'Mando 3', 'Mando 4']);
   hud.show(true);
   show('menu', false); show('results', false); show('pause', false);
   screen = 'play';
@@ -163,6 +165,17 @@ function handle(e: GameEvent, g: Game) {
       else if (cooled(`run${e.carrier}`, 1.5)) hud.toast(`¡Han atropellado a ${who(e.carrier!).cast.name}!`, 'bad');
       break;
     case 'stun': sfx.play('stun'); view.fx.stars(e.pos, 5); break;
+    case 'wobble':
+      sfx.play('wobble');
+      if (cooled(`wob${e.carrier}`, 1.5)) view.fx.text({ ...e.pos, y: e.pos.y + 0.9 }, '¡Uy, uy, uy!', '#1f1a2e', 32, '#fef3c7');
+      break;
+    case 'fall':
+      sfx.play('fall');
+      view.fx.dust({ ...e.pos, y: e.pos.y - 0.4 }, 9, 1);
+      view.fx.ring({ ...e.pos, y: e.pos.y - 0.6 }, '#fff7d6', 1.1);
+      view.fx.shake = Math.min(0.8, view.fx.shake + 0.35);
+      view.fx.text({ ...e.pos, y: e.pos.y + 1.6 }, '¡PATAPLOF!', '#ffffff', 44, '#7c3aed', 1.8);
+      break;
     case 'honk':
       if (cooled(`honk${e.car}`, 1.5)) { sfx.play('honk'); view.fx.text({ ...e.pos, y: e.pos.y + 0.8 }, '¡PIIII!', '#fef08a', 40); }
       break;
@@ -284,6 +297,14 @@ if (opts.auto) start(true, false);
     }
   },
   get simTime() { return simTime; },
+  /**
+   * Pruebas y grabación: el piloto automático lleva a todos los jugadores humanos (uno por jugador).
+   * Uso: `advance(n, fps, 'return window.__mudanza.autoInputs(g)')`.
+   */
+  autoInputs(g: Game): PlayerInput[] {
+    if (testPilots.game !== g) testPilots = { game: g, list: g.carriers.filter((c) => c.human !== null).map((c) => new Autopilot(c.id)) };
+    return testPilots.list.map((a) => a.input(g, DT));
+  },
   sound: (from: number, to: number) => renderTrack(soundLog.filter((e) => e.t >= from && e.t < to).map((e) => ({ ...e, t: e.t - from })), to - from),
   setZoom: (k: number | null) => view.setZoomOverride(k),
   fps: () => fpsSamples.length / fpsSamples.reduce((a, b) => a + b, 0),

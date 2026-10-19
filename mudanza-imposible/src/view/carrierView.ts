@@ -392,7 +392,8 @@ export class CarrierView {
       this.stunAge = 0;
       let dy = speed > 2 ? Math.atan2(v.x, v.z) - this.yaw : 0;
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-      this.spinTarget = dy + Math.PI * 2 * (dy >= 0 ? 1 : -1);
+      // Por equilibrio no hay pirueta: se va al suelo hacia donde se caía
+      this.spinTarget = c.knock === 'balance' ? 0 : dy + Math.PI * 2 * (dy >= 0 ? 1 : -1);
     }
     if (!stunned && this.wasStunned) {
       // Se levanta de un salto; el cuerpo vuelve a mirar al frente girando, sin saltos de orientación
@@ -446,6 +447,12 @@ export class CarrierView {
       wantPitch = 0.55 * this.stumbleDir * Math.sin(k * Math.PI);
       wantRoll = Math.sin(t * 18) * 0.25 * k;
     }
+    if (c.wobbling && !stunned) {
+      // Trastabilla: el cuerpo se va hacia donde lo lleva el desequilibrio (exagerado), con temblor
+      const lf = c.lean.x * fwd.x + c.lean.z * fwd.z, lr = c.lean.x * right.x + c.lean.z * right.z;
+      wantPitch = THREE.MathUtils.clamp(-lf * 1.4, -0.7, 0.7) + Math.sin(t * 17) * 0.05;
+      wantRoll = THREE.MathUtils.clamp(-lr * 1.4, -0.7, 0.7) + Math.sin(t * 13) * 0.08;
+    }
     if (airborne) { wantPitch = -0.25; wantRoll = Math.sin(t * 14) * 0.15; }
     let spin = 0;
     if (stunned) {
@@ -454,6 +461,12 @@ export class CarrierView {
       spin = this.spinTarget * THREE.MathUtils.smoothstep(this.stunAge, 0, 0.5);
       wantPitch = 1.35 * fall;
       wantRoll = Math.sin(t * 7) * 0.08 * fall;
+      if (c.knock === 'balance') {
+        // De bruces, de espaldas o de lado, según hacia dónde perdió el equilibrio
+        const ff = c.fallDir.x * fwd.x + c.fallDir.z * fwd.z, fr = c.fallDir.x * right.x + c.fallDir.z * right.z;
+        wantPitch = -1.35 * ff * fall;
+        wantRoll += -1.35 * fr * fall;
+      }
     }
     // Al levantarse, salta de golpe (más rápido que al caer)
     this.pitch = damp(this.pitch, wantPitch, this.getUp > 0 ? 16 : 10, dt);
@@ -494,7 +507,7 @@ export class CarrierView {
     const lagLocalX = THREE.MathUtils.clamp(lx * right.x + lz * right.z, -0.15, 0.15);
     const lagLocalZ = THREE.MathUtils.clamp(lx * fwd.x + lz * fwd.z, -0.15, 0.15);
     // Mira a cámara cuando sufre (tirón fuerte, traspié, en el aire): así se le ve la cara
-    const lookCam = stunned ? 0 : strain > 0.6 || this.stumbleT > 0 || airborne ? 1 : sofaGrab ? 0.35 : 0.25;
+    const lookCam = stunned ? 0 : strain > 0.6 || this.stumbleT > 0 || c.wobbling || airborne ? 1 : sofaGrab ? 0.35 : 0.25;
     let toCam = Math.PI - (this.yaw + spin);
     toCam = THREE.MathUtils.clamp(Math.atan2(Math.sin(toCam), Math.cos(toCam)), -1.1, 1.1) * lookCam;
     const headYaw = damp(rig.head.rotation.y, toCam + Math.sin(t * 0.7 + c.id * 2) * 0.15 * (1 - sp), 8, dt);
@@ -516,7 +529,7 @@ export class CarrierView {
     }
     // Cara: cejas, boca, pupilas y parpadeo
     const effort = sofaGrab ? strain : 0;
-    const scared = stunned || airborne || this.stumbleT > 0;
+    const scared = stunned || airborne || this.stumbleT > 0 || c.wobbling;
     for (const b of rig.brows) b.rotation.z = (b.userData.side as number) * (scared ? -0.35 : effort * 0.5);
     rig.smile.visible = !scared && effort < 0.45 && c.cast.cast !== 'enano';
     rig.shout.visible = !rig.smile.visible;
@@ -547,7 +560,7 @@ export class CarrierView {
         if (sofaGrab) {
           // La mano se apoya en la superficie (no se hunde en el sofá)
           hand = sofaGrab.clone().sub(this.group.position).addScaledVector(fwd, -this.rig.armR * 1.4).addScaledVector(right, s * 0.13);
-        } else if (stunned || airborne || this.stumbleT > 0) {
+        } else if (stunned || airborne || this.stumbleT > 0 || c.wobbling) {
           // Molinillo de brazos
           const a = t * 14 + i * Math.PI;
           hand = toLocal(rig.torso, rig.shoulders[i].clone().add(new THREE.Vector3(s * 0.3, 0.28 + Math.sin(a) * 0.15, Math.cos(a) * 0.2)));

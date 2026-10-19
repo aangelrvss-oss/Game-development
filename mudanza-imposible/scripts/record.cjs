@@ -19,7 +19,7 @@ async function take(b, name, run) {
   const errors = [];
   p.on('pageerror', (e) => errors.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await p.goto(`${url}?capture=1&carriers=4`);
+  await p.goto(`${url}?capture=1&humans=1&carriers=4`);
   await p.waitForFunction(() => window.__mudanza);
   let n = 0;
   const log = [];

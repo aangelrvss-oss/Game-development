@@ -80,9 +80,12 @@ export class Hud {
     if (game.phase === 'playing') {
       if (game.sofaUp < 0.55) w = '¡Volcado! Pulsa R (o Y en el mando) para enderezarlo';
       else if (game.sofaUp < 0.8) w = '¡Que se vuelca!';
+      else if (game.coop && game.soloDrag > 1.2) w = '¡Uno solo apenas puede con él! Agarradlo los dos';
       else if (game.stuckTime > 1.5) w = '¿Atascados? Gira el sofá (Q/E) o soltad un asa';
       // (no mientras el jugador sigue mareado: todavía no puede agarrar)
-      else if (!game.carriers.some((c) => c.human !== null && (c.holding || c.stunned > 0))) w = 'Acércate al sofá y pulsa ESPACIO para agarrarlo';
+      else if (!game.carriers.some((c) => c.human !== null && (c.holding || c.stunned > 0))) {
+        w = game.carriers.filter((c) => c.human !== null).length > 1 ? 'Acercaos al sofá y agarradlo: J1 con ESPACIO, J2 con INTRO' : 'Acércate al sofá y pulsa ESPACIO para agarrarlo';
+      }
     }
     this.warn.textContent = w;
     this.warn.style.display = w ? 'block' : 'none';
@@ -96,7 +99,7 @@ export class Hud {
     for (const c of game.carriers) {
       if (c.human === null) continue;
       const el = document.getElementById(`pl-${c.id}`);
-      if (el) el.textContent = c.stunned > 0 ? ' · ¡mareado!' : c.holding ? ' · agarrando' : '';
+      if (el) el.textContent = c.stunned > 0 ? (c.knock === 'balance' ? ' · ¡al suelo!' : ' · ¡mareado!') : c.wobbling ? ' · ¡tambaleándose!' : c.holding ? ' · agarrando' : '';
     }
   }
 }

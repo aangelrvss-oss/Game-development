@@ -23,6 +23,37 @@ export const CARRIER = {
   stunTime: 1.8,
   /** Cambio brusco de velocidad que tumba a un porteador (atropello, golpe fuerte). */
   stunDv: 9,
+  /**
+   * Fuerza horizontal con la que cada uno mueve el mueble (N), además de moverse a sí mismo.
+   * El sofá a rastras roza más que eso: uno solo apenas lo arrastra y entre dos se lleva bien.
+   */
+  pullForce: 200,
+  // Equilibrio (modelo del laboratorio de personaje: péndulo invertido empujado por fuerzas medidas)
+  comHeight: 0.9,
+  ankleMax: 6,
+  stepMax: 10,
+  kp: 30,
+  kd: 8,
+  /** Tiempo con el que se acostumbra a una fuerza (s): los cambios más rápidos le pillan desprevenido. */
+  adapt: 0.35,
+  /** Cuánto desequilibra un tirón del sofá mientras lo sujeta. */
+  holdGain: 1.6,
+  /**
+   * Al perder el agarre (suelta tirando, el asa se escapa), la tensión que sostenía desaparece de golpe:
+   * se convierte en un giro del tronco hacia atrás (rad/s por cada m/s² de tensión por masa).
+   */
+  releaseKick: 1.0,
+  /** Cambios de fuerza por debajo de esto (N) no sorprenden: agarrar, alzar y llevar el sofá con normalidad. */
+  deadZone: 100,
+  /** Cuánto desequilibra un empujón (el compañero, el sofá que le golpea). */
+  shoveGain: 0.5,
+  loseAt: 0.26,
+  fallAt: 0.78,
+  regainBelow: 0.1,
+  stumbleMin: 0.4,
+  stumbleMaxTime: 1.4,
+  /** Tiempo en el suelo tras perder el equilibrio (s). */
+  fallTime: 1.3,
 };
 
 export const CENTER_Y = CARRIER.halfHeight + CARRIER.radius;
@@ -36,6 +67,12 @@ export const CAST: { cast: Cast; name: string; color: string }[] = [
   { cast: 'enano', name: 'Enano', color: '#f97316' },
   { cast: 'perro', name: 'Salchicha', color: '#a16207' },
 ];
+
+type V2 = { x: number; z: number };
+const len2 = (v: V2) => Math.hypot(v.x, v.z);
+
+/** Resultado del equilibrio en un paso, para los sucesos de la partida. */
+export type BalanceEvent = 'wobble' | 'fall' | 'steady' | null;
 
 export class Carrier {
   readonly body: RAPIER.RigidBody;
@@ -54,6 +91,28 @@ export class Carrier {
   grounded = true;
   /** Velocidad pedida en este paso (para que los ayudantes la imiten). */
   wantVel = { x: 0, z: 0 };
+  /** Desequilibrio: desviación del tronco (rad, hacia dónde se va) y su velocidad. */
+  lean: V2 = { x: 0, z: 0 };
+  leanVel: V2 = { x: 0, z: 0 };
+  /** Trastabilla: da pasos apresurados hacia donde se cae. */
+  wobbling = false;
+  /** Veces que ha trastabillado y que se ha caído por equilibrio en la partida. */
+  wobbles = 0;
+  falls = 0;
+  /** Cómo cayó la última vez: atropello o equilibrio (la vista anima distinto cada caso). */
+  knock: 'car' | 'balance' = 'car';
+  /** Dirección de la caída por equilibrio. */
+  fallDir: V2 = { x: 0, z: 1 };
+  /** Fuerza horizontal medida sobre el cuerpo (N, suavizada) y la que espera (con retraso). */
+  private force: V2 = { x: 0, z: 0 };
+  private forceExp: V2 = { x: 0, z: 0 };
+  private lastJ: V2 = { x: 0, z: 0 };
+  private wobbleTime = 0;
+  private calmTime = 0;
+  /** Tensión que sostenía en el paso anterior (si agarraba). */
+  private heldTension: V2 | null = null;
+  /** Tras agarrar, un momento para hacerse con el peso: el tirón del propio agarre no sorprende. */
+  private grabGrace = 0;
   /** Índice de jugador humano, o null si es un ayudante. */
   constructor(
     private R: R,
@@ -62,6 +121,8 @@ export class Carrier {
     readonly cast: (typeof CAST)[number],
     public human: number | null,
     pos: Vec3,
+    /** Física cooperativa: fuerza de tiro limitada y equilibrio (ver `CARRIER.pullForce` y `balance`). */
+    readonly coop = false,
   ) {
     this.body = world.createRigidBody(
       R.RigidBodyDesc.dynamic().setTranslation(pos.x, pos.y, pos.z).lockRotations().setCcdEnabled(true),
@@ -141,19 +202,35 @@ export class Carrier {
     if (m > 1) { mx /= m; mz /= m; }
     if (this.stunned > 0) { mx = 0; mz = 0; }
     const speed = this.joint ? CARRIER.carrySpeed : CARRIER.walkSpeed;
-    const tx = mx * speed, tz = mz * speed;
-    this.wantVel = { x: tx, z: tz };
+    let tx = mx * speed, tz = mz * speed;
     // Suelo debajo
     const ray = new this.R.Ray(this.pos, { x: 0, y: -1, z: 0 });
-    const hit = this.world.castRay(ray, CENTER_Y + 0.12, true, undefined, undefined, undefined, this.body);
+    const hit = this.world.castRayAndGetNormal(ray, CENTER_Y + 0.12, true, undefined, undefined, undefined, this.body);
     this.grounded = hit !== null;
-    const maxA = (this.grounded ? CARRIER.accel : CARRIER.airAccel) * (this.stunned > 0 ? 0.15 : 1);
+    const mass = this.body.mass();
+    let maxA = (this.grounded ? CARRIER.accel : CARRIER.airAccel) * (this.stunned > 0 ? 0.15 : 1);
+    if (this.coop && this.joint && this.grounded && this.stunned <= 0) {
+      // Cargando: la fuerza para el mueble es limitada. En pendiente, además, sostiene su propio peso.
+      const n = hit!.normal;
+      maxA = CARRIER.pullForce / mass + 9.81 * Math.abs(n.y) * Math.hypot(n.x, n.z) * 1.3;
+    }
+    if (this.wobbling && this.stunned <= 0) {
+      // Pasos apresurados hacia donde se cae: los pies intentan volver a ponerse debajo del cuerpo
+      const d = this.lean, l = len2(d);
+      if (l > 1e-4) {
+        const sp = 1.2 + 3 * l;
+        tx = tx * 0.3 + (d.x / l) * sp;
+        tz = tz * 0.3 + (d.z / l) * sp;
+        if (!this.joint) maxA = CARRIER.accel * 0.6;
+      }
+    }
+    this.wantVel = { x: tx, z: tz };
     let ax = (tx - v.x) / dt, az = (tz - v.z) / dt;
     const a = Math.hypot(ax, az);
     if (a > maxA) { ax *= maxA / a; az *= maxA / a; }
-    const mass = this.body.mass();
-    this.body.applyImpulse({ x: ax * mass * dt, y: 0, z: az * mass * dt }, true);
-    if (m > 0.15 && !this.joint) this.facing = { x: mx / Math.max(m, 1e-6), z: mz / Math.max(m, 1e-6) };
+    this.lastJ = { x: ax * mass * dt, z: az * mass * dt };
+    this.body.applyImpulse({ x: this.lastJ.x, y: 0, z: this.lastJ.z }, true);
+    if (m > 0.15 && !this.joint && !this.wobbling) this.facing = { x: mx / Math.max(m, 1e-6), z: mz / Math.max(m, 1e-6) };
     // Alzar: sube la mano poco a poco
     const goal = input.lift && this.joint ? 1 : 0;
     this.handLift += Math.sign(goal - this.handLift) * Math.min(Math.abs(goal - this.handLift), dt * 3);
@@ -179,5 +256,85 @@ export class Carrier {
     this.body.setTranslation(p, true);
     this.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.prevVel = { x: 0, y: 0, z: 0 };
+    this.resetBalance();
+  }
+
+  resetBalance() {
+    this.lean = { x: 0, z: 0 }; this.leanVel = { x: 0, z: 0 };
+    this.force = { x: 0, z: 0 }; this.forceExp = { x: 0, z: 0 }; this.lastJ = { x: 0, z: 0 };
+    this.wobbling = false; this.wobbleTime = 0; this.calmTime = 0; this.heldTension = null;
+  }
+
+  /**
+   * Equilibrio, después del paso de física (modelo del laboratorio de personaje, simplificado).
+   * Mide la fuerza horizontal externa (aceleración real menos el empuje de su propio control): el agarre,
+   * el compañero o el sofá que le empujan. Lo que desequilibra es lo que cambia más deprisa de lo que
+   * espera. Las paredes no cuentan (`wall`): chocar con una pared frena, no tumba.
+   * `v0`: velocidad antes del paso. Devuelve si empieza a trastabillar, si se cae o si se recupera.
+   */
+  balance(dt: number, v0: Vec3, wall: boolean): BalanceEvent {
+    if (this.stunned > 0) { this.resetBalance(); return null; }
+    const v = this.body.linvel(), mass = this.body.mass();
+    const fx = (mass * (v.x - v0.x) - this.lastJ.x) / dt, fz = (mass * (v.z - v0.z) - this.lastJ.z) / dt;
+    if (!wall) {
+      // El empuje medido tiene ruido de contacto paso a paso: se suaviza (0,18 s)
+      const kf = Math.min(1, dt / 0.18);
+      this.force.x += (fx - this.force.x) * kf;
+      this.force.z += (fz - this.force.z) * kf;
+    }
+    if (this.joint && !this.heldTension) this.grabGrace = 0.5;
+    this.grabGrace = Math.max(0, this.grabGrace - dt);
+    const ka = this.grabGrace > 0 ? 1 : Math.min(1, dt / CARRIER.adapt);
+    this.forceExp.x += (this.force.x - this.forceExp.x) * ka;
+    this.forceExp.z += (this.force.z - this.forceExp.z) * ka;
+    let sx = this.force.x - this.forceExp.x, sz = this.force.z - this.forceExp.z;
+    const g = 9.81, h = CARRIER.comHeight, D = this.lean, W = this.leanVel;
+    if (this.heldTension && !this.joint) {
+      // Acaba de soltar: la tensión con la que tiraba (o le tiraban) desaparece de golpe
+      const k = CARRIER.releaseKick / (mass * h);
+      W.x -= this.heldTension.x * k; W.z -= this.heldTension.z * k;
+    }
+    this.heldTension = this.joint ? { ...this.forceExp } : null;
+    let gain = CARRIER.shoveGain;
+    if (this.joint) {
+      gain = CARRIER.holdGain;
+      // Tirando, la tensión que crece la genera él mismo: solo le sorprende que caiga de golpe
+      // (el otro suelta, el sofá cede) y eso le echa hacia atrás.
+      const fe = len2(this.forceExp);
+      if (len2(this.wantVel) > 0.3 && fe > 1) {
+        const ux = this.forceExp.x / fe, uz = this.forceExp.z / fe;
+        const drop = Math.max(0, fe - (this.force.x * ux + this.force.z * uz));
+        sx = -ux * drop; sz = -uz * drop;
+      }
+    }
+    const sl = Math.hypot(sx, sz), keep = sl > CARRIER.deadZone ? (sl - CARRIER.deadZone) / sl : 0;
+    sx *= keep; sz *= keep;
+    // Péndulo invertido: la gravedad agranda la desviación; el control (tobillos o pasos) es limitado
+    const umax = this.wobbling ? CARRIER.stepMax : CARRIER.ankleMax;
+    let ux = -CARRIER.kp * D.x - CARRIER.kd * W.x, uz = -CARRIER.kp * D.z - CARRIER.kd * W.z;
+    const u = Math.hypot(ux, uz);
+    if (u > umax) { ux *= umax / u; uz *= umax / u; }
+    const dist = (n: number) => Math.max(-25, Math.min(25, n));
+    W.x += ((g / h) * D.x + dist((gain * sx) / (mass * h)) + ux) * dt;
+    W.z += ((g / h) * D.z + dist((gain * sz) / (mass * h)) + uz) * dt;
+    D.x += W.x * dt; D.z += W.z * dt;
+    const l = len2(D);
+    if (this.wobbling) {
+      this.wobbleTime += dt;
+      this.calmTime = l < CARRIER.regainBelow ? this.calmTime + dt : 0;
+      if ((l > CARRIER.fallAt && this.wobbleTime > CARRIER.stumbleMin) || l > 1.1 || (this.wobbleTime > CARRIER.stumbleMaxTime && l > CARRIER.loseAt)) {
+        this.fallDir = { x: D.x / l, z: D.z / l };
+        this.knock = 'balance';
+        this.stunned = CARRIER.fallTime;
+        this.release();
+        this.resetBalance();
+        this.falls++;
+        return 'fall';
+      }
+      if (this.calmTime > 0.25) { this.wobbling = false; return 'steady'; }
+      return null;
+    }
+    if (l > CARRIER.loseAt) { this.wobbling = true; this.wobbleTime = 0; this.calmTime = 0; this.wobbles++; return 'wobble'; }
+    return null;
   }
 }

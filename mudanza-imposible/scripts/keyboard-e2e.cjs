@@ -9,7 +9,8 @@ const check = (name, ok, info) => { results.push({ name, ok, info }); console.lo
   const errors = [];
   p.on('pageerror', (e) => errors.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await p.goto(url);
+  // Escenario de 1 jugador con 3 ayudantes (el menú propone ahora 2 jugadores sin ayudantes)
+  await p.goto(url + '?humans=1&carriers=4');
   await p.waitForFunction(() => window.__mudanza && document.getElementById('menu').style.display === 'flex');
   await p.screenshot({ path: 'shots/k00-menu.png' });
   await p.click('#btn-start');

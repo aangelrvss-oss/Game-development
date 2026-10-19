@@ -24,6 +24,8 @@ export type GameEvent =
   | { type: 'impact'; pos: Vec3; strength: number; damage: number }
   | { type: 'carHit'; pos: Vec3; target: 'sofa' | 'carrier'; carrier?: number }
   | { type: 'stun'; carrier: number; pos: Vec3 }
+  | { type: 'wobble'; carrier: number; pos: Vec3 }
+  | { type: 'fall'; carrier: number; pos: Vec3 }
   | { type: 'honk'; car: number; pos: Vec3 }
   | { type: 'light'; ped: 'green' | 'red' }
   | { type: 'stage'; index: number; label: string }

@@ -1,6 +1,6 @@
 // Prueba de humo en navegador real (Chromium sin interfaz): carga, juega en modo demo, captura pantallas.
 const { chromium } = require('playwright');
-const url = process.argv[2] || 'http://localhost:4173/?auto=1';
+const url = process.argv[2] || 'http://localhost:4173/?auto=1&carriers=4';
 const outDir = process.argv[3] || 'shots';
 const maxSec = Number(process.argv[4] || 120);
 (async () => {

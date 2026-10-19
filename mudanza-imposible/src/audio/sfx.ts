@@ -1,6 +1,6 @@
 // Sonidos sintetizados con WebAudio: sin archivos ni licencias de terceros.
 // Funciona con un AudioContext normal (juego) o con un OfflineAudioContext (pista de audio de las grabaciones).
-export type SfxName = 'grab' | 'release' | 'slip' | 'impact' | 'crash' | 'honk' | 'stun' | 'beep' | 'pedTick' | 'checkpoint' | 'win' | 'lose' | 'hop' | 'step' | 'thud';
+export type SfxName = 'grab' | 'release' | 'slip' | 'impact' | 'crash' | 'honk' | 'stun' | 'beep' | 'pedTick' | 'checkpoint' | 'win' | 'lose' | 'hop' | 'step' | 'thud' | 'wobble' | 'fall';
 
 export class Sfx {
   private ctx: BaseAudioContext | null = null;
@@ -56,6 +56,9 @@ export class Sfx {
       case 'win': [523, 659, 784, 1046, 784, 1046].forEach((f, i) => this.tone(f, 0.18, 'triangle', 0.25, undefined, i * 0.12)); return;
       case 'lose': [392, 349, 311, 233].forEach((f, i) => this.tone(f, 0.3, 'sawtooth', 0.12, undefined, i * 0.22)); return;
       case 'hop': return this.tone(260, 0.2, 'sine', 0.25, 620);
+      // Tambaleo: «uy-uy-uy» que sube y baja; caída: silbido hacia abajo y golpe sordo
+      case 'wobble': [0, 0.11, 0.22].forEach((d, i) => this.tone(i % 2 ? 420 : 560, 0.1, 'sine', 0.16, i % 2 ? 560 : 420, d)); return;
+      case 'fall': this.tone(820, 0.32, 'sine', 0.16, 180); return this.tone(85, 0.22, 'sine', 0.4, 40, 0.3);
     }
   }
 

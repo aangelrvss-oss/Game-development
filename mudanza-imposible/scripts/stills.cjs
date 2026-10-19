@@ -9,7 +9,7 @@ const carriers = process.argv[3] || '4';
   const errors = [];
   p.on('pageerror', (e) => errors.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await p.goto(`http://localhost:4173/?capture=1&carriers=${carriers}`);
+  await p.goto(`http://localhost:4173/?capture=1&humans=1&carriers=${carriers}`);
   await p.waitForFunction(() => window.__mudanza && window.__mudanza.game);
   await p.evaluate(() => window.__mudanza.start(true, false));
   // [segundo de juego, zoom, nombre]

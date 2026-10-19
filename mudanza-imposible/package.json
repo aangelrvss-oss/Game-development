@@ -13,7 +13,8 @@
     "perf": "vite-node scripts/perf.ts",
     "e2e:smoke": "node scripts/smoke.cjs",
     "e2e:teclado": "node scripts/keyboard-e2e.cjs",
-    "e2e:dos": "node scripts/two-players-e2e.cjs"
+    "e2e:dos": "node scripts/two-players-e2e.cjs",
+    "e2e:duo": "node scripts/duo-e2e.cjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.19.3",

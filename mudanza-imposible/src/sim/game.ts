@@ -33,6 +33,14 @@ export interface GameOptions {
   seed?: number;
 }
 
+/**
+ * Física cooperativa: cuando todos los porteadores son humanos (sin ayudantes de la máquina), cada uno tira
+ * con fuerza limitada, el sofá pesa más y roza más a rastras (uno solo apenas lo mueve) y los porteadores
+ * pierden el equilibrio. Con ayudantes se mantiene la física original: los ayudantes y el piloto automático
+ * están ajustados a ella.
+ */
+export const isCoop = (o: GameOptions) => o.humans >= 2 && o.carriers <= o.humans;
+
 export type Phase = 'countdown' | 'playing' | 'won' | 'lost';
 
 /** Puntos de reaparición del sofá según la etapa alcanzada. */
@@ -71,6 +79,10 @@ export class Game {
   stage = 0;
   inZone = 0;
   stuckTime = 0;
+  /** Física cooperativa (todos humanos): ver `isCoop`. */
+  readonly coop: boolean;
+  /** Tiempo que lleva uno solo intentando mover el sofá sin conseguirlo (para el aviso). */
+  soloDrag = 0;
   loseReason: 'broken' | 'time' | null = null;
   out: GameEvent[] = [];
   private prevSofaVel: Vec3 = { x: 0, y: 0, z: 0 };
@@ -84,6 +96,7 @@ export class Game {
 
   constructor(private R: R, readonly opts: GameOptions) {
     this.rng = mulberry32(opts.seed ?? 12345);
+    this.coop = isCoop(opts);
     this.build();
   }
 
@@ -100,7 +113,8 @@ export class Game {
       if (b.kind === 'ramp') cd.setFrictionCombineRule(R.CoefficientCombineRule.Min);
       this.world.createCollider(cd, body);
     }
-    const s = createSofa(R, this.world, { x: SOFA_START.x, y: SOFA_START.y, z: SOFA_START.z }, SOFA_START.yaw);
+    const coop = this.coop;
+    const s = createSofa(R, this.world, { x: SOFA_START.x, y: SOFA_START.y, z: SOFA_START.z }, SOFA_START.yaw, coop);
     this.sofa = s.body;
     this.sofaColliders = s.colliders;
     for (const c of s.colliders) this.handleOwner.set(c.handle, { kind: 'sofa' });
@@ -112,7 +126,7 @@ export class Game {
       const a = localToWorld(this.sofa, slot.p);
       const out = rotate(this.sofa.rotation(), slot.out);
       const p = { x: a.x + out.x * 1.3, y: CENTER_Y + 0.05, z: a.z + out.z * 1.3 };
-      const c = new Carrier(R, this.world, i, CAST[i], i < humans ? i : null, p);
+      const c = new Carrier(R, this.world, i, CAST[i], i < humans ? i : null, p, coop);
       c.facing = { x: -out.x, z: -out.z };
       this.carriers.push(c);
       this.handleOwner.set(c.collider.handle, { kind: 'carrier', i });
@@ -264,6 +278,8 @@ export class Game {
   private stun(c: Carrier) {
     if (c.stunned > 0) return;
     c.stunned = CARRIER.stunTime;
+    c.knock = 'car';
+    c.resetBalance();
     if (c.holding) c.release();
     this.emit({ type: 'stun', carrier: c.id, pos: c.pos });
   }
@@ -291,8 +307,13 @@ export class Game {
     for (const c of this.carriers) {
       const cv = c.body.linvel();
       const cdv = Math.hypot(cv.x - c.prevVel.x, cv.y - c.prevVel.y + 9.81 * dt, cv.z - c.prevVel.z);
-      c.prevVel = { x: cv.x, y: cv.y, z: cv.z };
       if (cdv > CARRIER.stunDv) this.stun(c);
+      else if (c.coop) {
+        const b = c.balance(dt, c.prevVel, this.touchesWall(c));
+        if (b === 'wobble') this.emit({ type: 'wobble', carrier: c.id, pos: c.pos });
+        else if (b === 'fall') this.emit({ type: 'fall', carrier: c.id, pos: c.pos });
+      }
+      c.prevVel = { x: cv.x, y: cv.y, z: cv.z };
       const p = c.pos;
       const far = Math.hypot(p.x - sp.x, p.z - sp.z) > 22 || Math.abs(p.y - sp.y) > 6;
       if (p.y < -3 || far) {
@@ -310,6 +331,9 @@ export class Game {
     const speed = Math.hypot(v.x, v.z);
     const pushing = this.lead.active && Math.hypot(this.lead.x, this.lead.z) > 1;
     this.stuckTime = pushing && speed < 0.25 ? this.stuckTime + dt : Math.max(0, this.stuckTime - dt * 2);
+    const holders = this.carriers.filter((c) => c.holding);
+    const soloPush = holders.length === 1 && Math.hypot(holders[0].wantVel.x, holders[0].wantVel.z) > 1 && speed < 1.2;
+    this.soloDrag = soloPush ? this.soloDrag + dt : Math.max(0, this.soloDrag - dt * 2);
     if (this.phase !== 'playing') return;
     // Entrega
     const inZone = sp.x > ZONE.x0 && sp.x < ZONE.x1 && sp.z > ZONE.z0 && sp.z < ZONE.z1 && sp.y < 1.6;
@@ -317,6 +341,18 @@ export class Game {
     if (this.inZone >= RULES.winHold) { this.phase = 'won'; this.emit({ type: 'win' }); return; }
     if (this.integrity <= 0) { this.phase = 'lost'; this.loseReason = 'broken'; this.emit({ type: 'lose', reason: 'broken' }); return; }
     if (this.time >= RULES.timeLimit) { this.phase = 'lost'; this.loseReason = 'time'; this.emit({ type: 'lose', reason: 'time' }); }
+  }
+
+  /** ¿Choca con una pared u otro objeto fijo (contacto de lado, no el suelo)? */
+  private touchesWall(c: Carrier) {
+    let wall = false;
+    this.world.contactPairsWith(c.collider, (other) => {
+      if (wall || !other.parent()?.isFixed()) return;
+      this.world.contactPair(c.collider, other, (m) => {
+        if (m.numContacts() > 0 && Math.abs(m.normal().y) < 0.6) wall = true;
+      });
+    });
+    return wall;
   }
 
   /** Enderezar el sofá cuando está volcado. Suelta a todos y lo deja de pie con un pequeño salto. */
