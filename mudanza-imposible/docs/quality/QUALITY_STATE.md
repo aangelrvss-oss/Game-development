@@ -122,9 +122,18 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
 
 ## 8. Bucle
 
-- **Mecanismo:** `/loop` en modo autorregulado (`ScheduleWakeup`).
-- **Estado:** detenido a petición del usuario el 19-10-2026 a las 19:38 UTC; no hay despertares pendientes.
-- **Reanudación:** se reanuda cuando el ciclo 0 esté cerrado y protegido, sin pasar de 8 ciclos.
+- **Mecanismo:** `/loop` en modo autorregulado.
+  - Cada iteración ejecuta o integra un único ciclo y programa la siguiente con `ScheduleWakeup`, como latido de respaldo de 30 minutos.
+  - La señal principal es el aviso de fin del flujo de agentes del ciclo.
+- **Estado:** reactivado el 19-10-2026 a las ~21:00 UTC, después de cerrar y proteger el ciclo 0.
+- **Ciclo actual:** 1, en curso.
+- **Límite:** 8 ciclos completos.
+- **Se detiene:**
+  - cuando se cumple el criterio de la sección 6;
+  - ante una regresión crítica;
+  - ante un bloqueo que necesite una decisión humana;
+  - o si el usuario lo pide.
+- **Verificación:** la respuesta de `ScheduleWakeup` confirma el próximo despertar; no hay ningún otro proceso ni cron.
 
 ## 9. Registro de ciclos
 
