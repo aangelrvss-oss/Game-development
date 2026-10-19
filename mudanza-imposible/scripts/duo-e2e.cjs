@@ -78,7 +78,11 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
     `J1 Δz ${(s.cs[0].z - before[0].z).toFixed(2)}, J2 Δz ${(s.cs[1].z - before[1].z).toFixed(2)}`);
 
   // 3. Cada uno a un extremo del sofá y agarran (pulsando Espacio e Intro a la vez cuando llegan los dos)
+  // Si alguien no se acerca a su extremo en ~0,8 s (el sofá le corta el paso en línea recta), rodea el sofá
+  // por fuera durante ~0,6 s, como haría una persona. Cada rodeo queda anotado en `detours`.
+  const detours = [];
   async function grabBoth() {
+    const best = [Infinity, Infinity], stall = [0, 0], detour = [0, 0];
     for (let it = 0; it < 120; it++) {
       s = await st();
       if (s.cs.every((c) => c.h)) return true;
@@ -95,8 +99,22 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
           side = i === 0 ? near0 : -near0;
         }
         const tx = s.sofa[0] + ax * 1.75 * side, tz = s.sofa[2] + az * 1.75 * side;
-        const dx = tx - c.x, dz = tz - c.z;
+        const dx = tx - c.x, dz = tz - c.z, dist = Math.hypot(dx, dz);
         const k = keys[i];
+        if (dist < best[i] - 0.05) { best[i] = dist; stall[i] = 0; } else stall[i]++;
+        if (stall[i] >= 8 && !detour[i] && dist > 0.3) {
+          detour[i] = 6;
+          detours.push(`J${i + 1} bloqueado en (${c.x.toFixed(2)}, ${c.z.toFixed(2)}) hacia (${tx.toFixed(2)}, ${tz.toFixed(2)}); sofá (${s.sofa[0].toFixed(2)}, ${s.sofa[2].toFixed(2)}) yaw ${s.yaw.toFixed(2)}`);
+        }
+        if (detour[i] > 0) {
+          // Perpendicular a la dirección del objetivo, por el lado de fuera del sofá
+          let qx = -dz / dist, qz = dx / dist;
+          if (qx * (c.x - s.sofa[0]) + qz * (c.z - s.sofa[2]) < 0) { qx = -qx; qz = -qz; }
+          if (Math.abs(qx) > 0.3) down.push(qx > 0 ? k.r : k.l);
+          if (Math.abs(qz) > 0.3) down.push(qz > 0 ? k.d : k.u);
+          if (--detour[i] === 0) { best[i] = Infinity; stall[i] = 0; }
+          continue;
+        }
         if (Math.abs(dx) > 0.2) down.push(dx > 0 ? k.r : k.l);
         if (Math.abs(dz) > 0.2) down.push(dz > 0 ? k.d : k.u);
         if (Math.abs(dx) <= 0.2 && Math.abs(dz) <= 0.2) ready++;
@@ -144,7 +162,9 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   await p.screenshot({ path: 'shots/duo/a2-uno-solo.png' });
 
   // 4c. Vuelven a agarrar los dos y tiran en sentidos opuestos, de través al sofá (según su orientación real)
-  ok(await grabBoth(), 'J2 vuelve a agarrar');
+  const tRegrab = (await st()).t;
+  const regrabbed = await grabBoth();
+  ok(regrabbed, 'J2 vuelve a agarrar', regrabbed ? '' : `(sucesos: ${await evSince(tRegrab)}; sofá ${JSON.stringify(s.sofa.map((v) => +v.toFixed(2)))} yaw ${s.yaw.toFixed(2)}; estado ${JSON.stringify((await st()).cs.map((c) => ({ h: c.h, x: +c.x.toFixed(2), z: +c.z.toFixed(2), stun: +c.stun.toFixed(2), wob: c.wob })))})`);
   await hold([], 0.5);
   s = await st();
   const yaw0 = s.yaw;
@@ -188,12 +208,33 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   ok(s.cs[1].stun === 0, 'J2 se levanta solo');
   ok(await grabBoth(), 'tras levantarse, J2 vuelve a agarrar');
 
-  // 6. Chocar con una pared (J1 suelta y corre hacia el este hasta la valla): frena, no se cae
+  // 6. Chocar con una pared (J1 suelta y corre hacia el este hasta la valla): frena, no se cae.
+  // Soltar con el sofá en tensión puede hacer tambalearse (es la mecánica): se deja pasar 1 s antes de correr,
+  // para que la comprobación sea solo la del choque con la valla
   await p.keyboard.press('Space');
-  let wallFall = false;
-  await hold(['KeyD'], 2.5, async (n) => { if (n.cs[0].stun > 0 || n.cs[0].wob) wallFall = true; });
+  let releaseWob = false;
+  await hold([], 1.0, async (n) => { if (n.cs[0].wob || n.cs[0].stun > 0) releaseWob = true; });
+  for (let i = 0; i < 60 && ((await st()).cs[0].wob || (await st()).cs[0].stun > 0); i++) await p.waitForTimeout(100);
+  // Corre hacia el este hasta que algo fijo le para: la valla del patio (x 7,8), el seto junto a la salida
+  // (desde x 8,2, z 3,6–4,4) o, en la acera, el límite de la calle (x 18). Si se queda antes, la prueba no vale.
+  const free = !(await st()).cs[0].h;
+  let wallFall = false, lastX = -Infinity, still = 0;
+  const tWall = (await st()).t;
+  await p.keyboard.down('KeyD');
+  for (;;) {
+    await tick();
+    const n = await st();
+    if (n.cs[0].stun > 0 || n.cs[0].wob) wallFall = true;
+    still = n.cs[0].x - lastX < 0.02 ? still + 1 : 0;
+    lastX = n.cs[0].x;
+    if (still >= 5 || n.t - tWall > 6) break;
+  }
+  await p.keyboard.up('KeyD');
   s = await st();
-  ok(!wallFall, 'correr contra la pared frena sin tumbar', `J1 x=${s.cs[0].x.toFixed(2)}`);
+  const wx = s.cs[0].x, wz = s.cs[0].z;
+  const atWall = (wz > 3.3 && wz < 17 && Math.abs(wx - 7.8) < 0.6) || Math.abs(wx - 18) < 0.6;
+  ok(free && atWall && !wallFall, 'correr contra la pared frena sin tumbar',
+    `J1 se para en x=${wx.toFixed(2)}, z=${wz.toFixed(2)}${free ? '' : ' (J1 seguía agarrado)'}${atWall ? '' : ' (no llegó a una pared)'}${releaseWob ? ' (al soltar antes de correr se tambaleó: tensión del sofá)' : ''}`);
 
   // 7. Reiniciar con Retroceso
   await p.keyboard.press('Backspace');
@@ -228,6 +269,7 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
 
   const real = errors.filter((e) => !/deprecated parameters/.test(e));
   ok(real.length === 0, 'sin errores de página ni de consola', real.slice(0, 3).join(' | '));
+  if (detours.length) console.log(`Rodeos del piloto de prueba al agarrar: ${detours.length}\n  ${detours.join("\n  ")}`);
   console.log(fails ? `${fails} comprobaciones fallidas` : 'Todas las comprobaciones pasan');
   await b.close();
   process.exit(fails ? 1 : 0);
