@@ -50,7 +50,16 @@ Documento persistente de la transformación. Cada ciclo **lo lee al empezar y lo
 ## 4. Auditoría
 
 - **Informes íntegros:** en [`audit/`](audit/00-indice.md): 6 auditores, el revisor de completitud y el JSON original.
-- **Verificación propia, hallazgo por hallazgo:** en [`audit/08-verificacion.md`](audit/08-verificacion.md) (*en curso*).
+- **Verificación independiente, hallazgo por hallazgo:** en [`audit/08-verificacion.md`](audit/08-verificacion.md), con scripts en `scripts/audit/verif-*/`.
+  - **94 hallazgos:** 86 CONFIRMADOS, 8 PARCIALES, 0 refutados, 0 no reproducidos.
+  - **Los 6 críticos están confirmados con medición.** Se agrupan en 5: el de entrada aparece en dos áreas.
+  - **Parciales, casi siempre por gravedad exagerada:**
+    - fisica-10: recolocar a los porteadores alejados;
+    - niveles-15: un cuerpo fijo por caja, una optimización sin coste medible;
+    - ui-audio-07: alzar no se entiende; el aviso sí aparece en la escalera;
+    - ui-audio-11: la física cambia según el número de jugadores; el menú lo indica;
+    - ui-audio-13, -18 y -20: menores correctos con matices;
+    - reutilizable-03: jugadores solo distinguibles por color; los sombreros son una especificación nueva.
 
 Defectos críticos según los auditores, sin duplicados, con su verificación:
 
@@ -60,7 +69,12 @@ Defectos críticos según los auditores, sin duplicados, con su verificación:
 | C2 | El agarre es una mordaza rígida: uno solo alza y lleva el sofá; la masa no se nota en vertical | **CONFIRMADO**: `verify.ts`, caso B |
 | C3 | Se pierden pulsaciones de agarrar y enderezar en los fotogramas sin paso de física; Start solo pausa bien en el mando de J1 | **CONFIRMADO leyendo el código** (`input.ts:73`, `main.ts:240-253`); no reproducido con hardware |
 | C4 | `visOff` desplaza el muñeco para esconder penetraciones y contradice la cápsula física | **CONFIRMADO**: el código lo hace por diseño (`dollView.ts`, `pushOut`) y lo escribí yo en el ciclo anterior |
-| C5 | Nada demuestra que el nivel se complete con 3 o 4 jugadores (0/8 medidos) | **CONFIRMADO** (consecuencia de C1 y del piloto); se verifica de nuevo en `08-verificacion.md` |
+| C5 | Nada demuestra que el nivel se complete con 3 o 4 jugadores (0/8 medidos) | **CONFIRMADO** (qa-01 en `08-verificacion.md`) |
+
+Matices de la verificación sobre los críticos:
+- **C1:** depende de que los cuerpos toquen el sofá al agarrar (con los contactos desactivados en memoria no vuelca). Pierde un 16–24 % en 3 s. Con 3 jugadores solo se inclina.
+- **C2:** la masa real del sofá «90 kg» es de 66,5 kg, porque la densidad se calcula sobre cajas que se solapan.
+- **C3:** a 144 Hz se pierde el 58 % de las pulsaciones; medido con el `InputManager` real en Node, sin hardware.
 
 **Mayores:** 35 en total, en `audit/0*.md`. Los 10 problemas estructurales del revisor (`audit/07-revisor-completitud.md`, sección 4) son la base del plan.
 
@@ -80,8 +94,8 @@ Defectos críticos según los auditores, sin duplicados, con su verificación:
 
 | Ciclo | Objetivo | Estado |
 |---|---|---|
-| 0 | Diagnóstico: auditoría protegida, línea base, dirección artística, checkpoint, estado persistente | En curso: falta la verificación hallazgo por hallazgo y la línea base de navegador |
-| 1 | **Núcleo fiable**: entradas sin pérdidas (incluidos mandos y 4 jugadores); mano blanda con fuerza limitada y física única; alzado automático; cápsula a la anchura del muñeco y caída física sin `visOff`; pruebas de partida completa con 2, 3 y 4 jugadores | Siguiente |
+| 0 | Diagnóstico: auditoría protegida, línea base, dirección artística, checkpoint, estado persistente | **Cerrado** el 19-10-2026, ~21:05 UTC |
+| 1 | **Núcleo fiable**: entradas sin pérdidas (incluidos mandos y 4 jugadores); mano blanda con fuerza limitada y física única; alzado automático; cápsula a la anchura del muñeco y caída física sin `visOff`; pruebas de partida completa con 2, 3 y 4 jugadores. Especificación: [`cycles/ciclo-1.md`](cycles/ciclo-1.md) | **En curso** (flujo `wf_5b4f2ec4-c74`, en el worktree aislado `rebirth/ciclo-1`) |
 | 2 | Sistema de objetos (`ItemDef`) y entrega en el camión con progreso; nivel como datos (`LevelDef`) con el recorrido actual como nivel de referencia | Pendiente |
 | 3 | Nivel 1 completo («Una casa imposible»), con aprendizaje integrado | Pendiente |
 | 4 | Personajes y assets con Blender (muebles, camión) siguiendo la dirección artística | Pendiente |
@@ -114,11 +128,12 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
 
 ## 9. Registro de ciclos
 
-- **Ciclo 0** (19-10-2026, en curso):
-  - Hecho:
-    - auditoría con 7 agentes, protegida en el repositorio;
-    - línea base automática;
-    - dirección artística;
-    - Blender sin interfaz;
-    - etiqueta anotada local.
-  - Pendiente: verificación hallazgo por hallazgo y línea base de navegador.
+- **Ciclo 0** (19-10-2026, cerrado):
+  - auditoría con 7 agentes;
+  - verificación independiente de los 94 hallazgos;
+  - línea base automática y de navegador (`e2e:duo` 19/20 con un fallo previo);
+  - dirección artística;
+  - Blender sin interfaz;
+  - etiqueta anotada local, cuya publicación está bloqueada por la política (HTTP 403);
+  - todo en commits y publicado.
+  - **Incidencia:** 3 verificadores fallaron por el límite de uso de la sesión («resets 8:30pm UTC») y se repitieron con éxito. **Riesgo para los ciclos siguientes:** el límite de uso puede interrumpir flujos largos; si ocurre, se reanuda el flujo (los agentes terminados quedan en caché) y se registra.

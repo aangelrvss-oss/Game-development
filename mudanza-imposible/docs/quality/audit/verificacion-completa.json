@@ -1,0 +1,1021 @@
+{
+  "summary": "Verifica cada defecto de la auditoría (CONFIRMADO / REFUTADO / NO REPRODUCIDO) con evidencia",
+  "agentCount": 6,
+  "logs": [],
+  "result": [
+    {
+      "area": "fisica",
+      "result": {
+        "verdicts": [
+          {
+            "id": "fisica-01",
+            "severity": "critical",
+            "title": "Con 3 o 4 jugadores en la física cooperativa, las asas laterales vuelven inestable el sofá (vuelca y lo destroza solo)",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad crítica es correcta para 4 jugadores, un modo que el menú ofrece (main.ts:69): el sofá vuelca boca abajo y todos sueltan en menos de 1 s, sin que nadie haga nada. Hay tres matices. «Lo destroza» exagera: pierde un 16-24 % en 3 s. Con 3 jugadores quietos no pasa nada, y de lado solo se inclina (sofaUp mínimo 0,54) sin daño. Y depende de que los cuerpos toquen el sofá al agarrar: si agarran desde la posición de salida, o tras acercarse solo 10 pasos, no vuelca.",
+            "evidence": "Código leído hoy: carrier.ts:196 `this.joint.setContactsEnabled(this.coop)`; carrier.ts:131 `.lockRotations()`; sofa.ts:25-28 (asas laterales en z=±0,45); game.ts:124-131 (salida frente a SLOTS[i]).\n\nMedición `npx vite-node scripts/audit/verif-fisica/v01b-cuatro-acercandose.ts` (protocolo del auditor: se acercan 25 pasos y agarran):\n- n=4 quietos, contactos ON: «minUp=-1.00 maxω=6.00 integ=84 agarranFin=0000 ev=0.12:impact-3,0.38:impact-11,0.65:stun0,0.65:stun1,…,0.88:fall3,0.92:fall2».\n- Mismo caso con `setContactsEnabled(false)` puesto en memoria tras agarrar: «minUp=0.98 maxω=2.13 integ=100 agarranFin=1111». Esto prueba la causa.\n- Solo laterales: integ=83. Solo extremos: integ=100.\n- Andando a lo largo: integ=76 (con contactos OFF: 100 y 6,90 m).\n- De lado: integ=79, caen 3, 0 y 2.\n- n=3 quietos: integ=100. n=3 de lado: minUp=0.54 (con contactos OFF, 0.96).\n- Sensibilidad (acercamiento 0/10/40 pasos): 0 → minUp 0.95, integ 100; 10 → estable; 40 → integ 79.\n\n`grep -n \"humans:\" tests/*.ts`: ninguna prueba con 3 o 4 humanos.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v01b-cuatro-acercandose.ts (y v01-cuatro.ts para la sensibilidad)"
+          },
+          {
+            "id": "fisica-02",
+            "severity": "critical",
+            "title": "El agarre es una mordaza rígida: uno solo levanta y lleva el sofá alzando (y la masa no se nota en vertical)",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "El mecanismo es real, pero la gravedad crítica me parece algo exagerada. El truco no sale gratis: alzando solo, el sofá cuelga y golpea, y pierde un 15 % en 3 s y hasta un 44 % en 12 s. Además, los «90 kg» son en realidad 66,5 kg. Lo dejaría en major alta; comparte causa con fisica-01 (rótula rígida más contacto cuerpo-sofá).",
+            "evidence": "Código: carrier.ts:190-191 crea una rótula `JointData.spherical` sin límite de fuerza; carrier.ts:196 deja activos los contactos en cooperativa; carrier.ts:266-277 sube el ancla hasta liftY 0,78; game.ts:350 `soloDrag` exige speed<1.2.\n\n`npx vite-node scripts/audit/verif-fisica/v02-solo-alza.ts`:\n- Uno solo sin alzar: «dist3s=2.50 m … integ=100».\n- Uno solo alzando: «dist3s=4.85 m, centro y=0.92, extremo libre (borde inferior) max=2.10, up min=-0.13, soloDrag fin=0.00, integ=85».\n- Dos juntos: 6,94 m.\n- Contactos OFF alzando: 3,49 m y extremo libre max 0,03, es decir, se queda en el suelo.\n- coopMass=300 (masa real 221,5 kg): uno 2,36 m, dos 3,93 m.\n- coopMass=1000 (masa real 738 kg): dos alzan el centro a y=0,97, igual que con 66 kg.\n\n`npx vite-node scripts/audit/verif-fisica/v02b-solo-largo.ts`: uno solo alzando a mz=-0,6 recorre 23,4 m en 12 s y la integridad queda en 56.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v02-solo-alza.ts (y v02b-solo-largo.ts)"
+          },
+          {
+            "id": "fisica-03",
+            "severity": "critical",
+            "title": "Se pierden pulsaciones de agarrar y enderezar en los fotogramas sin paso de física (pantallas de más de 60 Hz)",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad crítica es correcta: el verbo principal falla en más del 50 % de las pulsaciones en monitores de 120 o 144 Hz (habituales) y en un 22 % a 75 Hz.",
+            "evidence": "Código: input.ts:20 añade a `pressedOnce` solo en el primer keydown; input.ts:73 lo vacía en cada `read()`; input.ts:57-58 y 66 calculan el flanco del mando contra `prevPad`, que se actualiza en cada lectura. main.ts:240 lee la entrada en cada fotograma; main.ts:243 `while (acc >= DT …)` puede no ejecutarse; main.ts:249 borra los flancos tras el primer paso.\n\n`npx vite-node scripts/audit/verif-fisica/v03-entrada.ts` usa el InputManager REAL con window y navigator simulados, más una réplica de main.ts:239-253:\n- «60 Hz: 0.0 % sin paso, 400/400»\n- «60 Hz (±1 ms): 395/400»\n- «75 Hz: 20.0 %, 312/400»\n- «120 Hz: 50.0 %, 195/400»\n- «144 Hz: 58.3 %, 171/400»\n- «240 Hz: 100/400»\n\nCon `Game` real a 144 Hz, Espacio pulsado en el fotograma k: «f0:NO f1:NO f2:agarra f3:NO f4:agarra …» (agarra 4 de 12). Botón A del mando a 144 Hz: 99/200.\n\nNo probado con monitor ni mando físicos: no se permite navegador.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v03-entrada.ts"
+          },
+          {
+            "id": "fisica-04",
+            "severity": "major",
+            "title": "«Alzar» no es necesario en la escalera; el aviso, el README y la prueba de regresión lo atribuyen mal",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad major es correcta. No rompe la partida, pero el HUD exige Mayús sin necesidad, incluso mientras están subiendo, y el README y la prueba justifican la mecánica con un diagnóstico falso.",
+            "evidence": "Código: game.ts:157-163 (`needsLiftAtStairs` = algún humano con handLift<0,5, sin mirar si avanzan); hud.ts:84; tests/sim.test.ts:346-362 (solo comprueba warned>4, lift=true y etapa Arriba); README.md:111 «Sin alzar, la escalera no se puede subir»; README.md:122-125.\n\n`npx vite-node scripts/audit/verif-fisica/v04-escalera.ts`:\n- z0=-17, empujan ambos sin alzar: «arriba en 3.95 s; aviso «alzad» 2.03 s, de ellos subiendo 1.97 s».\n- Alzando: 3,48 s.\n- A velocidad 0,35: 8,97 s sin alzar y 7,62 s alzando.\n- z0=-20: 3,85 s y 3,27 s.\n- Empujando solo J1 o solo J2: «NO (25 s)», alcen o no.\n- Pilotos con alzar forzado a false todo el rato: «etapa=Arriba t=33.52», frente a 30,57 s alzando.\n\nvitest: 29/29 pasan, incluida la prueba de la línea 346.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v04-escalera.ts"
+          },
+          {
+            "id": "fisica-05",
+            "severity": "major",
+            "title": "El piloto automático retrocede sin motivo 2,5 s después de cada punto de paso (`lastDist` no se reinicia)",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad major es correcta: el piloto es el modo demo del menú y la base de las pruebas e2e, y este fallo provocó el diagnóstico erróneo de fisica-04. Matiz: no todos los retrocesos caen unos 2,5 s después del cambio (el de 16,97 llega a +0,78 s y el de 35,50 a +0,02 s), porque `stuck` se arrastra entre puntos. Aun así, todos desaparecen con la corrección.",
+            "evidence": "Código: autopilot.ts:67 hace `this.wp++` sin reiniciar `lastDist` ni `stuck`; autopilot.ts:69 `if (dist < this.lastDist - 0.05)`; autopilot.ts:70 activa el retroceso con stuck>2,5.\n\n`npx vite-node scripts/audit/verif-fisica/v05-piloto.ts`, piloto ORIGINAL:\n- «t=42.45 … escalera 19.33→28.27 (8.93 s) retrocede escalera abajo hasta y=0.39 tras llegar a y=3.46».\n- 7 retrocesos: t=6.08, 10.67, 16.97, 19.95 [wp5 Escalera, sofá y=1.61 z=-22.79], 22.63, 32.82 y 35.50, los mismos instantes que da el auditor.\n\nCon una subclase en memoria que reinicia `lastDist` y `stuck` al cambiar de punto: «t=29.87 escalera 1.87 s, retrocesos (0)».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v05-piloto.ts"
+          },
+          {
+            "id": "fisica-06",
+            "severity": "major",
+            "title": "El límite de fuerza cooperativo se salta en el aire y el porteador de detrás flota sobre la escalera",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad major es aceptable: se ve en el único nivel, y el límite cooperativo deja de aplicarse entre 2,3 y 4,5 s en cada subida. Matiz: «empuja con más fuerza que en el suelo» solo es cierto frente al llano (420 N contra 200 N). En la escalera, con suelo, la fórmula da 7,02 m/s², más que los 6 m/s² del aire.",
+            "evidence": "Código: carrier.ts:241 `maxA = grounded ? accel : airAccel`; carrier.ts:242 el límite cooperativo exige `this.grounded`.\n\n`npx vite-node scripts/audit/verif-fisica/v06-aire.ts`:\n- «J1 (detrás) pierde el suelo agarrando en z=-20.36 y=0.79 (superficie y=0.00)», todavía en llano: la escalera empieza en z=-22 (level.ts:91).\n- «z=-23.4:y=1.93/sup=0.53/AIRE»: de pie estaría a 0,53+0,65=1,18.\n- Altura máxima de 0,76 m sobre la de estar de pie, en z=-26,02.\n- 2,47 s en el aire (2,32 s alzando); con v04 a velocidad 0,35, 4,53 s.\n- Aceleraciones máximas calculadas con las constantes: llano en cooperativa 2,86 m/s² (200 N), aire 6 m/s² (420 N), escalera con suelo en cooperativa 7,02 m/s².",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v06-aire.ts"
+          },
+          {
+            "id": "fisica-07",
+            "severity": "major",
+            "title": "Hay dos físicas según haya ayudantes; sin física cooperativa no hay choque, la fuerza es ilimitada y no hay equilibrio",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad major es correcta como defecto de diseño. Es intencionado (comentario en game.ts:36-41), pero impide un modo de 1 jugador, o mezclar humanos y ayudantes, con las mismas reglas.",
+            "evidence": "Código: game.ts:42 `isCoop = humans>=2 && carriers<=humans`; sofa.ts:44-45 (masa y rozamiento); carrier.ts:196, 242 y 268; game.ts:326 (equilibrio solo si `c.coop`); hud.ts:85 (aviso de «uno solo» solo en cooperativa).\n\n`npx vite-node scripts/audit/verif-fisica/v07-varios.ts`:\n- «humans=1 coop=false masaSofá=33 kg: uno solo lo lleva 9.02 m en 3 s; penetración máx. cuerpo-sofá 36.3 cm»; alzando, 9,23 m y 38,3 cm.\n- En cooperativa: «2.50 m; 0.0 cm».\n- {humans:2, carriers:4} → coop=false, masa 33 kg, rozamiento 0,7.\n- {humans:2, carriers:2} y {humans:4, carriers:4} → coop=true, 66 kg, rozamiento 1.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v07-varios.ts"
+          },
+          {
+            "id": "fisica-08",
+            "severity": "major",
+            "title": "Asignación de mandos por orden: con 2 en teclado y 2 con mando, J3 y J4 no tienen control",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad major es correcta: con 3 o 4 jugadores que mezclan teclado y mando, uno o dos jugadores se quedan sin control, y el mando se suma a la entrada de J1 y J2.",
+            "evidence": "Código: input.ts:32 `filter(... p.connected)`, así que `pads[i]` es la posición en la lista filtrada y no `Gamepad.index`; input.ts:41-51 aplican `KEYS[i]` y `pads[i]` al mismo jugador; main.ts:77 («El mando 1 es de J1…»).\n\n`npx vite-node scripts/audit/verif-fisica/v03-entrada.ts`, con W (J1), ← (J2), mando 0 a la derecha y mando 1 hacia abajo:\n- «J1: mx=0.71 mz=-0.71; J2: mx=-0.71 mz=0.71; J3: mx=0.00 mz=0.00; J4: mx=0.00 mz=0.00».\n- Al desconectar el mando 0: «pads()=1 -> el mando de índice 1 controla a J1. Su pulsación de A: J1.grab=false» (flanco perdido porque `prevPad` queda desfasado).",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v03-entrada.ts"
+          },
+          {
+            "id": "fisica-09",
+            "severity": "major",
+            "title": "El daño por Δv del centro no distingue un golpe real de un choque entre la articulación y los contactos",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad major es exagerada. En la partida a dos no da daños espurios: 0 impactos en el recorrido completo. Los golpes falsos con 4 jugadores son un síntoma de fisica-01 (empuje real cuerpo-sofá, no «ruido del motor»). Hoy sería minor; pesa como deuda para objetos frágiles.",
+            "evidence": "Código: game.ts:309-311 solo usa `sofa.linvel()` (ni velocidad angular ni con qué choca); game.ts:239-240 hace `world.step` y después `clampSofa`, y `afterStep` se llama en game.ts:263.\n\n`npx vite-node scripts/audit/verif-fisica/v07-varios.ts` (4 humanos quietos):\n- «t=0.12 impacto -3 (Δv=3.71 m/s); contactos del sofá: paso anterior=nada / este paso=porteador2».\n- «t=0.38 impacto -11 (Δv=5.47) … porteador3+porteador1 / porteador2».\n- «t=0.73 impacto -2 … +fijo(suelo/pared)».\n- «Recorrido completo con 2 pilotos: fase=won impactos=0 integridad=100».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v07-varios.ts"
+          },
+          {
+            "id": "fisica-10",
+            "severity": "major",
+            "title": "Recolocación de porteadores alejados del sofá",
+            "verdict": "PARCIAL",
+            "severityCheck": "La gravedad major es exagerada. Con un solo sofá es un rescate intencionado y no causa ningún daño. El criterio vertical (6 m) nunca salta en este nivel (FLOOR2=2,6, level.ts:30). Solo sería un defecto en niveles con varios objetos, y ya figura en la tabla de acoplamientos. La dejaría en minor o acoplamiento.",
+            "evidence": "Código: game.ts:332-336 (`far = dist > 22 || |dy| > 6` → `teleport` junto al sofá).\n\n`npx vite-node scripts/audit/verif-fisica/v07-varios.ts`: «J2 a 21,5 m: queda en x=21.50; J2 a 22,5 m: tras 1 paso está en (0.25, 1.40, 11.50), sofá en (0.00, 0.20, 10.00)».\n\nEl comportamiento es exactamente el descrito; lo que es solo hipotético es el perjuicio («quien vaya a por otro objeto»).",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v07-varios.ts"
+          },
+          {
+            "id": "fisica-11",
+            "severity": "minor",
+            "title": "Los humanos y los ayudantes llevan el sofá a alturas distintas, y el sofá cuelga inclinado unos 15°",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad minor es correcta para lo que se describe: con humanos he medido unos 12° de inclinación, no 15°. Pero se queda corta con los ayudantes. Su asa (y=0,05) está por debajo del centro de masas (unos 0,15), así que con 2 ayudantes el sofá cuelga a 63° (sofaUp 0,45 < 0,55, el umbral de «¡Volcado!» en hud.ts:82).",
+            "evidence": "Código: carrier.ts:171-178 (sonda a la altura de la mano y punto más cercano → lo alto del reposabrazos: sofa.ts:13, y 0,33+0,15 = 0,48); SLOTS con y=0,05 (sofa.ts:23-28).\n\n`npx vite-node scripts/audit/verif-fisica/v07-varios.ts`:\n- «humans=2: grabLocal.y=0.48/0.48 centro y=0.40 sofaUp=0.979 (11.8°)».\n- «humans=0 (2 ayudantes): grabLocal.y=0.05 centro y=0.85 sofaUp=0.450 (63.2°)».\n- «1 humano + 1 ayudante: centro y=0.62, eje largo inclinado 10.3°».\n\n`npx vite-node scripts/audit/verif-fisica/v11-ayudantes-inclinacion.ts`:\n- 2 ayudantes: up=0,45 estable durante 10 s.\n- 4 ayudantes: up=1,00.\n- Demo con 1 humano y 3 ayudantes: up<0,9 durante 29,8 de 35,8 s.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v07-varios.ts y v11-ayudantes-inclinacion.ts"
+          },
+          {
+            "id": "fisica-12",
+            "severity": "minor",
+            "title": "Start del mando: la pausa se activa y desactiva sola con mandos de J2 en adelante",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad minor es correcta: J2 no puede pausar con el mando, y un mando sin jugador hace parpadear la pausa.",
+            "evidence": "Código: input.ts:66 solo actualiza `prevPad[i]` dentro de `read(n)` para i<n; input.ts:78-85 `padStart` lee `prevPad` de todos los mandos; main.ts:236 llama a `padStart` y main.ts:256 llama a `read(1)` en pausa.\n\n`npx vite-node scripts/audit/verif-fisica/v03-entrada.ts` (partida de 2 humanos, Start mantenido en f1..f5):\n- mando 0: «-PPPPPPP»\n- mando 1: «-P------» (se pausa y se quita en el fotograma siguiente)\n- mando 2: «-P-P-PPP» (alterna en cada fotograma)",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v03-entrada.ts"
+          },
+          {
+            "id": "fisica-13",
+            "severity": "minor",
+            "title": "Teclado: Mayús como tecla de mantener, límite de 6 teclas simultáneas y teclas sin preventDefault",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad minor es correcta. Lo que depende del navegador o del hardware no lo he podido reproducir: la búsqueda rápida de Firefox con «/» en distribución US, las Teclas especiales de Windows y el límite de 6 teclas o el fantasma. Lo comprobado son los hechos del código y el recuento de teclas.",
+            "evidence": "Código: input.ts:5-6 (alzar = ShiftLeft/ShiftRight, mantenido); input.ts:19 (`preventDefault` solo en Arrow* y Space); input.ts:25 (`blur` vacía `down`); README.md:692 lo reconoce.\n\n`npx vite-node scripts/audit/verif-fisica/v03-entrada.ts`:\n- «Space:sí ArrowUp/Down/Left/Right:sí; KeyW KeyA KeyS KeyD ShiftLeft KeyQ KeyE KeyR Enter NumpadEnter ShiftRight Comma Period Slash: NO».\n- «Mayús izq. mantenida: lift=true; tras un blur de la ventana: lift=false».\n\nRecuento: W+D+Q y ↑+→+coma suman 6 teclas que no son modificadores; Espacio o Intro sería la 7.ª, por encima del límite de 6 teclas del protocolo de arranque USB (afirmación teórica, no medida).",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v03-entrada.ts"
+          },
+          {
+            "id": "fisica-14",
+            "severity": "minor",
+            "title": "Mando: sin comprobar la distribución, zona muerta sin reescalar y alzar en B",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad minor es correcta.",
+            "evidence": "Código: `grep -rn mapping src/input src/main.ts` no devuelve nada; input.ts:53-54 aplican la zona muerta de 0,2 sin reescalar y la suman a la cruceta (input.ts:64-65); input.ts:59 alza con los botones 1, 6 o 7; input.ts:60-61 giran con LB/RB.\n\n`npx vite-node scripts/audit/verif-fisica/v03-entrada.ts`:\n- «eje=0.199->mx=0.000  eje=0.201->mx=0.201».\n- «mapping='' (no estándar) y botón 1: lift=true».\n- «stick 0,5 + cruceta derecha: mx=1.00».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v03-entrada.ts"
+          },
+          {
+            "id": "fisica-15",
+            "severity": "minor",
+            "title": "Detalles de la intención del grupo y de las asas ocupadas",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad minor es correcta, quizá algo corta para el giro: un jugador que no agarra gira el sofá 85° en 2 s solo con Q o E.",
+            "evidence": "Código:\n- game.ts:187: `if (inp.turn !== 0) lw += …` sin comprobar `c.holding`.\n- bots.ts:68: los ayudantes se mueven si h.w≠0, aunque `lead.active` sea false.\n- game.ts:194-195: `taken` solo incluye las asas de los ayudantes.\n- bots.ts:57 y 92: eligen asa entre `!taken.has(i)`.\n\n`npx vite-node scripts/audit/verif-fisica/v07-varios.ts` (1 humano y 2 ayudantes; el humano lejos y sin agarrar):\n- turn=0 → giro de 0,1°.\n- turn=1 durante 2 s → «agarran=011 (humano=false) lead.w=0.9 giro del sofá=-84.9°».\n\nLo de `taken` lo he comprobado solo leyendo el código.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/v07-varios.ts"
+          },
+          {
+            "id": "fisica-16",
+            "severity": "minor",
+            "title": "Avisos del HUD fijos para teclado y 2 jugadores",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "La gravedad minor es correcta.",
+            "evidence": "Código:\n- hud.ts:84: «Mantened Mayús (J1 la izquierda, J2 la derecha)».\n- hud.ts:89: «J1 con ESPACIO, J2 con INTRO».\n- hud.ts:86: «Gira el sofá (Q/E)» (teclas de J1).\n- main.ts:120: ayuda escrita a mano ('WASD…', 'Flechas…', 'Mando 3', 'Mando 4').\n\nÚnica excepción: hud.ts:82 sí menciona «o Y en el mando».",
+            "script": ""
+          }
+        ],
+        "notes": "1) La masa real del sofá no es la que dicen el código ni el auditor. `npx vite-node scripts/audit/verif-fisica/v11-ayudantes-inclinacion.ts` da: SOFA.coopMass=90 → 66,5 kg; mass=45 → 33,2 kg; coopMass 300 → 221,5 kg; coopMass 1000 → 738,4 kg. La causa es que Rapier calcula la masa del `roundCuboid` con el cuboide interior: volúmenes 0,504+0,190+0,059+0,059, mientras que sofa.ts:43 supone 0,792 para la base. Así que los «90 kg», «300 kg» y «1000 kg» del informe son nominales. Esto afecta a cualquier ajuste fuerza/masa (pullForce/mass).\n\n2) fisica-11 se queda corto con los ayudantes. Sus asas (y=0,05) están por debajo del centro de masas, así que con 2 ayudantes el sofá cuelga a 63° (sofaUp 0,45), por debajo del umbral de «¡Volcado!» (hud.ts:82). En la demo con 1 humano y 3 ayudantes, el sofá va con up<0,9 durante el 83 % del tiempo agarrado.\n\n3) fisica-01 depende de la pose al agarrar:\n- Si agarran desde la salida o tras acercarse 10 pasos, con 4 jugadores no vuelca (aunque ω llega al tope de 6 rad/s sin acercarse).\n- Con 25 o 40 pasos, vuelca o pierde un 16-21 %.\n- La frase del auditor «Con 3 jugadores de lado: sofaUp mínimo 0,54» corresponde a contactos ACTIVOS; con contactos desactivados, 0,96.\n\n4) fisica-02: el truco de alzar solo cuesta integridad (−15 % en 3 s, hasta −44 % en 12 s), pero recorre 23 m en 12 s y el aviso soloDrag se apaga.\n\n5) fisica-05: corregir `lastDist` baja el recorrido de 42,45 s a 29,87 s y la escalera de 8,93 s a 1,87 s. Los tiempos «Velocidad del piloto con dos… 42,4 s» del README se deben sobre todo a este fallo.\n\n6) fisica-03: incluso a 60 Hz con ±1 ms de jitter se pierde el 1,2 % de las pulsaciones; a 75 Hz, el 22 %.\n\n7) Estado del repositorio:\n- `git diff --stat 08547f8 HEAD -- src tests` está vacío: el código del juego es idéntico a 08547f8.\n- Durante la sesión aparecieron commits ajenos (9259a44, 837dca7). No he hecho ningún commit ni checkout y no he modificado archivos existentes.\n- vitest: 29/29 pasan. No he ejecutado tsc.\n\n8) Scripts nuevos, en /home/user/Game-development/mudanza-imposible/scripts/audit/verif-fisica/: v01-cuatro.ts, v01b-cuatro-acercandose.ts, v02-solo-alza.ts, v02b-solo-largo.ts, v03-entrada.ts, v04-escalera.ts, v05-piloto.ts, v06-aire.ts, v07-varios.ts y v11-ayudantes-inclinacion.ts. Todos se ejecutan con `npx vite-node <script>` desde mudanza-imposible.\n- v03 necesita `window.performance` en el stub: sin él, Rapier (wasm) falla con «RuntimeError: unreachable».\n- Para las pruebas causales, los scripts cambian SOFA.coopMass, setContactsEnabled y una subclase del Autopilot solo en memoria, nunca en disco."
+      }
+    },
+    {
+      "area": "niveles",
+      "result": {
+        "verdicts": [
+          {
+            "id": "niveles-01",
+            "severity": "major",
+            "title": "El camión es un bloque macizo mientras la vista dibuja una caja de carga abierta",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Exagerada para el juego actual. No falla nada: la entrega es la zona del suelo y nadie necesita entrar en la caja. Lo único visible es una pared invisible en la abertura. Solo es «major» si se mide como bloqueo de la función futura de cargar el camión.",
+            "evidence": "Código: src/sim/level.ts:119 `span(28, 34, 0, 3.4, -33.5, -27, 'truck')` crea un sólido (solid=true por defecto, level.ts:35) desde y=0 hasta 3,4. src/view/levelView.ts:601 dice «abierta por detrás». En levelView.ts:604 `bottom = 1.3`, en 616 está el suelo de carga a 1,3 y en 622-627 las cajas dentro. La zona va en level.ts:117 (x 23,5..28, delante del camión) y la victoria se comprueba en game.ts:354. Medición: `npx vite-node scripts/audit/verif-niveles/fisica.ts`, sección 1. Los rayos +x lanzados desde x=26, z=-30,25 por la abertura dibujada, a y=0,3/1/2/3, chocan los cuatro en «x=28.000». El rayo vertical en x=31 «choca en y=3.400», cuando el suelo de carga dibujado está a 1,375.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/fisica.ts"
+          },
+          {
+            "id": "niveles-02",
+            "severity": "major",
+            "title": "Cuatro listas paralelas describen el mismo camino y van acopladas por índice",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Algo exagerada como defecto actual, porque hoy no hay fallo observable. Es razonable como deuda que bloquea el cambio a varios niveles, y la desincronización silenciosa está demostrada. Matiz: ROUTE no va acoplada por índice. Va por coordenadas repetidas y por la etiqueta 'Escalera'. Las que sí van por índice son STAGES, CHECKPOINTS, NEXT y `stage>=5`.",
+            "evidence": "Código: ROUTE tiene 11 puntos (level.ts:129-141), STAGES 7 (level.ts:144-152), CHECKPOINTS 7 (game.ts:47-55) y NEXT 6 (levelView.ts:99-102, con `NEXT[stage]` y `n ?? null` en 108-109). world.ts:122 pasa `game.stage >= 5`. game.ts:389 usa `Math.min(this.stage, CHECKPOINTS.length - 1)`, así que no lanza ningún error. El valor -30.6 aparece en level.ts:136-139, game.ts:52-53 y levelView.ts:100; 25.6/25.5 en level.ts:140 y game.ts:54. Medición: `npx vite-node scripts/audit/verif-niveles/etapas.ts`, que inserta una etapa 'Acera' en STAGES solo en memoria. Original: «stage=2 ('Portal'); reaparece en {z:-16}», zona activa en «Rampa, Camión». Con la etapa añadida: «stage=3 ('Portal'); reaparece en {z:-20.5}» (el checkpoint de la escalera), zona activa en «Arriba, Rampa, Camión». No hay ninguna excepción.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/etapas.ts"
+          },
+          {
+            "id": "niveles-03",
+            "severity": "minor",
+            "title": "Las etapas repiten literales en vez de usar las constantes",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta. El fallo es latente: hoy los valores coinciden.",
+            "evidence": "src/sim/level.ts:147 `z < -13.5` y level.ts:148 `z < -22 && y > 0.6`, frente a `DOOR.z` (level.ts:85) y `STAIRS.z0` (level.ts:91). fisica.ts, sección 6: «DOOR.z=-13.5 (STAGES 'Portal' usa -13.5); STAIRS.z0=-22 (STAGES 'Escalera' usa -22)». Los dos `reached` son ciertos justo pasada la constante.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/fisica.ts"
+          },
+          {
+            "id": "niveles-04",
+            "severity": "minor",
+            "title": "La escalera está definida a medias y su dibujo se calcula en tres sitios",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta: es duplicación con un desfase visual de unos centímetros.",
+            "evidence": "Código: level.ts:91 `STAIRS = { z0, z1, top }` no tiene x ni ancho. La colisión usa w0=-1.4 y w1=1.4 (level.ts:92-95). Los peldaños llevan `n = 14` y ancho 2,8 en x=0 (levelView.ts:240, 246). decor.ts:347 repite n=14 y decor.ts:352 usa `s * 1.37`. game.ts:160 usa `Math.abs(s.x) < 1.8`. Medición (fisica.ts, sección 2, rayos verticales en x=0): «rise=0.1857 m». En el centro del canto dibujado (z0-run·i-0,05) la diferencia es 0.167. En el centro de la huella es 0.093 y al fondo de la huella 0.004. La pendiente de colisión pasa por las esquinas interiores, así que en el borde exacto del peldaño el tope dibujado queda exactamente una contrahuella (0,186 m) por encima. Coincide con «unos 0,19 m».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/fisica.ts"
+          },
+          {
+            "id": "niveles-05",
+            "severity": "minor",
+            "title": "La región de la calle está escrita a mano en cuatro sitios",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta.",
+            "evidence": "El contenido es cierto, pero la línea citada de hud.ts está mal: hud.ts tiene 107 líneas (`wc -l`). La aparición real está en src/ui/hud.ts:96, `s.z < 7 && s.z > -12 && s.y < 1.5`, que además añade una condición en y. Las otras: src/main.ts:185 (`case 'light'`, aviso de verde), main.ts:254 (dentro de `frame`, que empieza en main.ts:227) y main.ts:295 (dentro de `advance`, main.ts:278), todas con `z < 7 && z > -12`. Ninguna se deriva de `LANES` (traffic.ts:7-10) ni de las aceras (level.ts:68, 70). Comando: `grep -n \"z < 7\" src/ui/hud.ts src/main.ts`.",
+            "script": ""
+          },
+          {
+            "id": "niveles-06",
+            "severity": "minor",
+            "title": "La simulación ignora rz si una caja también tiene rx, pero la vista aplica las dos",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta: es latente y hoy no afecta a ninguna caja.",
+            "evidence": "game.ts:404-409: `if (rx) return {x: sin(rx/2)...}` devuelve solo rx, con el comentario «Solo se usa una de las dos rotaciones a la vez». levelView.ts:50-51 aplica `rotation.x` y `rotation.z`. `Box` (level.ts:14-28) no tiene campo `ry`. fisica.ts, sección 3: «cajas con rx: stairs rx=0.356», «cajas con rz: ramp rz=-0.297», «cajas con rx y rz a la vez: 0», «¿alguna caja tiene campo ry? false».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/fisica.ts"
+          },
+          {
+            "id": "niveles-07",
+            "severity": "minor",
+            "title": "Los decoradores por caja solo funcionan en una orientación o a una altura",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta. Además ya se nota hoy: el pasillo de arriba no tiene rodapié.",
+            "evidence": "addFence (levelView.ts:220-227) usa `len = b.h[2]*2` y reparte las estacas en z. Su barra en levelView.ts:234 se desplaza en x. addRampStripes (levelView.ts:261-266) usa `b.h[0]` y `Euler(0,0,b.rz)`. addSkirting (levelView.ts:197) usa y=0,07 fijo, y solo se llama si `b.p[1] < 2.2` (levelView.ts:75). fisica.ts, sección 4: las 2 vallas son «larga en z», hay una única rampa con rz=-0.297 y en las 5 paredes salen «rodapié SÍ» para las dos de y 0..4,20 y «NO» para las tres que empiezan en y=2,60 (las del pasillo superior y la terraza).",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/fisica.ts"
+          },
+          {
+            "id": "niveles-08",
+            "severity": "minor",
+            "title": "mergeStatic no funde las mallas con varios materiales (edificios de fondo)",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta.",
+            "evidence": "levelView.ts:155: `... || Array.isArray(m.material) || keep.has(m)) return;`. levelView.ts:381-385 asigna un array de 6 materiales y las llamadas `building(...)` están en levelView.ts:392-403. Medición: `npx vite-node scripts/audit/verif-niveles/vista.ts`, que ejecuta buildLevel() con un canvas falso. Salida: «multimaterial sin fundir: 9 mallas, 54 grupos => 54 llamadas de dibujo en el pase de color» y «fundidas: 146 mallas, 30752 triángulos; de ellas 26 con caja envolvente de más de 40 m (no se descartan por cámara)». README.md:483 anota «unos 9 000 triángulos más en cualquier vista».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/vista.ts"
+          },
+          {
+            "id": "niveles-09",
+            "severity": "minor",
+            "title": "La zona, los focos del semáforo y el camión se funden y siguen animándose solo porque comparten el objeto material",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta: es una fragilidad y hoy no hay fallo.",
+            "evidence": "levelView.ts:96-97: `keep` = fadeables + baliza. levelView.ts:111 anima `zone.material.opacity`. Los focos usan ownMat (levelView.ts:560, 570) y addTruck (600-655) no se excluye. vista.ts: la «zona: malla en escena con posición (0.00,0.00,0.00), geometría indexada=false, caja geom x 23.50..28.00 z -34.00..-26.50», es decir, fundida. La «opacidad tras update(zoneActive=true)=0.9499; tras update(zoneActive=false)=0.8000», así que la malla fundida sí se anima. «semáforos: 8 materiales cambian de color con update(); mallas que los usan: fundidas=8, originales=0». «camión: hijo previo al letrero ENTREGA es Group con 0 hijos» y «mallas con su origen dentro del camión que siguen sueltas en la escena: 0».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/vista.ts"
+          },
+          {
+            "id": "niveles-10",
+            "severity": "minor",
+            "title": "La vista no tiene liberación de recursos: cambiar de nivel dejaría basura en la GPU",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta. Es latente: hoy buildLevel() se llama una sola vez (world.ts:59) y no hay fuga real.",
+            "evidence": "El canvas y la CanvasTexture de addZone se crean en levelView.ts:661-668. textSprite crea canvas, textura y SpriteMaterial en text.ts:7-28, y ownMat se usa en levelView.ts:48 y 306-321. La interfaz LevelView (levelView.ts:31-36) no tiene dispose. `grep -n \"setLevel\\|dispose\" src/view/world.ts src/view/levelView.ts` solo encuentra world.ts:98-99 (porteadores y coches). vista.ts: «LevelView tiene dispose: false» y «2.ª construcción: canvas nuevos=4; geometrías nuevas=226/227; materiales nuevos=54/188; texturas nuevas=5/31». Nada libera lo de la primera construcción.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/vista.ts"
+          },
+          {
+            "id": "niveles-11",
+            "severity": "minor",
+            "title": "El piloto depende del texto de las etiquetas y Waypoint.y no se usa",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta.",
+            "evidence": "autopilot.ts:82: `inp.lift = target.label === 'Escalera';`. tests/sim.test.ts:352: `STAGES.findIndex((s) => s.label === 'Arriba')`, y sim.test.ts:360 `toBe('Arriba')`. level.ts:127 declara `y?: number`. `grep -n \"\\.y\\b\" src/sim/autopilot.ts` no devuelve nada, y fisica.ts, sección 6, da «waypoints con y definido: 0».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/fisica.ts"
+          },
+          {
+            "id": "niveles-12",
+            "severity": "minor",
+            "title": "Las cajas de choque de los objetos ignoran su giro ry",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta: desfases de unos 0,05 a 0,22 m en objetos de decoración.",
+            "evidence": "La referencia «props.ts:184-186» está mal: props.ts tiene 56 líneas. Lo relevante está en props.ts:19-20 («alineada con los ejes»), en level.ts:122, que hace `add({p, h: o.hit, kind:'prop'})` sin rotación, y en decor.ts:377, donde la vista aplica `o.rotation.y = p.ry`. fisica.ts, sección 5: los 9 objetos con ry y hit tienen colisor «q=(0.000,0.000,0.000,1.000)». El dibujo girado sobresale de su caja: armchair ry=-0.50 «sobresale 0.179 m en x, 0.179 m en z»; wheelbarrow ry=0.40 «0.222 m en x, 0.104 m en z»; handTruck ry=2.60 «0.089/0.109».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/fisica.ts"
+          },
+          {
+            "id": "niveles-13",
+            "severity": "minor",
+            "title": "El texto dice «zona verde» y la zona se pinta amarilla",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta.",
+            "evidence": "index.html:84 («hasta la zona verde del camión») e index.html:99 («deja el sofá en la zona verde»). levelView.ts:664 rellena con `#facc15` (amarillo), con rayas `#fff7d6` en 665-666. El letrero de levelView.ts:674 sí es verde (`bg: '#16a34a'`). Matiz: el README no dice solo «zona amarilla» (README.md:274). README.md:29 dice «zona verde junto al camión», así que el README se contradice a sí mismo. Comando: `grep -rn -i \"zona verde\\|zona amarilla\" src index.html README.md`.",
+            "script": ""
+          },
+          {
+            "id": "niveles-14",
+            "severity": "minor",
+            "title": "Código muerto y caché con clave incompleta",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta, incluso generosa. Hoy no tiene efecto visible: los edificios con la misma clave usan siempre la misma semilla (style+30 con estilos 0..4, levelView.ts:378-384), y la casa (levelView.ts:26) tiene una clave distinta.",
+            "evidence": "`grep -rn TERRACE src tests scripts` solo encuentra la definición en level.ts:105. textures.ts:179-180: `windowsTex(wall, shutter, seed = 12)` con la clave `win|${wall}|${shutter}`. vista.ts: «windowsTex(misma pared y persiana, semilla 1 y 2) devuelve la misma textura: true».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/vista.ts"
+          },
+          {
+            "id": "niveles-15",
+            "severity": "minor",
+            "title": "Cada caja sólida crea su propio cuerpo fijo de Rapier",
+            "verdict": "PARCIAL",
+            "severityCheck": "«minor» es el máximo defendible. Es una nota de optimización y no un defecto: con el nivel actual no hay coste medible.",
+            "evidence": "El hecho es cierto: game.ts:108-115 hace un `createRigidBody(fixed)` por caja sólida. fisica.ts, sección 7: «cajas sólidas en LEVEL: 56 (de ellas 'prop': 27)» y «fijos: 56; colisores en cuerpos fijos: 56». El beneficio que se insinúa no se sostiene: `npx vite-node scripts/audit/verif-niveles/cuerpos.ts` (40 cajas dinámicas sin dormir, 2000 pasos, 5 repeticiones) da con el nivel x1 «actual: mediana 0.1605 ms/paso» frente a «un solo cuerpo fijo: 0.1630», ruido; con el nivel x10 (560 colisores), 0.2335 frente a 0.2061 ms/paso, unos 0,03 ms. Como referencia, Game.step real cuesta «0.1594 ms/paso».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/cuerpos.ts"
+          }
+        ],
+        "notes": "1) Código verificado: `git diff --stat 08547f8 HEAD -- mudanza-imposible/src mudanza-imposible/index.html mudanza-imposible/tests mudanza-imposible/README.md` sale vacío. Durante la verificación otra tarea movió HEAD a 837dca7, pero el código del juego sigue siendo idéntico al de 08547f8. Yo no ejecuté ninguna orden git que cambie el estado.\n2) Varias referencias de línea del informe no existen. hud.ts tiene 107 líneas: las citas hud.ts:233, 285 y 297 corresponden en realidad a hud.ts:33, 84 y 96. materials.ts tiene 49 líneas: `mat`/`ownMat` están en 6-26, no en 241-261. props.ts tiene 56 líneas, así que «props.ts:184-186» no existe. El contenido de los defectos 5 y 12 es cierto igualmente, pero las citas son poco fiables en las secciones de arquitectura y acoplamientos.\n3) El README se contradice: la línea 29 dice «zona verde» y la 274 «zona amarilla».\n4) La falta de rodapié en las paredes del piso de arriba (defecto 7) ya se ve hoy, no solo en edificios futuros.\n5) Observación propia sin gravedad: CHECKPOINTS[3] (z=-20,5, y=0,6) no cumple STAGES[3].reached, y CHECKPOINTS[5] (x=13) no cumple 'Rampa' (x>14). Parece intencionado (reaparecer antes del obstáculo), pero muestra que esas listas no son validables entre sí.\n6) El cálculo del defecto 4 da exactamente una contrahuella (0,1857 m) en el borde exacto del peldaño. Mi rayo, en el centro del canto dibujado de 0,1 m, mide 0,167; la media en la huella es 0,093.\n7) No ejecuté tsc ni vitest (la afirmación «29 pruebas en verde» del resumen no es un defecto). Tampoco lancé navegador ni servidor.\n8) Solo he creado scripts nuevos, en /home/user/Game-development/mudanza-imposible/scripts/audit/verif-niveles/: fisica.ts, etapas.ts, cuerpos.ts y vista.ts. vista.ts sustituye `document` por un canvas falso para poder ejecutar buildLevel() en Node."
+      }
+    },
+    {
+      "area": "vista",
+      "result": {
+        "verdicts": [
+          {
+            "id": "vista-01",
+            "severity": "critical",
+            "title": "visOff desplaza el muñeco entero para esconder penetraciones y contradice la cápsula física (lo prohíbe el usuario)",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Se puede defender como critical porque incumple una prohibición explícita del usuario (citada en docs/quality/audit/rebirth-audit.workflow.js:22) y es la tarea T-coh-1 del ciclo 1. Por lo que ve el jugador sería major: el desplazamiento es de unos 10 cm y, además, no llega a esconder los casos graves.",
+            "evidence": "Código: dollView.ts:31-33 (MAX_OFF_UP 0.2 y MAX_OFF_DOWN 0.6), 169-171 (offGoal = pushOut(...), salvo si s.holding, y group.position.copy(visOff)), 174-181 (aro, etiqueta y estrellas suman visOff) y 202-218 (pushOut, solo tronco y cabeza). README.md:82 y :172 lo presentan como solución. Medición con `npx vite-node scripts/audit/verif-vista/v01-visoff.ts`:\n- Empujando el extremo +x del sofá sin agarrar: «visOff>5cm en 82/90 fotogramas, medio 0.081 m, máx 0.111 m | … cápsula: distancia mínima al sofá -0.070 m, fotogramas con penetración >5 mm: 10». La cápsula penetra solo de forma transitoria (yo mido hasta 7 cm, no los 2,7 cm del auditor), mientras que el dibujo se aparta de forma sostenida.\n- Tambaleo pegado al sofá: «desequilibrio 0.65 rad … haría falta apartar el dibujo 0.750 m | visOff aplicado 0.200 m | penetración residual del tronco/cabeza dibujados 0.295 m». El auditor daba 0,82 m.\n- Tumbado: «visOff mín 0.031 máx 0.056 m».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/v01-visoff.ts"
+          },
+          {
+            "id": "vista-02",
+            "severity": "major",
+            "title": "El volumen dibujado no cabe en el físico: más alto, más ancho, inclinación y pose tumbada solo visuales",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Major es correcto: es la causa raíz de vista-01 y vista-03, y permite atravesar un cuerpo que se ve en pantalla.",
+            "evidence": "Código: carrier.ts:8-9 (radio 0.32, semialtura 0.33), carrier.ts:131 (lockRotations), dollRig.ts:157-158 (lathes de tronco hasta r=0.359), dollRig.ts:336 (inclinación de hasta 1.2 rad), dollView.ts:138-144 (giro LIE_ANGLE 1.45 rad alrededor de los pies). Medición con v02-volumen.ts:\n- «altura dibujada (pies→punto más alto) 1.541 m; cápsula 1.300 m». El auditor daba 1,58 m; la diferencia de unos 4 cm sale de la respiración y el aplastamiento.\n- «radio horizontal del tronco 0.359 m frente a radio de cápsula 0.32».\n- «Tumbado: vértice dibujado más alejado del eje de la cápsula 1.547 m; la cápsula se ha movido 0.000 m y su rotación es (0,0,0,1)». No existe ningún cuerpo físico tumbado.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/v02-volumen.ts"
+          },
+          {
+            "id": "vista-03",
+            "severity": "major",
+            "title": "La dirección de caída dibujada no es la simulada y la oclusión mira donde no está el cuerpo",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Exagerada; yo la pondría en minor. La dirección dibujada se desvía a propósito, para no dibujar el cuerpo dentro del sofá o de una pared, y la física no tiene cuerpo tumbado (es consecuencia de vista-02). El fallo propio de este defecto es la oclusión: world.ts sigue lanzando el rayo a la cápsula de pie, así que solo falla con geometrías concretas, y no lo he reproducido con una pared real.",
+            "evidence": "Código: dollView.ts:118 (this.fallDir = freeFallDir(c.fallDir)), dollView.ts:224-241, y world.ts:172, que añade el punto p + c.fallDir·0,7 (la dirección de la simulación, no la dibujada). Medición con v02-volumen.ts, con el porteador pegado al extremo +x y cayendo hacia el sofá: «simulación c.fallDir=(-1.00,0.00), dibujo DollView.fallDir=(-0.07,-1.00): 86° de diferencia». La cabeza se dibuja en (1.38, 8.83) y el punto extra de oclusión queda en (0.73, 10.00), a 1.34 m. Coincide exactamente con lo que midió el auditor.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/v02-volumen.ts"
+          },
+          {
+            "id": "vista-04",
+            "severity": "major",
+            "title": "Piernas de goma de varios metros: no hay estado en el aire y la reaparición no recoloca los pies",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Major es correcto: es un artefacto muy visible, en juego normal y en cada reaparición.",
+            "evidence": "Código: grep «grounded» en src/view/doll devuelve 0 resultados. snap() solo se llama en dollView.ts:91. tube.ts:88-89 estira sin límite. dollView.ts:103-108 devuelve footY si no hay suelo a menos de 2,3 m. game.ts:335 hace el teleport. Medición con v03-piernas.ts:\n- «De pie quieto: cadera→tobillo = 0.293 / 0.293 m».\n- «Cápsula soltada a 1,5 m: 43 fotogramas con c.grounded=false; cadera→tobillo máx 1.795 m».\n- «Reaparición (game.ts:335): cadera→tobillo máx 6.959 m; fotogramas >0,45 m: 27 (0.45 s)». El estiramiento depende de lo lejos que salte; el auditor midió 2,65 m.\n- Piloto 2J: pies por encima de 0,45 m en «20.2%/18.7% 6.0%/7.2%» de los fotogramas, con máximo 1.149 m.\n- Piloto 4J: hasta 27–35 % en J4, con máximo 1.078 m.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/v03-piernas.ts"
+          },
+          {
+            "id": "vista-05",
+            "severity": "major",
+            "title": "Caras ilegibles desde la cámara de juego: la gorra tapa los ojos",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Major es correcto: incumple ART_DIRECTION.md:42-45 y la cara es el canal expresivo del personaje.",
+            "evidence": "Código: dollRig.ts:185 (ojo en DIM.headC+0.075 = 0.245 de una cabeza de 0.55, dollRig.ts:179), dollRig.ts:191 (ceja de radio 0.013) y dollRig.ts:211-213 (casquete de r 0.336 y visera de r 0.21 en z=-0.2). Medición con v04b-caras-barrido.ts, muñeco quieto de frente a la cámara: «elevación 53.4°: ojos visera/visible», «62.2°: visera/visera» y «≥45°: el ojo izquierdo siempre tapado por la visera». Medición con v04-caras.ts (recorridos con piloto, muestreo cada 4 fotogramas):\n- 2J: algún ojo visible J1 0 % y J2 74 %; obstáculos: gorra 87.9 %, sofá 10.1 %.\n- 4J: algún ojo visible 44/1/0/60 %; obstáculos: gorra 100 %.\n- Cuando se ve, el ojo mide p50 7,9–8,7 px de ancho y la cabeza 62–73 px.\n- Caso estático: ojo de 7.2×7.1 px y ceja de 2.0 px de grosor a 1280×720.\n- De espaldas a la cámara: J1 74 % en 2J; J2 y J3 99 % en 4J.\nLos porcentajes por jugador no coinciden con los del auditor (otras partidas), pero la conclusión sí.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/v04-caras.ts"
+          },
+          {
+            "id": "vista-06",
+            "severity": "major",
+            "title": "Identificación de 4 jugadores solo por color e incoherente",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Major es correcto para un juego local de hasta 4 jugadores. ART_DIRECTION.md:27-34 pide un sombrero distinto por jugador y el mismo tono en peto, sombrero y aro.",
+            "evidence": "Código:\n- dollView.ts:12-17: PLAYER_LOOKS solo cambia colores sobre el mismo CharacterRig con gorra.\n- carrierView.ts:7: PLAYER_COLORS es ['#facc15','#22d3ee','#f472b6','#a3e635'], frente al peto de J1 '#d93a2e' (dollRig.ts:52) y el de J4 '#5f9c2a'.\n- dollView.ts:67 y hud.ts:36 usan PLAYER_COLORS.\n- README.md:26 dice «peto y gorra rojos, aro amarillo».\n- El rojo de peligro y las cinchas son '#ef4444' (sofaView.ts:92 y 118).\n- grep de indicadores fuera de pantalla: ninguno (solo la baliza de objetivo, levelView.ts:116).\nCálculo propio (Viénot 1999, ΔE76) con un script de Python en línea, sin archivo: peto J1–J4 da 100.0 en visión normal y 4.5 con deuteranopía; aro J1–J4 da 5.2 con protanopía; peto J1 frente a rojo de peligro da 8.4. No he medido que los aros se solapen con 4 jugadores.",
+            "script": ""
+          },
+          {
+            "id": "vista-07",
+            "severity": "major",
+            "title": "Coste de dibujo del muñeco y del sofá impide escalar a 4 jugadores y muchos objetos",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Algo exagerada. Todas las cifras son exactas, pero «impide escalar» no está demostrado: no hay medida de fotogramas por segundo en una GPU real. Es un riesgo de escalado, no un fallo actual. Entre major bajo y minor.",
+            "evidence": "Código: dollRig.ts:79-80 (rubber y cloth crean un material en cada llamada), dollRig.ts:185 (geometría nueva por ojo), dollRig.ts:211 (gorra de 40×20), sofaView.ts:15-19 y 39-47. Medición con v05-coste.ts, estimando las llamadas como projectObject (visibles y en el frustum, sin GPU):\n- Muñeco: «48 mallas en total, 47 visibles, 23 materiales (24 con la boca oculta), 47 geometrías, 14402 triángulos, 24 proyectores de sombra; ¿los dos ojos comparten geometría? false».\n- Sofá: «54 mallas visibles (llamadas), 18072 triángulos».\n- Escena 2J: «~233 llamadas, 71.6 k triángulos, 246 mallas proyectoras».\n- Escena 4J: «~331 llamadas, 100.5 k triángulos, 294 proyectoras; muñecos 47+47+47+47».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/v05-coste.ts"
+          },
+          {
+            "id": "vista-08",
+            "severity": "major",
+            "title": "Sin interpolación entre pasos de física: tirones a más de 60 Hz",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Major es razonable porque las pantallas de 120/144 Hz son habituales. A 60 Hz exactos apenas se nota (99 % de fotogramas con 1 paso). El tirón visual no se puede observar en este entorno; lo confirmado es el mecanismo y su efecto calculado.",
+            "evidence": "Código: main.ts:241-253 (acumulador con DT 1/60, como máximo 5 pasos y luego acc=0) y main.ts:259 (view.render dibuja el estado actual, sin alpha). sofaView.ts:141 reconoce que hay «fotogramas sin paso». Simulación aritmética del mismo bucle con `npx vite-node scripts/audit/verif-vista/v07-bucle.ts`:\n- «144 Hz: 0 pasos: 58%, 1 pasos: 42% | desplazamiento dibujado por fotograma 2.36 ± 2.79 cm».\n- «120 Hz: 0 pasos 50%».\n- «60 Hz: 1 pasos 99%, 5.66 ± 0.69 cm».\n- «Fotograma de 70 ms: 4 pasos de física de golpe».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/v07-bucle.ts"
+          },
+          {
+            "id": "vista-09",
+            "severity": "minor",
+            "title": "El babero pone a DoubleSide el material compartido del peto",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Minor es correcto: dibuja caras traseras de más y puede dar artefactos de luz, sin efecto en el juego.",
+            "evidence": "Código: dollRig.ts:143 (over = cloth(...)) y dollRig.ts:160-161 (bib usa over; `(bib.material).side = THREE.DoubleSide`). Comparten over las líneas 158, 165, 170 y 221. En ejecución, v05-coste.ts da: «material del peto (torso.children[1]) side=DoubleSide; mallas que lo comparten: 8».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/v05-coste.ts"
+          },
+          {
+            "id": "vista-10",
+            "severity": "minor",
+            "title": "Las manos se hunden en el objeto y saltan sin transición al agarrar o soltar",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Minor es correcto: es pulido de animación. El hundimiento es pequeño (unos 4 cm) y el salto, muy visible.",
+            "evidence": "Código: dollRig.ts:470-473 (la mano va al agarre ±0,14 m en lateral y +0,05 m en altura, sin suavizado), dollRig.ts:489-491 (+0,06 m a lo largo del antebrazo). No hay pose de mano cerrada: palma y pulgar fijos (dollRig.ts:235-242). Medición con v06-manos-fugas.ts:\n- «Agarrar: salto de cada manopla en UN fotograma: 0.870 / 0.516 m».\n- «Soltar: 0.776 / 0.770 m».\n- «vértices de manopla dentro del sofá >5 mm en 120/120 muestras, máx 0.041 m»; el centro de la manopla queda 4,3 cm fuera.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/v06-manos-fugas.ts"
+          },
+          {
+            "id": "vista-11",
+            "severity": "minor",
+            "title": "Fugas de memoria de vídeo al reiniciar",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Minor es correcto: por reinicio se pierde una textura de 64×64 por muñeco y un material por coche.",
+            "evidence": "Código: dollRig.ts:257-263 (CanvasTexture de la sombra), dollView.ts:243-256 (dispose libera materiales y el mapa de la etiqueta, pero no el mapa de la sombra), carView.ts:43 (brake = ownMat) y world.ts:99 (attach solo libera geometrías de los coches). Medición con v06-manos-fugas.ts, escuchando el evento 'dispose' tras un segundo attach: «textura de la etiqueta liberada=true; material de la sombra de contacto liberado=true; TEXTURA de canvas de la sombra liberada=false; material de freno del coche (ownMat) liberado=false».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/v06-manos-fugas.ts"
+          },
+          {
+            "id": "vista-12",
+            "severity": "minor",
+            "title": "Fusión estática gigante y fadeables con material propio",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Minor es correcto: es optimización, sin fallo visible salvo la textura aplastada al recortar.",
+            "evidence": "Código:\n- levelView.ts:149-173: mergeStatic agrupa por material y sombra en todo el nivel; :155 excluye las mallas multimaterial.\n- levelView.ts:48 (ownMat) y 273-279 (clone()).\n- world.ts:196-198: recorte con scale.y sobre UV horneadas por worldUV (textures.ts:164-176), así que la textura se aplasta.\nMedición con v05-coste.ts: «nivel 226 mallas, 185 materiales, 157 mallas con material único, 64 fadeables; mallas fundidas grandes: 41 (radio de esfera envolvente máx 55.8 m; 21 con radio > 20 m); mallas multimaterial sin fundir: 9». Matiz: solo 36 de los 64 fadeables tienen material propio, porque las copas de árbol (levelView.ts:433, modo 'hide') lo comparten. La afirmación «cada fadeable tiene material propio» es inexacta, pero no cambia el defecto.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/v05-coste.ts"
+          },
+          {
+            "id": "vista-13",
+            "severity": "minor",
+            "title": "Efectos con un material por partícula",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Minor es correcto: son picos breves de materiales y llamadas.",
+            "evidence": "Código: fx.ts:22 y :33 (dustMat.clone()); fx.ts:51, :60 y :71 (new MeshBasicMaterial por partícula). main.ts:193-194 lanza confetti(…, 70) y un texto en la victoria, es decir, 71 objetos. Medición con v05-coste.ts: «confeti(70): 70 mallas con 70 materiales distintos».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/v05-coste.ts"
+          },
+          {
+            "id": "vista-14",
+            "severity": "minor",
+            "title": "Sombra que parpadea y temblor de cámara que depende de la tasa de fotogramas",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Minor es correcto.",
+            "evidence": "Código:\n- world.ts:155-156: el sol y su objetivo siguen a camTarget, que se suaviza cada fotograma, sin ajustarse a la rejilla de texeles. Con el frustum de ±26 m (world.ts:56) y un mapa de 2048 (world.ts:54), cada texel mide 52/2048 = 2,54 cm.\n- world.ts:152: temblor con Math.random() en cada fotograma; fx.ts:91 solo hace decaer la amplitud con dt, así que la frecuencia del temblor es la de la pantalla.\nEl parpadeo de la sombra no se ha observado en píxeles, porque aquí no hay GPU: está confirmado el mecanismo, no el efecto visual.",
+            "script": ""
+          },
+          {
+            "id": "vista-15",
+            "severity": "minor",
+            "title": "Los contadores de render infravaloran el coste",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Minor es correcto: afecta a la medición, no al juego.",
+            "evidence": "node_modules/three/src/renderers/WebGLRenderer.js:1606 llama a shadowMap.render(...) y :1612 hace `if ( this.info.autoReset === true ) this.info.reset();`, de modo que las llamadas de sombra se borran antes de la pasada principal. main.ts:312: renderInfo devuelve view.renderer.info.render y autoReset no se cambia en ningún sitio. Proyectores no contados (v05-coste.ts): 246 con 2J y 294 con 4J.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/v05-coste.ts"
+          }
+        ],
+        "notes": "He verificado los 15 defectos: los 15 se confirman, con matices en las cifras y en la gravedad de algunos.\n\n**Cómo se ha medido:**\n- Todas las mediciones usan un arnés nuevo, /home/user/Game-development/mudanza-imposible/scripts/audit/verif-vista/harness.ts. Crea un WorldView sin WebGLRenderer (Object.create más los campos a mano, y renderer.render vacío) y un `document`/`window` de pega con canvas 2D falso. Así attach() y render() ejecutan el código real de src/view (DollView, CharacterRig, SofaView, cámara, oclusión) en Node.\n- Hallazgo técnico: si existe `window` sin `performance`, el wasm de Rapier compat muere con «RuntimeError: unreachable» al simular. Le paso `performance` al `window` de pega.\n- Control de que la vista no altera la simulación: v00-humo.ts (con vista) y v00b-humo-sin-vista.ts (sin vista) acaban con el sofá en la misma posición (z=5.3595).\n- Ningún archivo existente se ha tocado. No he lanzado navegador ni servidor, ni he hecho operaciones de git.\n\n**Cifras que no coinciden exactamente con el auditor:**\n- vista-01: la cápsula sí penetra de forma transitoria, hasta 7 cm al chocar andando, no ≤ 2,7 cm.\n- vista-02: el muñeco mide 1,54 m, no 1,58.\n- vista-04: tras reaparecer, la pierna se estira hasta 6,96 m; depende de la distancia del salto.\n- vista-05: los porcentajes por jugador varían según la partida; la gorra causa entre el 88 y el 100 % de los bloqueos. Con elevación de 53° la visera tapa un ojo, y desde unos 62° tapa los dos.\n- vista-12: solo 36 de los 64 fadeables tienen material propio.\n\n**Gravedad que discuto:**\n- vista-03 la bajaría a minor: es un efecto secundario de vista-02 y la oclusión ya apunta a la cápsula.\n- vista-07: las cifras son exactas (233/331 llamadas, 71,6/100,5 k triángulos), pero «impide escalar» no está demostrado sin medir en una GPU real.\n- vista-01 es critical por la prohibición explícita del usuario; por lo que ve el jugador sería major.\n\n**Lo que no se puede reproducir en este entorno:** la percepción de tirones a 120/144 Hz (vista-08) y el parpadeo de la sombra en píxeles (vista-14). Para ambos he confirmado el mecanismo, por código y por simulación del bucle.\n\n**Observaciones que el informe no recogía:**\n- Incluso a 60 Hz, el acumulador de main.ts produce alrededor de un 1 % de fotogramas con 0 o 2 pasos.\n- Con 4J y el piloto, la partida terminó en 'lost' por tiempo (180 s), mientras que con 2J se ganó en 43 s. Las cifras de 4J salen de una partida que el piloto no completó.\n- El muñeco se ladea a la vez que la gorra (dollRig.ts:209, yaw 0.18), y por eso la visera tapa antes el ojo izquierdo."
+      }
+    },
+    {
+      "area": "ui-audio",
+      "result": {
+        "verdicts": [
+          {
+            "id": "ui-audio-01",
+            "severity": "critical",
+            "title": "Se pierden pulsaciones de agarrar/soltar y enderezar en los fotogramas sin paso de simulación",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta. Agarrar y soltar es la acción central del juego. A 120 Hz se pierde el 50 % de las pulsaciones y a 144 Hz el 58 %, sin ningún aviso. Incluso a 60 Hz se pierde una fracción apreciable cuando las marcas de tiempo de rAF fluctúan o se redondean. Es «pulso y no agarra» en el núcleo de la jugabilidad.",
+            "evidence": "Código leído hoy:\n- main.ts:240 llama a `input.read(...)` en cada fotograma.\n- input.ts:73 hace `this.pressedOnce.clear()` en cada read.\n- input.ts:66 actualiza prevPad.\n- Si acc < DT, el `while (acc >= DT && steps < 5)` de main.ts:243 no ejecuta g.step y esos `inputs` se descartan.\n\nMedición con `npx vite-node scripts/audit/verif-ui-audio/indep-01-flancos.ts` (InputManager real con window simulado + Game real + copia de main.ts:238-253).\n\nA) Fotogramas sin paso:\n- 75 Hz: 20,0 %.\n- 120 Hz: 50,0 %.\n- 144 Hz: 58,3 %.\n- 165 Hz: 63,6 %, con los 4 modelos de reloj.\n- 60 Hz depende del modelo: «exacto» (float) 8,8 %; «trunc0.1ms» media 18,2 % [0,0–33,3]; «jit±0.5ms» media 17,2 % [2,8–24,8].\n\nC) Una pulsación por partida nueva, 40 partidas:\n- «120 Hz exacto: agarra en 25/40; pulsación leída en fotograma sin paso: 15/40, de ellas agarran: 0».\n- «144 Hz exacto: agarra en 14/40; … 26/40, de ellas agarran: 0».\n- «60 Hz jit±0.5ms: agarra en 39/40».\n\nB) Con 120 pulsaciones a 144 Hz solo 48 (40 %) llegan a g.step con grab=true.\n\nLa cifra del auditor para 60 Hz (0,8-2,9 %) depende del modelo de reloj. Con mis modelos sale entre 2,8 % y 33 % según la fase. Sin navegador ni pantalla real no se puede fijar la cifra exacta.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-01-flancos.ts"
+          },
+          {
+            "id": "ui-audio-02",
+            "severity": "major",
+            "title": "Los enfriamientos de mensajes y sonidos no se reinician entre partidas: en las repeticiones faltan bocinas, tic del semáforo y textos",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta. En la repetición desaparecen todas las bocinas, que avisan del peligro de los coches, y todo el tic del semáforo. Pasa en cada «Otra vez», que es el bucle principal del juego.",
+            "evidence": "Código:\n- main.ts:49 crea `toastCooldown`, que nunca se limpia; solo hay `set` en 134 y 158.\n- main.ts:126 pone `simTime = 0`.\n- cooled() (131-136) devuelve false mientras `simTime - t < s`.\n- Hallazgo extra: en main.ts:254 se evalúa `cooled('pedtick', 0.5)` ANTES de comprobar la posición del sofá. Por eso la clave se renueva cada 0,5 s con el semáforo en verde aunque el sofá esté lejos de la calle, incluso en resultados.\n\nMedición con `npx vite-node scripts/audit/verif-ui-audio/indep-02-enfriamientos.ts` (Game real, piloto como en la demo, copia de cooled y de las ramas honk/light/pedTick):\n- «partida 1 (won en simTime 38.6) … bocinas (eventos 3, suenan 3) · tics semáforo 12».\n- «mapa al pulsar «Otra vez»: pedtick=46.6 honk0=14.7 honk5=14.8».\n- «partida 2 con mapa heredado: bocinas (eventos 3, suenan 0) · tics semáforo 0».\n- «partida 2 con mapa limpio: bocinas (eventos 3, suenan 3) · tics semáforo 12».\n\nEl resultado es igual con las semillas 11→11, 11→22 y 5→5.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-02-enfriamientos.ts"
+          },
+          {
+            "id": "ui-audio-03",
+            "severity": "major",
+            "title": "El botón Start de los mandos que no son el de J1 abre y cierra la pausa al instante, o la alterna en cada fotograma",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta en el contexto de mandos, que el juego anuncia para J1–J4: la pausa no sirve desde el mando de J2, J3 ni J4. Con hardware real no se ha probado (README:657).",
+            "evidence": "Código:\n- input.ts:78-85: padStart compara con `prevPad[i]`.\n- input.ts:66: prevPad solo se actualiza dentro de read(n) para i<n.\n- main.ts:256: en pausa se llama `input.read(1)`.\n\nMedición con `npx vite-node scripts/audit/verif-ui-audio/indep-03-start-mando.ts` (InputManager real, getGamepads simulado, copia de main.ts:235-257). Trazas (· jugando, P pausa, R resultados):\n- J1 mantiene Start: `···PPPPPPPPP`.\n- J2 mantiene Start 6 fotogramas: `···P········` (se abre y se cierra).\n- 3.er mando, no leído: `···P·P·P····`.\n- Demo con mando 2: `···P·P·P····`.\n- Resultados con 3.er mando: `RRR·P·P·PPPP` (reinicia y luego alterna).\n\nMatiz: un toque de J2 de un solo fotograma sí pausa (`···PPPP`), pero una pulsación humana dura varios fotogramas. En resultados, el mando de J2 reinicia sin alternar la pausa (`RRR·········`): lo de «después hace lo mismo con la pausa» solo pasa con mandos no leídos.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-03-start-mando.ts"
+          },
+          {
+            "id": "ui-audio-04",
+            "severity": "major",
+            "title": "Con mando no se puede empezar la partida ni navegar por los menús",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Aceptable como major para el objetivo de jugar en el sofá con mandos. En un PC siempre hay teclado, así que también sería defendible como moderada.",
+            "evidence": "- main.ts:235: `if (game && screen !== 'menu')`. padStart (236) solo se consulta fuera del menú.\n- En el menú (260-265) solo se llama `input.read(1)`.\n- `grep -rn \"buttons\\[\\|getGamepads\\|padStart\" src` solo encuentra input.ts:32,55,78,82 y main.ts:236. No hay ninguna otra lectura de mando ni gestión de foco para navegar.\n- index.html:85-88 (opciones y botones) y 106 (Reiniciar/Menú de la pausa) solo tienen onclick (main.ts:80-86).\n- main.ts:77 dice «J3 y J4 solo con mando».\n- Desde la pausa, con mando solo se puede reanudar (Start). No se puede reiniciar ni ir al menú. Con teclado, Retroceso sí reinicia.",
+            "script": ""
+          },
+          {
+            "id": "ui-audio-05",
+            "severity": "major",
+            "title": "Los mandos se asignan por posición y se comparten con el teclado: no se puede jugar 2 en teclado más 2 con mando",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta respecto al objetivo de hasta 4 jugadores locales. Es una limitación de diseño, no un fallo que rompa la demo por defecto (2 en teclado).",
+            "evidence": "Código:\n- input.ts:31-33: pads() filtra los conectados y pierde el índice real.\n- input.ts:41-66: el jugador i suma KEYS[i] y pads[i].\n- input.ts:25: no se escucha gamepaddisconnected (grep sin resultados).\n\nMedición con `npx vite-node scripts/audit/verif-ui-audio/indep-03-start-mando.ts`:\n- «3 mandos [a,b,c], c empuja el stick → mx por jugador: 0.0 0.0 1.0 0.0».\n- «b desconectado ([a,null,c]) → 0.0 1.0 0.0 0.0 ← c pasa de J3 a J2».\n- «2 mandos, el mando a empuja → 1.0 0.0 ← mueve a J1 aunque J1 juegue con WASD».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-03-start-mando.ts"
+          },
+          {
+            "id": "ui-audio-06",
+            "severity": "major",
+            "title": "Reinicios accidentales y resultados que se saltan solos",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Aceptable. Un Retroceso accidental tira la partida entera sin confirmación, y J2 usa Intro constantemente. En un teclado ISO español, Retroceso está encima de Intro.",
+            "evidence": "- main.ts:95: `screen === 'play' && code === 'Backspace'` → start() sin confirmar. También funciona en pausa, porque screen sigue siendo 'play'.\n- main.ts:92: en resultados, 'Enter' o 'KeyR' → start().\n- input.ts:5-6: Space y R son de J1; Enter y NumpadEnter son agarrar de J2.\n- main.ts:195-196: `pendingResults = { g, at: simTime + 1.2 }`.\n- main.ts:88-96 (onGlobal) no tiene ningún bloqueo temporal tras mostrar los resultados.\n- Mitigación parcial: onGlobal ignora e.repeat (input.ts:22), así que mantener la tecla pulsada no reinicia; solo una pulsación nueva.",
+            "script": ""
+          },
+          {
+            "id": "ui-audio-07",
+            "severity": "major",
+            "title": "«Alzar» (Mayús) no se entiende y no da ninguna respuesta visible",
+            "verdict": "PARCIAL",
+            "severityCheck": "Exagerada: menor o moderada. El banner sale justo cuando hace falta (al pie de la escalera, con las teclas exactas) y el sofá se eleva de forma visible. Falta un indicador de estado, pero no bloquea la partida.",
+            "evidence": "Cierto:\n- La acción solo se explica en index.html:93 y en el banner de hud.ts:84, que cita solo Mayús de J1 y J2 y no el mando.\n- El panel (hud.ts:104) muestra «agarrando», nunca «alzando».\n- La simulación lo exige en coop (game.ts:157-163 needsLiftAtStairs; carrier.ts:266).\n\nFalso que no haya respuesta visible:\n- Alzar sube el ancla de la mano de handY 0,22 a liftY 0,78 (carrier.ts:150, 16-17).\n- Las manos dibujadas siguen el punto de agarre (world.ts:115-116).\n- Medición con `npx vite-node scripts/audit/verif-ui-audio/indep-04-varios.ts`: «[07] agarran=true,true · sofá y sin alzar 0.406 m → tras 1 s alzando 0.958 m (Δ 0.553 m)».\n\nLo de las Teclas especiales de Windows (5 pulsaciones de Mayús) es plausible pero no se puede reproducir aquí.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-04-varios.ts"
+          },
+          {
+            "id": "ui-audio-08",
+            "severity": "major",
+            "title": "El cronómetro cuenta hacia arriba aunque el objetivo es un límite de tiempo",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Exagerada: menor. Es una decisión de diseño de UX con justificación parcial: el tiempo transcurrido sirve para la estrella de tiempo par (≤90 s, main.ts:214). Además el número se pone rojo a falta de 30 s. Es mejorable, pero no es un defecto mayor.",
+            "evidence": "- hud.ts:55: `this.time.textContent = fmt(game.time)` (tiempo transcurrido).\n- hud.ts:54 y 56: `left` solo se usa para la clase 'late' (<30 s).\n- game.ts:14 timeLimit 180 y game.ts:358 derrota.\n- game.ts:397: `this.time += 5` al reaparecer, comunicado solo con el toast de main.ts:190.\n- No hay ningún sonido asociado al tiempo: el grep de sfx.play en main.ts no da ninguno.",
+            "script": ""
+          },
+          {
+            "id": "ui-audio-09",
+            "severity": "major",
+            "title": "Los avisos citan teclas equivocadas o incompletas para J2, para quien juega con mando y para J3/J4",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Exagerada: menor. En el teclado compartido, la R y la Q/E de J1 funcionan para cualquiera: tryRight se dispara con el `right` de cualquier humano (game.ts:190) y el giro suma el de todos (187). Las instrucciones son incompletas, pero no impiden jugar a los dos en teclado. Pesa más de cara a 4 jugadores con mando.",
+            "evidence": "- hud.ts:82: «Pulsa R (o Y en el mando)». Falta Slash de J2 (input.ts:6).\n- hud.ts:86: «Gira el sofá (Q/E)». Faltan Comma y Period de J2.\n- hud.ts:89: «J1 con ESPACIO, J2 con INTRO» para cualquier número de humanos mayor que 1, sin mencionar J3, J4 ni el mando.\n- main.ts:120 pasa un array fijo de ayudas de teclado a hud.setup.\n- hud.ts:36 lo muestra según c.human, sin saber qué dispositivo usa cada jugador.",
+            "script": ""
+          },
+          {
+            "id": "ui-audio-10",
+            "severity": "major",
+            "title": "La demo automática y el modo captura guardan récord, y hay un solo récord para cualquier configuración",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Exagerada: menor. Contamina el «Mejor tiempo» (la demo hace 36 s, difícil de batir), pero es metainformación y no afecta a la partida.",
+            "evidence": "- main.ts:205-211: results() lee y escribe 'mudanza.best' si `won`, sin comprobar `autopilot` ni `capture`.\n- main.ts:294: advance(), del modo captura, también llama a results().\n- `grep -rn localStorage src` solo da main.ts:207 y 209: una sola clave, sin nivel, número de jugadores ni modo.\n- La captura docs/capturas/s12-resultado.jpg (vista hoy) muestra «Mejor tiempo 36.0 s · en este navegador» con el panel «J1 … Piloto automático».",
+            "script": ""
+          },
+          {
+            "id": "ui-audio-11",
+            "severity": "major",
+            "title": "La física cambia sin aviso al tocar el número de jugadores",
+            "verdict": "PARCIAL",
+            "severityCheck": "Exagerada: menor. El menú sí muestra el estado resultante y la nota explica la diferencia de física.",
+            "evidence": "Cierto el mecanismo. Medición con `npx vite-node scripts/audit/verif-ui-audio/indep-04-varios.ts`, con copia del setter de main.ts:69 e isCoop real (game.ts:42): «inicio h=2 c=2 coop=true | elige 3 → h=3 c=3 coop=true | elige 2 → h=2 c=3 coop=false».\n\nLa fila «Ayudantes de la máquina» (index.html:87) se ve siempre: main.ts:71 no la oculta.\n\nNo es del todo «sin aviso»:\n- La fila «Porteadores en total» redibuja el 3 resaltado (main.ts:60, clase 'on').\n- index.html:97-98 explica que con ayudantes se usa la física original.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-04-varios.ts"
+          },
+          {
+            "id": "ui-audio-12",
+            "severity": "minor",
+            "title": "La cuenta atrás, la reaparición y la interfaz no suenan; hay sonidos definidos que nadie usa",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (menor).",
+            "evidence": "- Medición con `npx vite-node scripts/audit/verif-ui-audio/indep-04-varios.ts`: «[12] cuenta atrás: 181 pasos, eventos emitidos: {}». game.ts:172-175 no emite nada.\n- main.ts:190: respawnSofa solo lanza un toast.\n- `grep -rn \"'step'\\|'thud'\" src` solo aparece en sfx.ts:3, 48 y 54 (definición), sin ningún play.\n- README.md:665: «Repeticiones o cámara de espectador, y música» en «No existe todavía».\n- Los botones del menú no tienen sonido (main.ts:80-86).",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-04-varios.ts"
+          },
+          {
+            "id": "ui-audio-13",
+            "severity": "minor",
+            "title": "La mezcla no tiene limitador ni buses y el silencio no persiste",
+            "verdict": "PARCIAL",
+            "severityCheck": "Correcta (menor). La saturación es menos probable de lo que sugiere el informe.",
+            "evidence": "Cierto:\n- Hay una sola ganancia maestra, sin compresor (sfx.ts:24-29).\n- toggleMute fija 0,5 (sfx.ts:33). En el juego coincide con el volumen por defecto, así que no tiene efecto práctico.\n- El silencio no se guarda: `grep localStorage` no da nada en sfx.ts.\n- M en el menú: el toast va a #h-toasts, dentro de #hud, que está oculto (index.html:14; hud.show(false) en main.ts:104).\n\nNo sostenido: «al coincidir con fall o stun puede saturar». El auditor suma ganancias nominales, pero el ruido filtrado tiene picos muy por debajo de su ganancia. Medición con `npx vite-node scripts/audit/verif-ui-audio/indep-05-pico-mezcla.ts` (síntesis numérica del grafo de sfx.ts, biquad según la especificación WebAudio, 200 realizaciones):\n- «crash + impact(8) + stun + fall + honk: mediana 0.67, máx 0.88, >1,0 en 0/200».\n- «2×crash + 2×stun + impact: máx 1.07, >1,0 en 6/200».\n- «3×crash + 3×stun + impact + 2×fall: >1,0 en 148/200».\n\nSolo satura con varios atropellos simultáneos. La estimación usa ondas ideales.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-05-pico-mezcla.ts"
+          },
+          {
+            "id": "ui-audio-14",
+            "severity": "minor",
+            "title": "El audio no varía y cada ruido reserva memoria nueva",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (menor).",
+            "evidence": "- sfx.ts:40-61: frecuencias y volúmenes fijos. Solo impact escala con args[0] (44-46).\n- No hay StereoPanner ni tono aleatorio en todo sfx.ts.\n- 'grab' suena igual para cualquier humano (main.ts:141; sfx.ts:40).\n- sfx.ts:87-90: noise() hace `c.createBuffer(...)` y rellena un buffer nuevo en cada llamada.",
+            "script": ""
+          },
+          {
+            "id": "ui-audio-15",
+            "severity": "minor",
+            "title": "La simulación y sus sonidos siguen detrás del overlay de resultados",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (menor). Tras ganar casi no se oye nada, porque el sofá está en el camión. Tras perder en la calle sí hay atropellos y bocinas.",
+            "evidence": "main.ts:235-254: con screen === 'results' y sin pausa se sigue llamando a g.step y a handle.\n\nMedición con `npx vite-node scripts/audit/verif-ui-audio/indep-04-varios.ts`, derrota forzada con el sofá en la calzada: «[15] … eventos en los 30 s siguientes (resultados): {\"carHit\":2,\"honk\":11,\"impact\":2,\"light\":3}». Cada carHit da crash y el toast «¡Atropello al sofá!» bajo la tarjeta.\n\nTras una victoria (indep-02): «eventos tras el final (8 s en resultados): {\"light\":1}».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-04-varios.ts"
+          },
+          {
+            "id": "ui-audio-16",
+            "severity": "minor",
+            "title": "soundLog crece sin límite y su eje de tiempo se reinicia en cada partida",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (menor). Solo afecta a la memoria en sesiones largas y a sound() fuera del uso previsto.",
+            "evidence": "- main.ts:26 declara `soundLog`.\n- main.ts:37: `sfx.onPlay = … soundLog.push({ t: simTime, … })` siempre, también sin capture. `grep soundLog` no da ningún recorte ni vaciado.\n- main.ts:126: `simTime = 0` en cada start.\n- main.ts:309: sound(from,to) filtra solo por `e.t`, así que mezcla eventos de partidas anteriores con el mismo t.",
+            "script": ""
+          },
+          {
+            "id": "ui-audio-17",
+            "severity": "minor",
+            "title": "La API de captura se publica siempre y graba mal con ciertas fps",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (menor). Los scripts del repo usan 30 fps, que es exacto, así que hoy no hay grabaciones afectadas. new Function solo es accesible desde el propio contexto de la página: no hay riesgo de seguridad real.",
+            "evidence": "- main.ts:273: `__mudanza` se asigna sin comprobar capture ni import.meta.env.\n- main.ts:281: new Function.\n- main.ts:285: `Math.round(60 / fps)`.\n- main.ts:286-293 no comprueba `paused` y duplica 238-254.\n\nMedición con `npx vite-node scripts/audit/verif-ui-audio/indep-04-varios.ts`: «24 fps → 3 pasos = 0.0500 s (debería 0.0417; 20.0 %) | 25 fps → 2 pasos (-16.7 %) | 30 fps → 0.0 % | 50 fps → -16.7 %».\n\nLos scripts usan fps=30: record-duo.cjs:46, stills.cjs:20-21 y duo-e2e.cjs:258.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-04-varios.ts"
+          },
+          {
+            "id": "ui-audio-18",
+            "severity": "minor",
+            "title": "El HUD se solapa en ventanas estrechas y su letra es pequeña para jugar desde el sofá",
+            "verdict": "PARCIAL",
+            "severityCheck": "Correcta (menor).",
+            "evidence": "No se pueden lanzar navegadores. He medido sobre la captura 1:1 docs/capturas/duo/a2-uno-solo.jpg (1280×720, duo-e2e.cjs:20) con `python3 -I scripts/audit/verif-ui-audio/indep-06-hud-anchos.py`. Salida:\n- «pills: tiempo 105px, etapas 507px, sofá 190px».\n- «se parte por debajo de ~842px».\n- «2.ª fila (sofá solo, alineado a la izquierda): y 70-120px; #h-warn/#h-light empiezan en y=96px».\n- «por debajo de ~642px también baja la pill de etapas».\n- Paneles de jugador de 293 y 284 px (más el borde de 6 px), unos 300 px.\n\nConfirmado:\n- El corte está en ~842 px (el auditor dice ~860).\n- Solape vertical con top:96 (index.html:15, 30, 31); con #h-warn, cuando el aviso es ancho.\n- Por debajo de 700 px se ocultan jugadores y ayuda (index.html:61).\n- Hay textos de 12-13 px (index.html:18, 24, 38, 40, 55).\n\nNo sostenido:\n- El choque con #h-light entre ~642 y ~842 px: la pill que baja queda a la izquierda (justify-content:space-between con un solo elemento) y #h-light está a la derecha.\n- «Con 4 ocupan dos filas» a 1280 px: los paneles J3/J4 («Mando 3/4») son más cortos y caben en una fila (unos 1000-1100 px de 1270 disponibles). En cambio, solaparían #h-hint.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-06-hud-anchos.py"
+          },
+          {
+            "id": "ui-audio-19",
+            "severity": "minor",
+            "title": "Resultados poco informativos y con formatos distintos",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (menor).",
+            "evidence": "- main.ts:216: «Tiempo» con formato m:ss.s.\n- main.ts:221: «Mejor tiempo» con formato `${best.toFixed(1)} s`.\n- docs/capturas/s12-resultado.jpg muestra «0:36.0» frente a «36.0 s».\n- main.ts:220 usa g.stageLabel.\n- La etapa «Camión» (level.ts:151) usa la misma caja x/z que la victoria (game.ts:354), y las etapas se actualizan antes de comprobar la victoria (game.ts:341-344 frente a 354-356). Medición con indep-04: «[23/19] … fase final won en 35.6 s · stageLabel al acabar: «Camión»».\n- La cuadrícula (217-222) no tiene estadísticas por jugador.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-04-varios.ts"
+          },
+          {
+            "id": "ui-audio-20",
+            "severity": "minor",
+            "title": "Las etiquetas de teclas dependen de la distribución del teclado y hay riesgo de doble activación",
+            "verdict": "PARCIAL",
+            "severityCheck": "Correcta (menor).",
+            "evidence": "Confirmado:\n- index.html:95 muestra `<kbd>-</kbd>` y input.ts:6 usa e.code 'Slash'. En un teclado US es «/». En el teclado ISO español, que es el público del juego, esa tecla física sí es «-»: la etiqueta acierta para ES y falla para US.\n- input.ts:19 solo llama a preventDefault con flechas y Espacio, no con Intro.\n\nDoble activación (onGlobal más clic nativo de un botón con foco): NO REPRODUCIDO. Hace falta un navegador, y no está permitido lanzarlo. En todos los flujos con ratón, el botón pulsado queda oculto (display:none) o se recrea (main.ts:56). Que conserve el foco depende de cómo aplique cada navegador la regla de «focus fixup». No hay código de foco (`grep focus` vacío).",
+            "script": ""
+          },
+          {
+            "id": "ui-audio-21",
+            "severity": "minor",
+            "title": "No se pausa sola al perder el foco, ocultar la pestaña o desconectar un mando",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (menor).",
+            "evidence": "- `grep -rn \"visibilitychange\\|gamepaddisconnected\\|gamepadconnected\" src index.html` no da resultados.\n- input.ts:25: con blur solo se hace `this.down.clear()`.\n\nMatiz: al ocultar la pestaña, rAF se detiene, y main.ts:228 limita dtReal a 0,1 s. La partida queda congelada en la práctica, aunque sin mostrar la pausa. Con la ventana visible y sin foco, o al desconectar un mando, sigue corriendo y los mandos se reasignan (ver ui-audio-05).",
+            "script": ""
+          },
+          {
+            "id": "ui-audio-22",
+            "severity": "minor",
+            "title": "Sin interpolación de render: tirones en pantallas de alta frecuencia",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (menor).",
+            "evidence": "Código:\n- main.ts:259: `view.render(g, …)` usa el estado tal cual.\n- sofaView.ts:136-137: `group.position.set(p.x…)` desde body.translation().\n- carrierView.ts:364-368: igual para los porteadores.\n- El propio comentario de sofaView.ts:141 reconoce «en pantallas de 120 Hz hay fotogramas sin paso».\n\nMedición indep-01, A): repiten pose el 50,0 % de los fotogramas a 120 Hz y el 58,3 % a 144 Hz (no exactamente «la mitad»).\n\nLa percepción de tirones no se puede reproducir aquí: hace falta una pantalla de más de 60 Hz. A 120 Hz la cadencia es regular (2:2, equivale a 60 fps). La irregular, con tirones, es la de 144 Hz (2/3). La cámara (world.ts:141) suaviza en cada fotograma.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-01-flancos.ts"
+          },
+          {
+            "id": "ui-audio-23",
+            "severity": "minor",
+            "title": "Escrituras en el DOM en cada fotograma y código muerto",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (menor).",
+            "evidence": "- hud.ts:100: `this.light.innerHTML = …` en cada update, incluso con #h-light oculto.\n- hud.ts:55 y 65-67: textContent y style en cada fotograma.\n- `grep -rn prevEdge src`: solo input.ts:13 (declaración) y 71 (escritura), nunca se lee.\n- main.ts:188: `e.index > 0`. game.ts:342-343 incrementa la etapa antes de emitir. Medición con indep-04: «índices de 'stage' emitidos: 1,2,3,4,5,6».",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/indep-04-varios.ts"
+          },
+          {
+            "id": "ui-audio-24",
+            "severity": "minor",
+            "title": "Textos del menú duplicados y desfasados",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (menor).",
+            "evidence": "- index.html:84: «Demo para dos en el mismo teclado … Tenéis 3 minutos».\n- index.html:99: «antes de 3 minutos». Ambos duplican RULES.timeLimit=180 (game.ts:14). En cambio, main.ts:213 sí lo calcula.\n- index.html:85 junto con main.ts:69 permiten de 1 a 4 jugadores.\n- index.html:97: «<b>Sin ayudantes</b> …». No hay ningún botón con ese texto: las opciones son 2-6 porteadores (main.ts:70) y Atentos/Despistados (main.ts:71).",
+            "script": ""
+          }
+        ],
+        "notes": "**Hallazgos que el informe no recogía**\n\n1. Orden de evaluación en el tic del semáforo (main.ts:254 y 295). `g.light.ped === 'green' && cooled('pedtick', 0.5) && g.sofaPos.z < 7 …` llama a cooled(), que modifica el mapa, antes de comprobar dónde está el sofá. La clave 'pedtick' se renueva cada 0,5 s con el semáforo en verde aunque el sofá esté lejos de la calle, también en la pantalla de resultados. Por eso el defecto ui-audio-02 es peor de lo descrito: en mi medición se pierde el 100 % de los tics en la repetición (12 frente a 0).\n\n2. En el modo demo y en el de captura, el resultado de las partidas es idéntico con semillas distintas (11, 22 y 5 dan el mismo tiempo, 38,6 s). La semilla solo afecta a los ayudantes. Conviene tenerlo en cuenta al usar varias semillas como si fueran casos de prueba distintos.\n\n3. Tras una derrota, la simulación sigue y los coches pueden volver a atropellar el sofá: carHit dispara el toast «¡Atropello al sofá! −12 %» aunque damage() ya no reste nada (game.ts:303). El mensaje es falso bajo la tarjeta de resultados.\n\n4. En ui-audio-01, la cifra de 60 Hz es muy sensible al modelo de reloj de rAF. Con marcas de tiempo truncadas a 0,1 ms o con fluctuación de ±0,5 ms salen de media un 17-18 % de fotogramas sin paso (entre 0 % y 33 % según la fase), muy por encima del 0,8-2,9 % del auditor. Habría que medirlo en un navegador real antes de fijar la cifra. Las de 75, 120, 144 y 165 Hz son exactas: 20 %, 50 %, 58,3 % y 63,6 %.\n\n**Sobre la verificación**\n\nTodos los scripts son nuevos, con prefijo «indep-», en /home/user/Game-development/mudanza-imposible/scripts/audit/verif-ui-audio/. No he modificado ni ejecutado los scripts 01-06 que ya había en esa carpeta, de otro verificador. No he tocado ningún archivo del repositorio ni el estado de git, y no he lanzado navegadores. El código de src e index.html es idéntico a 08547f8 (`git diff --stat 08547f8 HEAD -- src index.html` sale vacío).\n\nLas comprobaciones de mando y pantalla de más de 60 Hz se han hecho con getGamepads simulado y marcas de tiempo sintéticas, usando el InputManager y el Game reales. No hay hardware.\n\n**Resumen de gravedades:** de acuerdo con 01 (critical) y con 02, 03, 04, 05 y 06 (major). Considero exageradas como major las 07, 08, 09, 10 y 11; para mí son menores o moderadas."
+      }
+    },
+    {
+      "area": "qa",
+      "result": {
+        "verdicts": [
+          {
+            "id": "qa-01",
+            "severity": "critical",
+            "title": "Nada demuestra que el nivel se pueda completar con 3 o 4 jugadores, que es la configuración objetivo: medido 0/8 en ambos casos",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Exagerada; lo justo es major. Todos los hechos son ciertos: no hay ninguna prueba con 3 o 4 humanos y el piloto no completa el nivel. Pero el fallo está en la herramienta de prueba (el piloto no suelta asas) y en la cobertura, no en que el juego sea imposible. Mi contrafactual, en el que J3 y J4 sueltan el asa junto a la puerta, completa el nivel con 3 y con 4 jugadores. Además, «0/8» es en realidad 0/1: sin ayudantes la semilla no interviene y las 8 partidas son la misma trayectoria. Solo sería critical si se toma como bloqueo del ciclo 1, que exige pruebas con 3 y 4 jugadores (docs/quality/QUALITY_STATE.md:84).",
+            "evidence": "Barrido propio, 8 semillas por configuración. `npx vite-node scripts/audit/verif-qa/q01-barrido.ts 3 3 atentos 1 8` → «VICTORIAS 0/8»; las 8 semillas dan exactamente «lost/time t=180.00 int=100 etapa=Calle wp=[3,3,3] sofa=(-0.01,0.39,-10.52) yaw=-1.66». Con `4 4 atentos` → «VICTORIAS 0/8»; las 8 dan «lost/time t=180.00 int=70 etapa=Calle wp=[3,3,3,3] sofa=(-0.06,0.39,-12.31)».\n\nCausa, con `q02-diagnostico-coop.ts 3 normal`. Entre t=20 y t=170 s, J1 agarra (1.10,0.00) y está en z de −13.1 a −14.1, dentro del hueco de la puerta. J3 agarra (0.88,0.45) y está en x de 0.42 a 0.98 y z de −12.4 a −13.2. Con radio 0.32 (carrier.ts:8) choca con la jamba DOOR.x1=0.8 (level.ts:85-87). Con 4 jugadores, J4 agarra (−0.55,−0.45) en x de −1.0 a −1.36.\n\nLectura de código: autopilot.ts:55-83 nunca pone grab=true mientras carga. Los ayudantes sí sueltan cuando se bloquean (bots.ts:83-94).\n\nContrafactual `q02-diagnostico-coop.ts 3 sueltan` (J3 suelta entre z=−9 y z=−16) → «FIN sueltan won ... tiempo 58.92 integridad 21». Con `4 sueltan` → «won tiempo 53.18 integridad 43».\n\nCobertura: la única partida completa con varios humanos es tests/sim.test.ts:364-375 (2 jugadores). src/main.ts:69 ofrece 1, 2, 3 o 4 humanos.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/q01-barrido.ts; /home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/q02-diagnostico-coop.ts"
+          },
+          {
+            "id": "qa-02",
+            "severity": "major",
+            "title": "Con 5 y 6 porteadores atentos (opciones del menú) el piloto no termina, y el README sigue diciendo que con 5 se entrega",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (major). El README documenta un resultado falso, el menú ofrece 5 y 6 porteadores (main.ts:70) y no hay ninguna prueba con 5 o 6.",
+            "evidence": "`npx vite-node scripts/sim-run.ts 5 atentos 1` → «FIN lost time tiempo 180.0 integridad 100», con código de salida 0. La traza dice «t=25.0 wp=6 stage=Arriba sofa=(1.2,3.42,-30.6) yaw=-2.04». Desde ahí el piloto sigue en wp=6 hasta los 180 s y el sofá se desplaza por el pasillo de arriba hasta x≈10.4. Una precisión: no se queda en el rellano, como dice el auditor.\n\nPor qué no avanza: wrapHalfPi(0−(−2.04)) = −1.10, y |−1.10| > tol 0.3 (autopilot.ts:67). Además dist > 0.8 en cuanto el sofá se aleja.\n\nBarrido q01: con 1 humano y 5 atentos, 0/8; las 8 semillas son idénticas («sofa=(10.40,3.42,-31.07) yaw=-2.04 wp=[6]»). Con 1 humano y 6 atentos, 1/8: solo gana la semilla 5, con «won t=88.03 int=70». De las 7 derrotas, 6 acaban con «sofa=(0.02,0.93,-14.95) etapa=Arriba».\n\nREADME.md:400 dice: «| 5 | atentos | entregado | 102,4 s | 100 % |». tests/sim.test.ts:166-170 solo prueba 2 y 4 porteadores.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/q01-barrido.ts"
+          },
+          {
+            "id": "qa-03",
+            "severity": "major",
+            "title": "`place()` no aparta a los porteadores: las pruebas que parecen aisladas tienen un porteador a 1,78 m del sofá",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Exagerada; lo justo es minor. El rescate ocurre exactamente como describe el auditor, y el comentario del helper («aparta a los porteadores») es falso. Pero el efecto en las pruebas es pequeño. Con el porteador apartado de verdad, las pruebas de la puerta, la rampa y enderezar dan resultados idénticos. La del coche cambia sus cifras, pero sigue pasando.",
+            "evidence": "tests/sim.test.ts:30 manda a los porteadores a (x+30, 0.7, z+30). game.ts:333-335: si están a más de 22 m, los teletransporta a (sp.x+(rng−0.5)·2, max(sp.y,0)+1.2, sp.z+1.5).\n\nPosición tras un paso, con `npx vite-node scripts/audit/verif-qa/q04-place-rescate.ts`:\n- puerta: «porteador=(0.96,1.50,-9.50) ... distancia horizontal=1.78 m»;\n- coche: «(8.96,1.50,-0.10) ... 1.78 m» y «|c.z - LANES[0].z| = 1.50 umbral de detección CAR.hz + 0.9 = 1.85 -> dentro de la banda: true» (traffic.ts:77);\n- patio: «(0.96,1.80,11.50) ... 1.78»;\n- rampa: «(16.96,4.00,-29.10) ... 1.78».\n\nImpacto, comparando «COMO EN LA PRUEBA» con «APARTADO DE VERDAD» (dmin=42.43):\n- puerta: z=−12.85 / −23.56 en ambos casos;\n- rampa: dx=5.54 en ambos;\n- enderezar: up después = 1.00 en ambos;\n- coche: integridad 65 frente a 48, |dx| 9.98 frente a 11.00, carHit(sofá) y honk true en ambos. Todas las aserciones pasan.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/q04-place-rescate.ts"
+          },
+          {
+            "id": "qa-04",
+            "severity": "major",
+            "title": "La prueba con ayudantes despistados usa una semilla elegida a mano; con la semilla 3 se pierde",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Aceptable, en el límite entre major y minor. Lo agrava algo que el auditor no dijo: la semilla 2 de la prueba gana con solo un 28 % de integridad, y la prueba no comprueba la integridad (tests/sim.test.ts:178-180). Además, el juego real usa una semilla aleatoria (main.ts:117). Lo que no se ha demostrado es que reordenar los cuerpos cambie el resultado; eso es una conjetura.",
+            "evidence": "tests/sim.test.ts:169 prueba `[4, 'despistados', 2]`.\n\n`npx vite-node scripts/sim-run.ts 4 despistados 3` → sucesos «righted» a los 18.9, 21.4 y 21.9 s con z≈−12 (ante la puerta), y después «FIN lost broken tiempo 38.3 integridad 0», con código de salida 0. Con la semilla 2 → «FIN won null tiempo 60.3 integridad 28».\n\nBarrido q01:\n- 4 despistados: «VICTORIAS 7/8»; solo pierde la semilla 3;\n- 3 despistados: «VICTORIAS 6/8»; pierden las semillas 2 y 8, por rotura.\n\nq05: con 4 despistados salen 8 trayectorias distintas en 8 semillas, así que la semilla sí decide el resultado.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/q01-barrido.ts; /home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/q05-semillas.ts"
+          },
+          {
+            "id": "qa-05",
+            "severity": "major",
+            "title": "Las semillas apenas cambian nada con ayudantes atentos: las configuraciones de la prueba no miden robustez",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Exagerada; lo justo es minor. El parámetro de semilla es decorativo, pero el nombre de las pruebas no promete robustez frente a semillas: no se pierde ninguna cobertura de lo que dicen probar. Una precisión: [2, atentos, 1] y [4, atentos, 3] no son la misma trayectoria entre sí (35.57 s frente a 35.95 s). Cada una es independiente de su semilla.",
+            "evidence": "`npx vite-node scripts/audit/verif-qa/q05-semillas.ts` calcula un hash sha1 de la posición del sofá y de cada porteador en cada paso, y da:\n- 1 humano y 2 atentos: «1 trayectorias distintas en 8 semillas  55ba5774ffcc won t=35.57 int=100 <- semillas 1,2,3,4,5,6,7,8»;\n- 3 atentos: 1 trayectoria (35.98 s);\n- 4 atentos: 1 trayectoria (35.95 s);\n- 2 humanos y 2 porteadores (cooperativo): 1 trayectoria (42.45 s).\n\nLa semilla solo se usa en game.ts:98 y 133 (BotBrain), en game.ts:335 (rescate) y en bots.ts:143, 162 y 178 (reasignar asa, vagabundeo de los despistados, soltar tras bloqueo). Con atentos esas ramas no llegan a cambiar nada.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/q05-semillas.ts"
+          },
+          {
+            "id": "qa-06",
+            "severity": "major",
+            "title": "Casi ningún script tiene umbral ni falla con código de error; perf oculta una partida que no termina",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Algo exagerada; está entre minor y major. No hay CI, y keyboard-e2e imprime un veredicto legible («TODO OK» o «FALLAN n»). Un matiz: si se lanza una excepción dentro del IIFE async, el proceso sí sale con 1 (Node v22). Lo que sale con 0 son las comprobaciones fallidas y las partidas perdidas. Sube a major si estos scripts se usan como puerta automática de la línea base.",
+            "evidence": "`grep -n process.exit scripts/*.cjs scripts/*.ts` → solo scripts/duo-e2e.cjs:280. keyboard-e2e.cjs:82 imprime `FALLAN n` sin llamar a exit.\n\n`npx vite-node scripts/perf.ts` → «6 porteadores: 0.133 ms por paso de simulación (3600 pasos, presupuesto 16,7 ms por fotograma)», con código de salida 0. `q06-perf-fin.ts` muestra en qué estado corta cada partida: «6 porteadores: 3600 pasos, fase al cortar=playing, etapa=Arriba, t de partida=57.0». Con 2 y 4 porteadores las partidas terminan en 'won' a los 2315 y 2338 pasos.\n\n`sim-run.ts 4 despistados 3` pierde y sale con 0.\n\nComprobación del matiz en Node v22.22.0: `node -e \"(async()=>{throw new Error('x')})()\"` → exit 1; `node -e \"(async()=>{console.log('FALLAN 1')})()\"` → exit 0.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/q06-perf-fin.ts"
+          },
+          {
+            "id": "qa-07",
+            "severity": "major",
+            "title": "Las etapas nunca retroceden y el piloto nunca vuelve a un punto de paso anterior: si el objeto retrocede, el piloto se atasca para siempre",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (major). Está medido y el contrafactual demuestra la causa. Además afecta a la interfaz: la pantalla de resultados («Etapa alcanzada», main.ts:220) y la barra de etapas del HUD (hud.ts:57-61) muestran 'Arriba' con el sofá en la planta baja. La parte del respawn es cierta en el código pero teórica: abajo no se puede caer por debajo de y=−3, porque el suelo cubre todo (level.ts:66). Y si se cayera, el checkpoint de 'Arriba' (game.ts:52) adelantaría el sofá en vez de penalizarlo.",
+            "evidence": "Código: game.ts:341-344 solo hace stage++, y autopilot.ts:63 y 67 solo hacen wp++.\n\n`npx vite-node scripts/sim-run.ts 6 atentos 3`: llega a «Arriba» a los 24.5 s. Después el sofá baja: t=40 (−0.0, 2.88, −26.8), t=55 (0.0, 0.93, −19.9), t=100 (0.0, 0.93, −14.9). Sigue con stage=Arriba y wp=6 hasta los 180 s, golpeándose contra la puerta cada ~8 s, y acaba con «FIN lost time tiempo 180.0 integridad 84».\n\n`q03-retroceso.ts 6 0`: hay retroceso en 6 de 8 semillas, con «s_con_etiqueta_Arriba_en_planta_baja=133.4», y «VICTORIAS 1/8».\n\nContrafactual `q03-retroceso.ts 6 1`, que reasigna wp a 4 o 5 al detectar el retroceso: «VICTORIAS 4/8». Las semillas 2, 3 y 4 se recuperan (81.0, 77.1 y 69.0 s). Las que siguen perdiendo vuelven a atascarse arriba por el problema de qa-02.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/q03-retroceso.ts"
+          },
+          {
+            "id": "qa-08",
+            "severity": "minor",
+            "title": "La prueba «soltar deja caer el sofá» no comprueba la caída",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (minor). El comportamiento funciona hoy; lo que falta es la aserción.",
+            "evidence": "tests/sim.test.ts:65-69 solo hace `expect(me.holding).toBe(true)` y `expect(me.holding).toBe(false)`.\n\nRéplica de la prueba midiendo alturas, con `npx vite-node scripts/audit/verif-qa/q07-soltar-caida.ts`:\n- «antes de agarrar: centro y=0.199 asa y=0.249»;\n- «tras 1,5 s sosteniendo: centro y=0.292 asa y=0.441»;\n- «1 s después de soltar: centro y=0.199 asa y=0.249 vy mínima=-0.949».\n\nEl sofá sube y cae de verdad, pero la prueba no lo mide.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/q07-soltar-caida.ts"
+          },
+          {
+            "id": "qa-09",
+            "severity": "minor",
+            "title": "Mundos WASM que no se liberan",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (minor). Hoy solo queda un mundo sin liberar (unos 0,3 MB). Solo crecería con muchas partidas o con fallos en mitad de una prueba.",
+            "evidence": "`grep -n dispose tests/sim.test.ts` → aparece en las líneas 43, 53, 70, 85, 115, ..., 374, pero ninguna entre 184 y 191 («se pierde al agotar el tiempo»). `grep afterEach|afterAll|finally` → 0 coincidencias: si falla un expect, el mundo no se libera.\n\nMedición con `npx vite-node scripts/audit/verif-qa/q08-memoria.ts 200 0|1`:\n- sin dispose: «RSS 160.5 MB -> 255.8 MB»;\n- con dispose: «RSS 167.8 MB -> 201.6 MB».\nSale ≈0,3 MB por cada mundo no liberado.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/q08-memoria.ts"
+          },
+          {
+            "id": "qa-10",
+            "severity": "minor",
+            "title": "Los scripts TypeScript no se comprueban con tsc",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (minor).",
+            "evidence": "tsconfig.json tiene `\"include\": [\"src\", \"tests\", \"vite.config.ts\"]`, sin scripts.\n\n`npx tsc -p scripts/audit/verif-qa/tsconfig.scripts.json` (hereda el tsconfig del proyecto y añade sim-run.ts, perf.ts y grip-check.ts) → tres veces «scripts/sim-run.ts(6,25|6,57|6,109): error TS2591: Cannot find name 'process'», con código de salida 2. `npx tsc --noEmit` del proyecto sale con 0.\n\nnode_modules/@types no contiene node. perf.ts y grip-check.ts compilan sin errores.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/tsconfig.scripts.json"
+          },
+          {
+            "id": "qa-11",
+            "severity": "minor",
+            "title": "Las pruebas e2e dependen del entorno",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (minor). En este contenedor funcionan porque playwright está instalado globalmente (`npm root -g` lo lista) y existe /opt/pw-browsers/chromium. En otra máquina no funcionarían.",
+            "evidence": "package.json no tiene playwright en devDependencies. Los scripts e2e (package.json:15-18) son solo `node scripts/*.cjs`: nada construye el juego ni arranca el preview.\n\nduo-e2e.cjs:2 documenta `NODE_PATH=$(npm root -g)`. two-players-e2e.cjs:8 hace `p.goto('http://localhost:4173/')` y no lee process.argv.\n\n`executablePath: '/opt/pw-browsers/chromium'` está fijo en sofa-contact-check.cjs:18, doll-check.cjs:16, record.cjs:50, record-duo.cjs:24 y video-cards.cjs:24. Falta en smoke.cjs:7, two-players-e2e.cjs:4, keyboard-e2e y duo-e2e (comprobado con grep).\n\nNo lancé ningún navegador, porque estaba prohibido.",
+            "script": ""
+          },
+          {
+            "id": "qa-12",
+            "severity": "minor",
+            "title": "Comprobaciones e2e atadas a textos de la interfaz y a un método privado",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (minor).",
+            "evidence": "- duo-e2e.cjs:157 usa `/Uno solo/.test(n.warn)`, que depende del texto de hud.ts:85: '¡Uno solo apenas puede con él! Agarradlo los dos'.\n- duo-e2e.cjs:268 usa `/entregado/i.test(title)`, que depende de main.ts:212: '¡Sofá entregado!'.\n- sofa-contact-check.cjs:120 llama a `window.__mudanza.game.stun(...)`, que es privado: game.ts:290 `private stun(c: Carrier)`.\n- smoke.cjs:10 guarda los mensajes 'error' y 'warning'; la línea 30 solo imprime cuántos hay y el script nunca falla.\n- duo-e2e.cjs:275 sí filtra el aviso de Rapier con `/deprecated parameters/`.",
+            "script": ""
+          },
+          {
+            "id": "qa-13",
+            "severity": "minor",
+            "title": "Vitest no comprueba valores no numéricos ni el reinicio",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (minor). En la práctica la simulación es determinista, pero ninguna prueba lo fija.",
+            "evidence": "`grep -n \"isFinite|isNaN|NaN|determin|restart|reinic\" tests/sim.test.ts` → 0 coincidencias.\n\nDónde se comprueba hoy cada cosa:\n- la finitud, solo en navegador: duo-e2e.cjs:259-264;\n- el reinicio con Retroceso, solo en navegador: keyboard-e2e.cjs:74-77 y duo-e2e.cjs:245-248. Retroceso llama a start() (main.ts:95), que crea un `new Game` (main.ts:117).\n\nDeterminismo: q05 da hashes sha1 idénticos en las 8 ejecuciones de cada configuración sin aleatoriedad efectiva, pero no hay ninguna prueba que lo fije.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/q05-semillas.ts"
+          }
+        ],
+        "notes": "**Estado del código:** `git diff --quiet 08547f8 HEAD` sobre mudanza-imposible/src, tests, sim-run.ts, perf.ts, grip-check.ts, package.json y tsconfig.json no da diferencias. `npx vitest run` → 29 de 29 pruebas en verde (2,21 s).\n\n**Barrido:** mi barrido de 8 semillas reproduce exactamente las 10 filas de la tabla del auditor. Pero con atentos y en cooperativo la semilla no cambia nada (q05: hash idéntico), así que «0/8» y «8/8» en esas filas son una sola trayectoria repetida: 0/1 y 1/1.\n\n**Hallazgos que el informe no recogía:**\n- Las pruebas de partida completa no comprueban la integridad (tests/sim.test.ts:178-180). La semilla 2 de los despistados pasa con el sofá al 28 %.\n- Con 2 humanos y 4 atentos se gana 8/8, pero la semilla 5 acaba con integridad 28 tras 17 enderezados.\n- El juego real usa una semilla aleatoria (main.ts:117), así que el resultado con despistados varía en cada partida real.\n- El mismo bloqueo del piloto en la puerta que impide 3 y 4 jugadores explica por qué J3 y J4 inmóviles también estorban: con 4 jugadores en modo 'dos' se pierde. Con 3 se gana en 43,1 s.\n- La etapa que no retrocede también es un fallo de interfaz: la pantalla de resultados (main.ts:220) muestra «Arriba» con el sofá en el portal.\n\n**Gravedad:** en qa-01, qa-03 y qa-05 la considero exagerada (major, minor y minor respectivamente). En qa-06 está en el límite entre minor y major.\n\n**Estado de git:** durante la sesión cambió por otro proceso (aparecieron confirmados verif-fisica, verif-niveles, verif-vista y verificacion-ronda1.json). Yo no ejecuté ningún comando que cambie el estado de git ni modifiqué archivos existentes.\n\n**Scripts nuevos** (todos en /home/user/Game-development/mudanza-imposible/scripts/audit/verif-qa/):\n- q01-barrido.ts\n- q02-diagnostico-coop.ts\n- q03-retroceso.ts\n- q04-place-rescate.ts\n- q05-semillas.ts\n- q06-perf-fin.ts\n- q07-soltar-caida.ts\n- q08-memoria.ts\n- tsconfig.scripts.json"
+      }
+    },
+    {
+      "area": "reutilizable",
+      "result": {
+        "verdicts": [
+          {
+            "id": "reutilizable-01",
+            "severity": "major",
+            "title": "Reutilizar Character.tryGrab del laboratorio reintroduce el bug de atravesar el mueble",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Exagerada. No es un defecto de nada que se ejecute hoy: el juego no usa ese código y en las 4 pruebas del propio laboratorio la penetración es como mucho de 1,0 cm (v01b). Es un riesgo latente si se copia tryGrab a un mundo con varios porteadores, y la recomendación 1 del propio auditor ya lo cubre. Yo la dejaría en minor, como aviso para cuando se reutilice.",
+            "evidence": "Código: en mudanza-imposible-character-lab/src/sim/character.ts, tryGrab empieza en la línea 162 y llama a `this.joint.setContactsEnabled(false)` en la línea 193, no en la 211-213 que cita el auditor. El archivo tiene 457 líneas y solo un commit (796340b), y la llamada siempre ha estado en la 193. El juego tiene `this.joint.setContactsEnabled(this.coop)` en carrier.ts:196 y followSofa en 204-209. README.md:149 documenta la llamada antigua y las líneas 160-165 dan 53-71 cm. Matiz: el juego solo lo corrigió en coop. Con ayudantes, coop=false (game.ts:42 y carrier.ts:128) y el contacto sigue desactivado, como admite el propio README. Medición: `npx vite-node scripts/audit/verif-reutilizable/v01-lab-trygrab.ts` ejecuta el Lab real con la RAPIER del juego y mide la penetración con contactCollider. Si se gira el sofá alrededor de la mano a ±0,8 rad/s durante 2,5 s (simulando a otro porteador), el laboratorio tal cual llega a 31,6 cm (x0=0) y 38,4 cm (x0=0,7), con más de 5 cm en el 42-47 % de los fotogramas. Reactivando el contacto tras agarrar baja a 0,2-0,4 cm, y sin agarrar a 0,0 cm. Girando el sofá sobre su centro: 25,1 cm frente a 0,3 cm. Si otro empuja el sofá contra él: 14,3 cm frente a 0,0 cm. `v01b-lab-pruebas.ts` (pruebas A-D del laboratorio tal cual): 0,0 / 0,6 / 0,0 / 1,0 cm.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-reutilizable/v01-lab-trygrab.ts"
+          },
+          {
+            "id": "reutilizable-02",
+            "severity": "major",
+            "title": "El aro de J1 tiene el mismo amarillo que el objetivo y los colores de jugador no siguen ART_DIRECTION",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Algo exagerada. El choque de color es real, pero el aro del objetivo mide 2,6 m de diámetro y lleva una flecha, y el de J1 mide 1,08 m. ART_DIRECTION se escribió después del código (6d6bc5b, posterior a 08547f8) y QUALITY_STATE.md:18 lo llama «propuesta vigente… aún no la ha validado visualmente». Es una incoherencia de identidad visual, no rompe el juego: minor, o major solo si ART_DIRECTION se toma como requisito del ciclo actual.",
+            "evidence": "El aro, el punto de agarre y la etiqueta usan el color del jugador (dollView.ts:67-72), sacado de PLAYER_COLORS = ['#facc15', '#22d3ee', '#f472b6', '#a3e635'] (src/view/carrierView.ts:7). El HUD también lo usa (hud.ts:36). El objetivo usa '#facc15' en el aro (levelView.ts:119, RingGeometry(1.0, 1.3) en la 120) y en la flecha (124). El aro del jugador es RingGeometry(0.42, 0.54) (dollView.ts:68). ART_DIRECTION.md:35-38 fija #e2483d, #1597b8, #d0457f y #5f9c2a, y la 67 reserva #facc15 para «destino y avisos». README.md:26 dice «J1 (muñeco de peto y gorra rojos, aro amarillo)» y la 28 «El aro amarillo en el suelo marca el siguiente objetivo». Matiz: los petos de J2-J4 en PLAYER_LOOKS (dollView.ts:14-16) ya son exactamente #1597b8, #d0457f y #5f9c2a, y el de J1 es #d93a2e (dollRig.ts:51), parecido a #e2483d. Lo que no sigue la paleta es PLAYER_COLORS (aro, etiqueta y HUD), así que peto y aro no coinciden.",
+            "script": ""
+          },
+          {
+            "id": "reutilizable-03",
+            "severity": "major",
+            "title": "Los 4 jugadores solo se distinguen por el color (no hay sombreros distintos)",
+            "verdict": "PARCIAL",
+            "severityCheck": "Exagerada. Falta el sombrero por jugador que pide ART_DIRECTION, una especificación posterior al código y sin validar. Pero el problema de daltonismo está mitigado por la etiqueta de texto «J1…J4» que siempre se ve. Yo la dejaría en minor (pendiente de dirección artística).",
+            "evidence": "Lo cierto: dollRig.ts:208-215 construye la misma gorra (casquete, visera, botón y banda) para todos, y PLAYER_LOOKS (dollView.ts:12-17) solo cambia colores (overalls, cap, capBand, hair, shirt). ART_DIRECTION.md:27-33 pide gorra, gorro con pompón, pañuelo y casco «aunque no se vea el color». Lo falso: no se distinguen solo por el color. Cada DollView crea una etiqueta de texto `textSprite(\\`J${playerIndex + 1}\\`, …)` (dollView.ts:72), la coloca sobre la cabeza en cada fotograma (179) sin ocultarla nunca, y se añade a la escena en world.ts:105 (worldObjects, dollView.ts:95). El HUD también muestra «J1/J2…» en texto (hud.ts:36).",
+            "script": ""
+          },
+          {
+            "id": "reutilizable-04",
+            "severity": "minor",
+            "title": "Documentos citados en el código de a-la-de-tres que no existen",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (minor): es deuda de documentación y no afecta a la ejecución ni a las pruebas.",
+            "evidence": "seats.ts:34 cita «diseño v3» y la tabla «Escalabilidad de 4 a 10 jugadores». seats.ts:37 y engine.ts:358 remiten a «docs/AMBIGUEDADES.md». levels.ts:4 y tests/rules.test.ts:1 citan el «kit del test de papel v3». `ls -la a-la-de-tres/docs`: vacío. `git log --all -- '*AMBIGUEDADES*'`: sin resultados. `find / -iname '*AMBIGUEDADES*'`: sin resultados. `git ls-files a-la-de-tres` lista solo .gitignore, .npmrc, package*.json, src/rules/{engine,levels,seats,types}.ts, tests/{helpers,rules.test}.ts, tsconfig.json y vite.config.ts. `ls a-la-de-tres/README*`: «No such file or directory».",
+            "script": ""
+          },
+          {
+            "id": "reutilizable-05",
+            "severity": "minor",
+            "title": "El muñeco está duplicado en dos copias que ya se han separado",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (minor): es deuda de mantenimiento. El laboratorio es un proyecto exploratorio aparte, y la recomendación (quedarse con dollRig.ts como única fuente) la resuelve.",
+            "evidence": "`diff mudanza-imposible-character-lab/src/view/tube.ts mudanza-imposible/src/view/doll/tube.ts` no da diferencias, y los dos tienen sha256 f7f856f7…cdb2. `diff characterRig.ts dollRig.ts | grep -c '^[<>]'` da 141 (39 líneas solo en el laboratorio y 102 solo en el juego), con 626 frente a 689 líneas. Las mejoras pendientes están en el README del laboratorio: «Lo que sigue sin estar bien» en la 173, los saltitos y el límite del 30 % en la 175, y se repiten en la 222.",
+            "script": ""
+          },
+          {
+            "id": "reutilizable-06",
+            "severity": "minor",
+            "title": "Coste por fotograma del muñeco que crece con 4 jugadores",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (minor). El coste crece de forma lineal y hay muchas asignaciones, pero la CPU medida es pequeña: unos 0,7 ms por fotograma con 4 muñecos y unos 0,1-0,14 ms en rayos. El −12 % del README es coste de render (llamadas de dibujo y triángulos con render por software), no de rayos.",
+            "evidence": "Código: ground() hace 8 llamadas a at() y 1 a heightAt, 9 en total (dollRig.ts:304-307). Las 6 esquinas de SOLE (96) suman una consulta cada una (416-418) y la sombra otra (539): 31 por fotograma con los dos pies apoyados. Además, el planificador llama a ground() al empezar cada paso (595 y 627). `this.debug = {…}` se construye sin condición en cada sync (531-537). En sync (316-689) aparecen 26 `new THREE.Vector3`, 6 `new THREE.Quaternion`, 1 `new THREE.Euler` y 27 `.clone()`. Medición: `npx vite-node scripts/audit/verif-reutilizable/v06-coste-muneco.ts` ejecuta DollView y CharacterRig reales sobre Game con J=1, 2 y 4, 600 fotogramas caminando. castRay por muñeco y fotograma: media 42,2, mínimo 31 y máximo 49, más de los «unos 31» del auditor. Por muñeco y fotograma se crean unos 232 Vector3, 3 Quaternion y 2 Euler. rig.debug es un objeto nuevo en el 100 % de los fotogramas. CPU de sync: 0,258 ms (J=1), 0,479 ms (J=2) y 0,708 ms (J=4) por fotograma. Game.step tarda unos 0,15 ms. Un castRay ONLY_FIXED cuesta 0,83 µs, así que 124 rayos son unos 0,10 ms. README.md:85-89 sí registra 6,8 frente a 7,7 fps (−12 %), con 166→208 llamadas de dibujo y 45 000→62 000 triángulos.",
+            "script": "/home/user/Game-development/mudanza-imposible/scripts/audit/verif-reutilizable/v06-coste-muneco.ts"
+          },
+          {
+            "id": "reutilizable-07",
+            "severity": "minor",
+            "title": "El README del laboratorio dice que no hay Blender, y ya está instalado",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (minor, casi trivial). El README era cierto cuando se escribió (b7b5db1, 09:47) y quedó desfasado al instalar bpy (2200910, 19:18 del mismo día). Matiz: está Blender como módulo de Python (bpy), no la aplicación.",
+            "evidence": "mudanza-imposible-character-lab/README.md:119 dice «no hay ninguna instalada (ni Blender ni conversores glTF)». assets-src/blender/setup.sh:2-15 instala bpy==5.2.2 en ~/blender-venv. `/root/blender-venv/bin/python -c \"import bpy; print('bpy', bpy.app.version_string)\"` imprime «bpy 5.2.2 LTS». `which blender gltf-transform gltfpack ffmpeg` solo encuentra /usr/bin/ffmpeg: no hay CLI de Blender ni conversores glTF.",
+            "script": ""
+          },
+          {
+            "id": "reutilizable-08",
+            "severity": "minor",
+            "title": "Dos planes de niveles distintos en la documentación",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (minor): es una incoherencia de planificación, y ninguno de los dos planes está implementado.",
+            "evidence": "ART_DIRECTION.md:78-83 es una tabla de ambiente de luz por nivel: «1 · Casa», «2 · Edificio», «3 · Calle» y «4 · Almacén». README.md:249-253, dentro de «Propuesta para la siguiente fase», da otros niveles: «Ático sin ascensor», «Calle en obras», «El piano» y «Día de lluvia», y una secuencia de 3-4 niveles. Busqué en docs/quality/cycles/ciclo-1.md y QUALITY_STATE.md con `grep -n 'Casa|Edificio|Almacén|Ático|Calle en obras|Día de lluvia'` y no hay coincidencias: ningún documento decide entre los dos.",
+            "script": ""
+          },
+          {
+            "id": "reutilizable-09",
+            "severity": "minor",
+            "title": "El muñeco no lleva el contorno obligatorio",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Correcta (minor): es estética, y README.md:84 ya lo reconoce como diseño provisional.",
+            "evidence": "`grep -n -i 'outline|BackSide|contorno|2a2140' src/view/doll/*.ts` no da coincidencias. Los ayudantes sí tienen contorno: outlineMat con BackSide e inked() en carrierView.ts:11-20. El sofá también: inkMat en sofaView.ts:13. El color es PALETTE.outline '#2a2140' (materials.ts:48). ART_DIRECTION.md:71 pide «Contorno oscuro (#2a2140) en personajes y objetos transportables». README.md:84 dice «No lleva contorno de dibujo animado como el resto del juego».",
+            "script": ""
+          },
+          {
+            "id": "reutilizable-10",
+            "severity": "minor",
+            "title": "Directorios vacíos y versión de Three distinta en a-la-de-tres",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Exagerada: es informativo. a-la-de-tres no importa three en ningún archivo, así que la diferencia de versión no tiene efecto. Los directorios vacíos solo existen en esta copia de trabajo: git no guarda directorios vacíos y un clon no los tendría.",
+            "evidence": "a-la-de-tres/package.json:14 tiene \"three\": \"0.170.0\" y la 17 \"@types/three\": \"0.170.0\". Versiones instaladas: three 0.170.0 y types 0.170.0 en a-la-de-tres, y three 0.179.1 y types 0.179.0 en el juego y en el laboratorio. `find a-la-de-tres -path '*/node_modules' -prune -o -type d -empty -print` lista src/bots, src/ui, src/game, src/audio, src/render y docs. `git ls-files a-la-de-tres | grep -c 'src/(audio|bots|game|render|ui)/|docs/'` da 0. `grep -rln three a-la-de-tres/src a-la-de-tres/tests a-la-de-tres/vite.config.ts` no encuentra nada (exit=1).",
+            "script": ""
+          },
+          {
+            "id": "reutilizable-11",
+            "severity": "minor",
+            "title": "RapierPhysics.js de three/examples carga otra versión de Rapier desde un CDN",
+            "verdict": "CONFIRMADO",
+            "severityCheck": "Exagerada. No es un defecto del repositorio: es un archivo de terceros en node_modules que no importa ningún proyecto. Es una advertencia para el futuro (informativo), no un minor.",
+            "evidence": "node_modules/three/examples/jsm/physics/RapierPhysics.js:3 define `const RAPIER_PATH = 'https://cdn.skypack.dev/@dimforge/rapier3d-compat@0.17.3';` y la línea 98 hace `RAPIER = await import( \\`${RAPIER_PATH}\\` );`. El juego usa @dimforge/rapier3d-compat 0.19.3 local (node_modules/@dimforge/rapier3d-compat/package.json). `grep -rln RapierPhysics` en src del juego, del laboratorio y de a-la-de-tres encuentra 0 archivos.",
+            "script": ""
+          }
+        ],
+        "notes": "1) Los números de línea del auditor para character.ts del laboratorio están mal. Cita setContactsEnabled en la 211-213 (también en la 213 en el resumen y en las recomendaciones), pero está en la 193, y tryGrab empieza en la 162. Además cita postStep 286-397, startFall 400-425, updateRecovering 441-469 y footGround 472-476, pero el archivo solo tiene 457 líneas y un único commit (796340b). Así que su sección «Arquitectura» del laboratorio no es fiable por número de línea. En el resto de defectos las líneas sí coinciden con HEAD.\n2) El juego solo corrigió el contacto al agarrar en coop. Con ayudantes (coop=false, game.ts:42 y carrier.ts:128) sigue `setContactsEnabled(false)` en carrier.ts:196, y README.md lo admite («el jugador humano puede seguir solapando el sofá al girarlo agarrado»). Además, reactivar solo el contacto en el laboratorio no basta: en v01, al girar el sofá alrededor de la mano, se le escapa el agarre y solo sigue agarrado el 56-77 % del tiempo. Hace falta también followSofa, como dice README.md:170.\n3) ART_DIRECTION.md no existía en 08547f8. Se añadió en 6d6bc5b y QUALITY_STATE.md:18 lo describe como propuesta aún no validada visualmente. Los defectos 02, 03 y 09 comparan el código con una especificación posterior, por eso rebajo su gravedad. Aun así, el amarillo compartido entre el aro de J1 y el objetivo es una incoherencia real, independiente de ART_DIRECTION (README.md:26 y 28).\n4) Defecto 06: el auditor se queda corto. La media real es de 42 rayos por muñeco y fotograma (no 31) y se crean unos 232 Vector3 por muñeco y fotograma: «38 puntos» eran sitios en el código, no instancias. Aun así, el coste de CPU medido es bajo (0,18-0,26 ms por muñeco). Las mediciones se hicieron en Node, en este contenedor y sin GPU. No mido render ni GC en navegador porque no se lanzan navegadores.\n5) Scripts nuevos, todos en /home/user/Game-development/mudanza-imposible/scripts/audit/verif-reutilizable/ y ejecutables con `npx vite-node <script>` desde /home/user/Game-development/mudanza-imposible:\n- v01-lab-trygrab.ts: penetración con giros y empujes externos, comparando laboratorio tal cual, contacto ON y sin agarrar.\n- v01b-lab-pruebas.ts: las pruebas A-D del laboratorio tal cual.\n- v06-coste-muneco.ts: rayos, asignaciones, debug y CPU de DollView con 1, 2 y 4 jugadores.\nImportan el laboratorio por ruta relativa y le pasan la RAPIER del juego (la importación de Rapier en el laboratorio es solo de tipos). No he modificado ningún archivo existente ni el estado de git."
+      }
+    }
+  ],
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Verify"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "verify:fisica",
+      "phaseIndex": 1,
+      "phaseTitle": "Verify",
+      "agentId": "a7573af9b3773309d",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1792442383232,
+      "lastProgressAt": 1792442383232,
+      "cached": true,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"fisica-01\",\"severity\":\"critical\",\"title\":\"Con 3 o 4 jugadores en la física cooperativa, las asas laterales vuelven inestable el sofá (vuelca y lo destroza solo)\",\"verdict\":\"CONFIRMADO\",\"severityCheck\":\"La gravedad crítica es correcta para 4 jugadores, un modo que el menú ofrece (main.ts:69): el sofá vuelca boca abajo y todos sueltan en menos de 1 s, sin que nadie haga nada. Hay…",
+      "promptPreview": "Eres un verificador independiente y escéptico. Repositorio: /home/user/Game-development. Juego: /home/user/Game-development/mudanza-imposible (Vite + TypeScript + Three.js + Rapier compat). Responde en español.\n\nLee la tabla «Defectos» de /home/user/Game-development/mudanza-imposible/docs/quality/audit/01-fisica.md (informe del auditor «fisica», 16 defectos ya ordenados por gravedad). Numera cada …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "verify:niveles",
+      "phaseIndex": 1,
+      "phaseTitle": "Verify",
+      "agentId": "a44f14a5d0598fbf4",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1792442383233,
+      "lastProgressAt": 1792442383233,
+      "cached": true,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"niveles-01\",\"severity\":\"major\",\"title\":\"El camión es un bloque macizo mientras la vista dibuja una caja de carga abierta\",\"verdict\":\"CONFIRMADO\",\"severityCheck\":\"Exagerada para el juego actual. No falla nada: la entrega es la zona del suelo y nadie necesita entrar en la caja. Lo único visible es una pared invisible en la abertura. Solo es «major» si se mide como bloqueo de la f…",
+      "promptPreview": "Eres un verificador independiente y escéptico. Repositorio: /home/user/Game-development. Juego: /home/user/Game-development/mudanza-imposible (Vite + TypeScript + Three.js + Rapier compat). Responde en español.\n\nLee la tabla «Defectos» de /home/user/Game-development/mudanza-imposible/docs/quality/audit/02-niveles.md (informe del auditor «niveles», 15 defectos ya ordenados por gravedad). Numera cad…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "verify:vista",
+      "phaseIndex": 1,
+      "phaseTitle": "Verify",
+      "agentId": "ac31cb6a2c8acab85",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1792442383234,
+      "lastProgressAt": 1792442383234,
+      "cached": true,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"vista-01\",\"severity\":\"critical\",\"title\":\"visOff desplaza el muñeco entero para esconder penetraciones y contradice la cápsula física (lo prohíbe el usuario)\",\"verdict\":\"CONFIRMADO\",\"severityCheck\":\"Se puede defender como critical porque incumple una prohibición explícita del usuario (citada en docs/quality/audit/rebirth-audit.workflow.js:22) y es la tarea T-coh-1 del ciclo 1. P…",
+      "promptPreview": "Eres un verificador independiente y escéptico. Repositorio: /home/user/Game-development. Juego: /home/user/Game-development/mudanza-imposible (Vite + TypeScript + Three.js + Rapier compat). Responde en español.\n\nLee la tabla «Defectos» de /home/user/Game-development/mudanza-imposible/docs/quality/audit/03-vista.md (informe del auditor «vista», 15 defectos ya ordenados por gravedad). Numera cada de…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "verify:ui-audio",
+      "phaseIndex": 1,
+      "phaseTitle": "Verify",
+      "agentId": "a099c104f24afd034",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1792442383267,
+      "queuedAt": 1792442383234,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "**Hallazgos que el informe no recogía** 1. Orden de evaluac…",
+      "promptPreview": "Eres un verificador independiente y escéptico. Repositorio: /home/user/Game-development. Juego: /home/user/Game-development/mudanza-imposible (Vite + TypeScript + Three.js + Rapier compat). Responde en español.\n\nLee la tabla «Defectos» de /home/user/Game-development/mudanza-imposible/docs/quality/audit/04-ui-audio.md (informe del auditor «ui-audio», 24 defectos ya ordenados por gravedad). Numera c…",
+      "promptFramed": true,
+      "lastProgressAt": 1792443144959,
+      "tokens": 213836,
+      "toolCalls": 46,
+      "durationMs": 761691,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"ui-audio-01\",\"severity\":\"critical\",\"title\":\"Se pierden pulsaciones de agarrar/soltar y enderezar en los fotogramas sin paso de simulación\",\"verdict\":\"CONFIRMADO\",\"severityCheck\":\"Correcta. Agarrar y soltar es la acción central del juego. A 120 Hz se pierde el 50 % de las pulsaciones y a 144 Hz el 58 %, sin ningún aviso. Incluso a 60 Hz se pierde una fracción apreciable cuando l…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "verify:qa",
+      "phaseIndex": 1,
+      "phaseTitle": "Verify",
+      "agentId": "a260b2e885235d834",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1792442383268,
+      "queuedAt": 1792442383234,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "**Estado del código:** `git diff --quiet 08547f8 HEAD` sobr…",
+      "promptPreview": "Eres un verificador independiente y escéptico. Repositorio: /home/user/Game-development. Juego: /home/user/Game-development/mudanza-imposible (Vite + TypeScript + Three.js + Rapier compat). Responde en español.\n\nLee la tabla «Defectos» de /home/user/Game-development/mudanza-imposible/docs/quality/audit/05-qa.md (informe del auditor «qa», 13 defectos ya ordenados por gravedad). Numera cada defecto …",
+      "promptFramed": true,
+      "lastProgressAt": 1792443017019,
+      "tokens": 210588,
+      "toolCalls": 38,
+      "durationMs": 632624,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"qa-01\",\"severity\":\"critical\",\"title\":\"Nada demuestra que el nivel se pueda completar con 3 o 4 jugadores, que es la configuración objetivo: medido 0/8 en ambos casos\",\"verdict\":\"CONFIRMADO\",\"severityCheck\":\"Exagerada; lo justo es major. Todos los hechos son ciertos: no hay ninguna prueba con 3 o 4 humanos y el piloto no completa el nivel. Pero el fallo está en la herramienta de…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "verify:reutilizable",
+      "phaseIndex": 1,
+      "phaseTitle": "Verify",
+      "agentId": "ada5ea11ccc8fc0d8",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1792443019344,
+      "queuedAt": 1792442383235,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "1) Los números de línea del auditor para character.ts del l…",
+      "promptPreview": "Eres un verificador independiente y escéptico. Repositorio: /home/user/Game-development. Juego: /home/user/Game-development/mudanza-imposible (Vite + TypeScript + Three.js + Rapier compat). Responde en español.\n\nLee la tabla «Defectos» de /home/user/Game-development/mudanza-imposible/docs/quality/audit/06-reutilizable.md (informe del auditor «reutilizable», 11 defectos ya ordenados por gravedad). …",
+      "promptFramed": true,
+      "lastProgressAt": 1792443525930,
+      "tokens": 183999,
+      "toolCalls": 55,
+      "durationMs": 506585,
+      "resultPreview": "{\"verdicts\":[{\"id\":\"reutilizable-01\",\"severity\":\"major\",\"title\":\"Reutilizar Character.tryGrab del laboratorio reintroduce el bug de atravesar el mueble\",\"verdict\":\"CONFIRMADO\",\"severityCheck\":\"Exagerada. No es un defecto de nada que se ejecute hoy: el juego no usa ese código y en las 4 pruebas del propio laboratorio la penetración es como mucho de 1,0 cm (v01b). Es un riesgo latente si se copia tr…"
+    }
+  ],
+  "totalTokens": 608423,
+  "totalToolCalls": 139
+}
