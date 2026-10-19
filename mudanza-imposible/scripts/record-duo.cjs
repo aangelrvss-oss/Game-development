@@ -13,6 +13,8 @@ const path = require('path');
 const url = process.argv[2] || 'http://localhost:4173/';
 const OUT = path.resolve(__dirname, '../shots/video-duo');
 const FPS = 30;
+// Versión grabada, para el rótulo inicial (p. ej. REC_VERSION="commit abc1234 · 19-10-2026")
+const VERSION = process.env.REC_VERSION || '';
 
 (async () => {
   fs.rmSync(OUT, { recursive: true, force: true });
@@ -60,7 +62,8 @@ const FPS = 30;
   // --- Tramo 1: teclado ---
   open('teclado');
   let s;
-  do { s = await frame(false); } while (s.phase === 'countdown' && s.cd > 1);
+  // Se guardan los 2 últimos segundos de la cuenta atrás: los dos personajes, quietos, antes de empezar
+  do { s = await frame(false); } while (s.phase === 'countdown' && s.cd > 2);
   while (s.phase === 'countdown') s = await frame();
   s = await run(0.3, []);
   s = await tap(['Space', 'Enter']); // los dos agarran a la vez
@@ -113,7 +116,7 @@ const FPS = 30;
       <div style="font-size:30px;font-weight:800;letter-spacing:.2em;opacity:.9">PARTIDA A DOS · MISMO TECLADO</div>
       <div style="font-size:96px;font-weight:900;line-height:1;margin:14px 0 18px;text-shadow:0 6px 0 rgba(0,0,0,.25)">La Mudanza<br>Imposible</div>
       <div style="font-size:24px;font-weight:700;max-width:1080px;line-height:1.35;background:rgba(0,0,0,.22);padding:12px 22px;border-radius:14px">
-        Juego real (física Rapier), capturado fotograma a fotograma a velocidad real.<br>Las pulsaciones las envía un script, no dos personas. Solo se cortan esperas al semáforo.</div></div>`,
+        Juego real (física Rapier), capturado fotograma a fotograma a velocidad real.<br>Las pulsaciones las envía un script, no dos personas. Solo se cortan esperas al semáforo.</div>${VERSION ? `<div style="margin-top:14px;font-size:20px;font-weight:700;opacity:.9">Versión grabada: ${VERSION}</div>` : ''}</div>`,
     'chip-teclado': `${base}<div class="chip">J1 (WASD + Espacio) y J2 (flechas + Intro): agarrar, tirar juntos, tirar a la contra, soltar tirando<small>Pulsaciones de teclado enviadas por un script de prueba</small></div>`,
     'chip-piloto': `${base}<div class="chip">El piloto automático del juego lleva a J1 y a J2 hasta el camión<small>Misma física cooperativa: sin ayudantes de la máquina</small></div>`,
     'chip-corte': `${base}<div class="chip">✂ Espera al semáforo en rojo, cortada</div>`,

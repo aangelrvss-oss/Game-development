@@ -384,6 +384,32 @@ Pendientes, por orden de impacto:
 5. **La puerta estrecha:** con la fachada recortada se lee el hueco, pero el apretón contra el marco no se percibe tanto como en un juego comercial.
 6. **Rendimiento:** unas 34 llamadas de dibujo por personaje y sombras de todo el nivel en cada fotograma. Es aceptable para una demo, pero conviene fundir más mallas antes de llegar a 6–10 jugadores.
 
+## Vídeo de gameplay actual (commit 3b50dfb)
+
+[`docs/video/mudanza-imposible-gameplay-3b50dfb-2026-10-19.mp4`](docs/video/mudanza-imposible-gameplay-3b50dfb-2026-10-19.mp4): 59,9 s, 9,6 MB (9 578 464 bytes), 1280×720 a 30 fps, H.264 High con AAC. [Fotogramas de muestra](docs/capturas/video-gameplay-3b50dfb.jpg).
+
+- **Qué se grabó.** El juego del commit `3b50dfb` (los muñecos del laboratorio y las tres correcciones de la validación crítica), compilado con `npm run build` y servido con `vite preview`. Se comprobó que el navegador cargaba ese paquete (`index-DGvHfqHP.js`) y que la partida tenía dos jugadores humanos y el código de la última corrección. Grabado el 19-10-2026 con el mecanismo de siempre (`record-duo.cjs` y `make-video-duo.sh`), sin tocar la física, los personajes ni el mapa.
+- **Diferencias con el vídeo anterior del grabador.** El rótulo inicial indica la versión grabada, y se guardan los dos últimos segundos de la cuenta atrás para ver a los dos personajes antes de empezar.
+
+**Contenido, por tiempos del vídeo:**
+
+| Tramo | Qué se ve | Quién controla |
+|---|---|---|
+| 0–3 s | Rótulo con el título y la versión (imagen fija, no es juego) | — |
+| 3–13 s | Cuenta atrás con los dos muñecos (J1 rojo, J2 turquesa). Agarran a la vez, tiran juntos, tiran a la contra (el sofá gira) y J2 suelta tirando: se tambalea y cae («¡PATAPLOF!») | Pulsaciones de teclado enviadas por un script de Playwright |
+| 13–21 s | Salen del patio hasta la acera | Piloto automático del juego para J1 y J2 |
+| 21–60 s | Se cortan 8,7 s de espera con el semáforo en rojo (lo indica un rótulo). Después: cruce, portal, escalera (con el aviso «alzad el sofá»), piso de arriba, rampa y camión. «¡Sofá entregado!» en 60,3 s de juego, con el sofá al 100 % y 3 estrellas | Piloto automático del juego |
+
+**Limitaciones de la grabación:**
+
+- **Ninguna persona jugó.** Las pulsaciones las envía un script y el resto lo lleva el piloto automático. Es la física real del juego, a velocidad real, pero no muestra cómo juega una persona.
+- **No es tiempo real del reloj.** Se graba en modo captura: cada fotograma avanza 1/30 s de juego. El contenedor no tiene GPU y tardó 669 s en dibujar los 57 s de juego.
+- **Solo se cortó una espera.** No hay más montaje que el corte del semáforo; no se ha acelerado nada.
+- **Lo que se ve mal en el vídeo:**
+  - **La caída de J2 se ve poco.** Ocurre en el borde inferior de la imagen y el rótulo «¡PATAPLOF!» la tapa en parte.
+  - **J2 sale de cuadro.** Mientras J1 tira solo (hacia los 11 s), J2 queda fuera de la imagen: la cámara sigue sobre todo al sofá.
+  - **Las caras apenas se ven** desde la cámara del juego.
+
 ## Vídeo de la partida a dos
 
 [`docs/video/mudanza-imposible-dos-jugadores.mp4`](docs/video/mudanza-imposible-dos-jugadores.mp4): 59 s, 9,5 MB, 1280×720 a 30 fps, H.264 High 4.0 con AAC y `faststart`.
