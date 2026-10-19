@@ -1,0 +1,6 @@
+# npm run perf
+> vite-node scripts/perf.ts
+
+2 porteadores: 0.191 ms por paso de simulación (2315 pasos, presupuesto 16,7 ms por fotograma)
+4 porteadores: 0.132 ms por paso de simulación (2338 pasos, presupuesto 16,7 ms por fotograma)
+6 porteadores: 0.147 ms por paso de simulación (3600 pasos, presupuesto 16,7 ms por fotograma)

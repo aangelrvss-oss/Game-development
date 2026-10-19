@@ -1,0 +1,7 @@
+# scripts/audit/agentes/verify.ts (reproducción de las afirmaciones de la auditoría)
+A n=2 coop=true agarran0=11 minUp=0.96 integ=100 impactos=0 caidas=0 agarranFin=11
+A n=3 coop=true agarran0=111 minUp=0.95 integ=100 impactos=0 caidas=0 agarranFin=111
+A n=4 coop=true agarran0=1111 minUp=-1.00 integ=84 impactos=3 caidas=2 agarranFin=0000
+B lift=false holding=true grabLocal={"x":1.1,"y":0.48} dist3s=2.50 maxExtremoLibreY=0.22 up=1.00 soloDrag=3.00
+B lift=true holding=true grabLocal={"x":1.1,"y":0.48} dist3s=4.85 maxExtremoLibreY=2.08 up=0.77 soloDrag=0.00
+C fase=won t=42.4 integ=100 retrocesosJ1=t=6.08(wp1,+3.22s) t=10.67(wp2,+2.48s) t=16.97(wp4,+0.78s) t=19.95(wp5,+2.50s) t=22.63(wp5,+5.18s) t=32.82(wp7,+2.43s) t=35.50(wp9,+0.02s)

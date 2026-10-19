@@ -1,0 +1,15 @@
+import RAPIER from '@dimforge/rapier3d-compat';
+import { Game, RULES } from '../../../src/sim/game.ts';
+import { NO_INPUT } from '../../../src/sim/types.ts';
+await RAPIER.init();
+const DT = 1/60;
+const g = new Game(RAPIER as any, { humans: 2, carriers: 2, botStyle: 'atentos', seed: 1 });
+for (let i = 0; i < (RULES.countdown + 0.2) * 60; i++) g.step(DT, [NO_INPUT, NO_INPUT]);
+g.step(DT, [{ ...NO_INPUT, grab: true }, { ...NO_INPUT, grab: true }]);
+console.log('grabLocal', g.carriers.map(c => JSON.stringify(c.grabLocal && Object.fromEntries(Object.entries(c.grabLocal).map(([k, v]) => [k, +(v as number).toFixed(2)])))));
+for (let i = 0; i < 60; i++) g.step(DT, [NO_INPUT, NO_INPUT]);
+console.log('sofa y tras 1 s agarrado (sin alzar)', g.sofaPos.y.toFixed(2), 'up', g.sofaUp.toFixed(3));
+for (let i = 0; i < 60; i++) g.step(DT, [{ ...NO_INPUT, lift: true }, { ...NO_INPUT, lift: true }]);
+console.log('sofa y tras 1 s alzando', g.sofaPos.y.toFixed(2), 'up', g.sofaUp.toFixed(3));
+for (let i = 0; i < 90; i++) g.step(DT, [{ ...NO_INPUT, lift: true }, NO_INPUT]);
+console.log('solo J1 alza 1,5 s: sofa up', g.sofaUp.toFixed(3), 'y', g.sofaPos.y.toFixed(2), 'ev', g.out.map(e=>e.type).join(','));

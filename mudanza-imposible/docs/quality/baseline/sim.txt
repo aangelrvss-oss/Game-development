@@ -1,0 +1,9 @@
+# npm run sim (piloto automático, 1 humano + ayudantes)
+2 atentos 1 | FIN won null tiempo 35.6 integridad 100
+3 atentos 1 | FIN won null tiempo 36.0 integridad 100
+4 atentos 3 | FIN won null tiempo 35.9 integridad 100
+4 despistados 1 | FIN won null tiempo 46.9 integridad 96
+4 despistados 2 | FIN won null tiempo 60.3 integridad 28
+4 despistados 3 | FIN lost broken tiempo 38.3 integridad 0
+4 despistados 4 | FIN won null tiempo 41.2 integridad 92
+6 despistados 1 | FIN won null tiempo 45.8 integridad 87
