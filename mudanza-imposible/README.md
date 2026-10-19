@@ -8,7 +8,9 @@ Todo lo que ocurre sale de la simulación física (Rapier). No hay animaciones p
 
 Todas las capturas de `docs/capturas/` son reales: Chromium sin interfaz con render por software. Las de `docs/capturas/pulido/` comparan la misma partida antes y después del pase visual (ver [Pase visual](#pase-visual-y-de-animación)).
 
-**Vídeo de una partida a dos (59 s, con los muñecos del laboratorio):** [`docs/video/mudanza-imposible-dos-jugadores.mp4`](docs/video/mudanza-imposible-dos-jugadores.mp4). Ver [cómo se ha grabado](#vídeo-de-la-partida-a-dos).
+**Vídeo más reciente (61 s, colisiones corregidas y escenario decorado):** [`docs/video/mudanza-imposible-colisiones-escenario-ff6e5e4.mp4`](docs/video/mudanza-imposible-colisiones-escenario-ff6e5e4.mp4). Ver [cómo se ha grabado](#vídeo-colisiones-corregidas-y-escenario-commit-ff6e5e4).
+
+Vídeo anterior de una partida a dos (59 s, con los muñecos del laboratorio): [`docs/video/mudanza-imposible-dos-jugadores.mp4`](docs/video/mudanza-imposible-dos-jugadores.mp4).
 
 Vídeo anterior, de 1 jugador con ayudantes (40 s): [`docs/video/mudanza-imposible-partida-real.mp4`](docs/video/mudanza-imposible-partida-real.mp4).
 
@@ -77,8 +79,8 @@ Los jugadores humanos usan el muñeco desarrollado en `../mudanza-imposible-char
 
 **Límites del muñeco en el juego:**
 - **La cara se ve poco con la cámara del juego.** La cámara es alta y desde el sur, y al llevar el sofá hacia el norte se les ve sobre todo de espaldas y desde arriba: se les reconoce por la gorra, el color del peto, el aro y la etiqueta. Solo giran la cabeza hacia la cámara (hasta 1 rad) cuando hacen mucha fuerza o se tambalean.
-- **El muñeco es unos 4 cm más ancho que su cápsula.** En primer plano, el tronco puede rozar o entrar un poco en el sofá al cargarlo.
-- **Tumbado puede atravesar una pared** si cae junto a ella. La cápsula física sigue de pie: el cuerpo tumbado es dibujo y solo evita el suelo.
+- **El muñeco es unos 4 cm más ancho que su cápsula.** Desde el 19-10-2026, si el tronco o la cabeza entran en el sofá, el dibujo se aparta lo justo (ver [Colisiones con el sofá](#colisiones-con-el-sofá-corregido-el-19-10-2026)). Contra paredes y otros objetos puede rozar unos centímetros.
+- **El cuerpo tumbado es dibujo:** la cápsula física sigue de pie. Desde el 19-10-2026 se dibuja hacia una dirección libre de sofá y paredes. Si no hay ninguna libre (un rincón), puede seguir entrando en una pared.
 - **No lleva contorno de dibujo animado** como el resto del juego. Es un diseño provisional.
 - **Coste de dibujo.** Con los materiales físicos del laboratorio (capa transparente y brillo de tela), dos muñecos dejaban el render por software de este contenedor en 3,7 fotogramas por segundo. Las pruebas en tiempo real empezaron a fallar porque algunas pulsaciones cortas caían entre dos fotogramas.
   - En el juego, el muñeco usa materiales estándar, como el resto de la escena, y solo sus piezas grandes proyectan sombra.
@@ -134,6 +136,127 @@ Hecha el 19-10-2026 sobre la partida a dos. Punto de partida: rama limpia, 26 de
 - **Leve deriva del sofá** agarrado y quieto.
 - **Q/E** hace que quien lo pulsa rodee el sofá. Falta comprobar con personas si se entiende o si basta con tirar a la contra.
 - **Las pruebas con dos pilotos automáticos** a veces se bloquean entre sí: cada piloto retrocede por su cuenta. Es una limitación de las pruebas, no del juego.
+
+## Colisiones con el sofá (corregido el 19-10-2026)
+
+En el gameplay, los porteadores parecían atravesar el sofá. Se midió antes de cambiar nada: cuánto entra la cápsula física en el sofá (`contactCollider` de Rapier) y, en el navegador, cuánto entran el tronco y la cabeza **dibujados** del muñeco. Las manos y los antebrazos no cuentan: tocar el mueble con ellas es agarrarlo.
+
+**Cómo es el sistema.**
+- **Personajes:** cada uno es una cápsula dinámica con la rotación bloqueada (radio 0,32 m). El muñeco solo se dibuja: lee la posición de la cápsula y no tiene cuerpo físico propio.
+- **Sofá:** un cuerpo dinámico con cuatro colliders (asiento redondeado, respaldo y dos brazos), que siguen al cuerpo al moverse y girar.
+- **Filtros:** no hay grupos de colisión, sensores ni filtros.
+- **Agarre:** una articulación de rótula entre la mano y el punto agarrado.
+  - Al crearla se llamaba a `setContactsEnabled(false)`.
+
+**Causa.**
+- Mientras alguien agarraba el sofá, su cuerpo y el sofá dejaban de chocar.
+- La rótula fija el punto agarrado a la mano, pero deja que el sofá gire a su alrededor. Además, la mano apuntaba siempre a la misma dirección del mundo.
+- Al girar el sofá, tirar a la contra o empujar hacia él mientras se agarraba, el mueble barría el cuerpo de quien lo sujetaba y se le metía dentro.
+- Sin agarrar, el choque siempre había funcionado.
+- Aparte de eso, el muñeco es algo más ancho que la cápsula (0,36 m de tronco), se inclina al empujar y se dibuja tumbado sin que la cápsula se tumbe.
+
+**Medidas antes de corregir** (Node, misma física):
+
+| Situación | Penetración máxima de la cápsula |
+|---|---|
+| Girar el sofá tirando a la contra | 53 cm, en el 67 % de los fotogramas |
+| Uno empuja hacia el sofá alzándolo mientras el otro tira de lado | 63 cm |
+| Acercarse desde 8 direcciones, agarrar y girar | 71 cm |
+| **Recorrido completo a dos con el piloto automático** | **50 cm, en el 70 % de los fotogramas** |
+| Sin agarrar (empujar el lateral) | 2,2 cm: el choque funcionaba |
+
+**Corrección, en la partida a dos (física cooperativa):**
+1. **El choque cuerpo-sofá sigue activo mientras se agarra** (`setContactsEnabled(this.coop)` en `carrier.ts`).
+2. **La mano sigue el giro del sofá** (`followSofa`): quien agarra se queda frente a su punto de agarre, como haría una persona, en vez de dejar que el mueble gire alrededor de su mano. Sin esto, con el choque activo, el sofá apenas podía girar (0,25 rad en vez de más de 0,5) y 7 pruebas fallaban.
+3. **En la vista, el dibujo se distingue de la cápsula de forma explícita** (`DollView`):
+   - Si el tronco o la cabeza dibujados entran en el sofá, el muñeco se aparta lo justo y de forma suave: hasta 20 cm de pie y 60 cm tumbado. Nunca mientras agarra, para que las manos sigan en el asa.
+   - Al caer, el cuerpo se dibuja hacia la dirección del golpe si cabe; si no, hacia la dirección libre más parecida, comprobando el sofá y las paredes.
+
+**En el modo con ayudantes no se activó el choque al agarrar.** Se probó y su fuerza sin límite empujaba y lanzaba el sofá: 4 de 8 partidas de prueba acababan con el sofá roto, y 6 de 10 aun limitando su empuje. Además, la mano que sigue al sofá arrastraba a los cuatro ayudantes a su alrededor. Ese modo queda exactamente como antes: mismos resultados en las simulaciones de referencia. En él, el jugador humano puede seguir solapando el sofá al girarlo agarrado.
+
+**Medidas después**, en el navegador con `scripts/sofa-contact-check.cjs` (cuerpo dibujado / cápsula):
+
+| Situación | Antes | Después |
+|---|---|---|
+| Girar el sofá a un lado / al otro | 14 / 26 cm | 0 / 0 cm |
+| Alzarlo y llevarlo zigzagueando | 51 cm | 0 cm |
+| Empujar hacia el sofá agarrado | 54 cm | 0 cm |
+| Soltar tirando (caída) | 11 cm | 0 cm |
+| Caer hacia el sofá (el mismo derribo que un coche) | 52 cm | 0,3 cm |
+| Empujar el lateral sin agarrar | 9,7 cm | 3,1 cm (2 % de los fotogramas por encima de 3 cm) |
+| Recorrido completo, por etapas | — | 0 cm dibujado; cápsula ≤ 0,5 cm |
+
+- **Primeros planos:** en ninguno se ve a nadie dentro del sofá al empujarlo, girarlo, alzarlo, soltarlo o caer a su lado.
+- **Lo que queda:** chocar contra el sofá a la carrera (5,2 m/s) mete la cápsula de 5 a 8 cm durante 1–3 pasos de física, hasta que el motor resuelve el choque. Ya pasaba antes y es lo normal en Rapier.
+- **Prueba de regresión:** «agarrando, girando y llevando el sofá, el cuerpo de los porteadores no lo atraviesa». Falla sin la corrección (0,53 m).
+
+**Lo que no cambia** (comprobado en Node, caso por caso, con el código anterior y el actual):
+- Soltar tirando: 36 de 42 caídas ahora, 37 antes; tambaleo en los 42 casos en las dos versiones.
+- Girar primero y soltar después: 16 de 24 caídas en las dos versiones.
+- El recorrido a dos con el piloto automático se completa (42,4 s, antes 46,4 s).
+
+## Escenario: decoración por zonas
+
+El recorrido y la disposición funcional no cambian: ni paredes, ni puertas, ni escalera, ni rampa, ni la zona de entrega. Se añaden objetos y detalles en cada zona, con una paleta corta y materiales compartidos.
+
+| Zona | Qué se ha añadido |
+|---|---|
+| Casa y jardín | Cajas de mudanza apiladas (algunas con pegatina «FRÁGIL»), carretilla de mudanza con una caja, sillón con etiqueta «SALÓN», lámpara de pie, alfombra enrollada, carretilla de jardín con flores, regadera, rastrillo contra la valla, manguera, buzón, cartel «¡Nos mudamos!», felpudo «BIENVENIDOS», jardineras bajo las ventanas y aplique sobre la puerta |
+| Calle | Contenedores de reciclaje, aparcabicis con bici, placa «C/ DEL SOFÁ», señal de paso de peatones, patinete aparcado, terraza de café con sombrilla, jardineras y apliques junto al portal, rejillas en el bordillo |
+| Escalera y edificio | Suelo de baldosas a cuadros en el portal (la entrada se nota distinta), buzones de latón, apliques cálidos, alfombra roja por el centro de los peldaños, pasamanos, cuadros de colores y una planta en el pasillo de arriba |
+| Camión y entrega | Plataforma elevadora bajada, palé con cajas, conos, carretilla y banderines de colores entre un mástil y el camión, detrás de la zona para no taparla |
+
+- **Todo choca con lo que debe.** Los objetos al alcance de los jugadores tienen su caja de choque en la simulación (`src/sim/props.ts`, compartido con la vista). Así no se atraviesan, que era justo el problema de esta tarea.
+- **Lejos del recorrido.** Todos quedan fuera del paso del sofá y del piloto automático. Dos se movieron porque una prueba existente corría justo por donde estaban: el sillón y la alfombra.
+- **No tapan la acción.** Los objetos altos quedan detrás de la acción o lejos de la cámara. Los banderines van al otro lado de la zona de entrega.
+- [Capturas por zonas](docs/capturas/escenario/).
+
+## Propuesta para la siguiente fase: niveles cortos y varios objetos
+
+**Cómo está hecho ahora:**
+- **Nivel:** son constantes de módulo en `src/sim/level.ts` (`LEVEL`, `DOOR`, `STAIRS`, `ZONE`, `ROUTE`, `STAGES`, `SOFA_START`). `levelView.ts` dibuja con funciones que leen esas constantes. Los objetos de decoración ya son datos (`PROPS`).
+- **Objeto transportable:** hay uno solo. Lo forman la constante `SOFA` y `createSofa`, más `Game.sofa`, `sofaColliders` e `integrity`. Las asas de los ayudantes (`SLOTS`) y la ruta del piloto también son del sofá.
+- **Entrega:** un rectángulo (`ZONE`). La partida se gana si el sofá reposa dentro 1 s.
+
+**Orden propuesto**, cada paso con las pruebas en verde antes del siguiente:
+
+1. **`LevelDef` sin cambiar el juego.** Agrupar en un objeto lo que hoy son constantes:
+   - cajas;
+   - objetos;
+   - ruta;
+   - etapas;
+   - salida;
+   - zona;
+   - carriles y semáforo;
+   - función de decoración.
+   
+   `Game` y `buildLevel` lo reciben por parámetro, con el nivel actual como valor por defecto. Es una refactorización mecánica: las 29 pruebas deben pasar sin tocarlas.
+2. **`ItemDef` para lo que se carga:**
+   - colliders;
+   - masa;
+   - roce;
+   - fragilidad (multiplicador de daño);
+   - asas;
+   - dibujo.
+   
+   `Game` pasa a tener `items[]`, cada uno con su cuerpo, su estado y si está entregado. El agarre busca el objeto más cercano, no «el sofá». El sofá es el primer `ItemDef`.
+3. **Probar varios objetos en el nivel actual:**
+   - Añadir dos o tres cajas ligeras que uno solo pueda llevar, y una nevera pesada.
+   - La entrega cuenta objetos.
+   - El objetivo pasa a ser «todo cargado antes de que acabe el tiempo»: una lista visible en la interfaz y estrellas según el estado de cada objeto.
+   - Así se comprueba si alternar trabajo solo y a dos tiene gracia, antes de construir mapas.
+4. **Niveles cortos con identidad**, reutilizando primitivas que ya existen (puertas estrechas, escalera que obliga a alzar, rampa resbaladiza, tráfico):
+   - **Ático sin ascensor:** muchas cajas, una escalera larga y un armario que no pasa sin ponerlo de pie.
+   - **Calle en obras:** zanjas, una pasarela estrecha y una hormigonera que se mueve.
+   - **El piano:** un solo objeto muy pesado y frágil, con rampa y montacargas.
+   - **Día de lluvia:** el mismo barrio con menos roce.
+   - **Secuencia:** 3–4 niveles seguidos, con un camión que se va llenando como meta final.
+5. **Lo que habrá que vigilar:**
+   - el coste de varios cuerpos dinámicos (Rapier aguanta decenas);
+   - que la cámara encuadre el objeto que se lleva y no solo el centro del grupo;
+   - una ruta del piloto automático por objeto, para seguir probando cada nivel sin personas.
+
+No se ha construido nada de esta arquitectura todavía: no hacía falta para corregir el estado actual.
 
 ## Controles
 
@@ -214,6 +337,7 @@ mudanza-imposible/
   src/main.ts           bucle de juego, menú, eventos → sonido/efectos/mensajes
   src/sim/              simulación (sin Three.js)
     level.ts            geometría del recorrido, etapas y puntos de paso
+    props.ts            objetos de decoración: posición y caja de choque (la vista los dibuja)
     sofa.ts             cuerpo del sofá, asas y utilidades de rotación
     carrier.ts          porteador: movimiento, agarre, alzar, soltar y equilibrio
     traffic.ts          coches, carriles y semáforo
@@ -222,6 +346,8 @@ mudanza-imposible/
     game.ts             estado de la partida, daños, recuperación, victoria/derrota
   src/view/             dibujo con Three.js (escena, sofá, personajes, coches, efectos, cámara)
     textures.ts         texturas procedurales (asfalto, baldosa, ladrillo, tablas, tejas, chapa, tela, fachadas)
+    decor.ts            decoración por zonas: objetos de props.ts y detalles sin choque
+    doll/               muñeco del laboratorio adaptado a los jugadores (dibujo separado de la cápsula física)
   src/input/input.ts    teclado (2 jugadores) y mandos (hasta 4)
   src/audio/sfx.ts      sonidos sintetizados
   src/ui/hud.ts         interfaz durante la partida
@@ -232,6 +358,7 @@ mudanza-imposible/
     video-cards.cjs     rótulos del vídeo
     make-video.sh       monta el MP4 (ffmpeg)
     duo-e2e.cjs         partida a dos en Chromium de principio a fin (npm run e2e:duo)
+    sofa-contact-check.cjs  mide cuánto entran en el sofá la cápsula y el muñeco dibujado (con «ruta», el recorrido)
     record-duo.cjs      graba la partida a dos fotograma a fotograma con su sonido
     make-video-duo.sh   monta el MP4 de la partida a dos
   docs/capturas/        capturas reales (pulido/: antes y después del pase visual)
@@ -242,12 +369,13 @@ mudanza-imposible/
 
 Todas se ejecutaron en este entorno (contenedor Linux sin GPU) entre el 18 y el 19-10-2026. La última vez fue tras integrar el muñeco y las tres correcciones de la validación crítica.
 
-### 1. `npm test`: 28 de 28 pruebas pasan
+### 1. `npm test`: 29 de 29 pruebas pasan
 
-(19-10-2026; las anteriores siguen pasando sin cambiar ningún umbral)
+(19-10-2026, tras corregir las colisiones y añadir la decoración; las anteriores siguen pasando sin cambiar ningún umbral)
 
 | Grupo | Qué comprueban |
 |---|---|
+| Regresión de colisiones (1) | Agarrando, girando, empujando hacia el sofá y llevándolo alzado, la cápsula de los porteadores no entra más de 3 cm en el sofá (sin la corrección: 53 cm). |
 | Regresiones de la validación crítica (2) | Empujar el sofá con el cuerpo, sin agarrarlo, no lo mueve después del choque inicial (sin la corrección: 9,8 m). Sin alzar, la pareja se atasca al pie de la escalera y aparece el aviso; alzando, sube. |
 | Dos jugadores sin ayudantes (física cooperativa, 8 pruebas) | La física cooperativa solo se activa sin ayudantes. Uno solo lleva el sofá menos de 3,2 m en 3 s y los dos, más del doble. Tirar a la contra lo gira (>0,5 rad) sin velocidades absurdas. Soltar mientras se tira con fuerza: tambaleo y caída, y a los 1,3 s se levanta. Llevarlo juntos (andar y alzar) no desequilibra a nadie, ni agarrarlo llegando a la carrera (esta prueba falla si se quita el margen tras agarrar). Chocar a la carrera con el compañero desequilibra a los dos, y contra una pared no. Dos jugadores llevados por el piloto automático completan el recorrido, todas las etapas en orden. |
 | Sofá y agarre | En reposo no se mueve ni vibra (<2 cm en 3 s). Los ayudantes agarran y, con el jugador, levantan el sofá (>0,6 m) y lo sacan del patio. Agarrar y soltar funcionan. |
@@ -259,6 +387,8 @@ Todas se ejecutaron en este entorno (contenedor Linux sin GPU) entre el 18 y el 
 | Datos del nivel | Todas las cajas tienen dimensiones válidas. |
 
 ### 2. `npm run sim`: piloto automático con física real, configuraciones variadas
+
+Repetido el 19-10-2026 con las colisiones corregidas y la decoración: 2, 3 y 4 atentos dan prácticamente lo mismo: 35,6, 36,0 y 35,9 s, al 100 % (antes 35,6, 36,0 y 36,0 s). Con despistados, unas semillas mejoran y otras empeoran, sin cambiar el reparto de entregas (ver [Problemas conocidos](#problemas-conocidos)).
 
 | Porteadores | Ayudantes | Resultado | Tiempo | Estado del sofá |
 |---|---|---|---|---|
@@ -275,7 +405,25 @@ El último caso es la última medición de una configuración que, en ejecucione
 
 ### 3. Pruebas en Chromium (Playwright, render por software)
 
-Repetidas el 19-10-2026 con los muñecos y las tres correcciones. `e2e:smoke`, `e2e:teclado` y `e2e:dos` pasan. **`e2e:duo` pasa entera en 2 de las 3 ejecuciones finales; en la tercera falla una comprobación** (ver abajo). Las tres primeras fijan en la URL su escenario de 1 jugador con ayudantes, porque el menú propone por defecto 2 jugadores.
+**Última tanda (19-10-2026), con las colisiones corregidas y la decoración** (build del commit `ff6e5e4`):
+
+| Prueba | Resultado |
+|---|---|
+| `sofa-contact-check.cjs ruta` | 7 escenarios de contacto y el recorrido completo (ver [Colisiones con el sofá](#colisiones-con-el-sofá-corregido-el-19-10-2026)). Victoria a los 42,4 s; 0 cm de cuerpo dibujado dentro del sofá en todas las etapas; 0 errores. |
+| `e2e:smoke` | Victoria a los 35,9 s con el sofá al 100 %. Unos 10,5–11 fps internos, como antes. |
+| `e2e:dos` | 3,80 m juntos y 1,22 rad de giro. Sin errores. |
+| `e2e:teclado` | Todo OK (3,78 m, 0,83 m de alto, 0,58 rad con Q, +0,56 m con Mayús). |
+| `e2e:duo` | 5 ejecuciones: **20/20, 20/20, 20/20, 19/20 y 19/20.** Victoria a los 42,4 s con el sofá al 100 % en todas. |
+
+- **Primer 19/20** (solo con la corrección de colisiones): al «soltar mientras tira», J2 ni se tambaleó.
+  - Se comparó en Node, caso por caso, con el código anterior: girar y después soltar tirando da los mismos resultados (16 de 24 caídas, 22 de 24 tambaleos). Con poca tensión al soltar no hay tambaleo, también antes.
+  - No es una regresión. La comprobación se deja como está.
+- **Segundo 19/20** (con la decoración): J1 se paró en mitad del patio (x = 0,25) corriendo «hacia la pared». Corría siempre hacia el este.
+  - Lo más probable es que tuviera el sofá en medio: no hay ningún objeto nuevo ahí y, desde la validación anterior, el cuerpo ya no aparta el sofá a empujones. Pero esa ejecución no registró qué le paró.
+  - Ahora la prueba corre hacia el lado contrario al sofá, sigue exigiendo pararse en una valla, un seto o el límite de la calle, y anota qué tenía cerca si no llega.
+  - Las dos ejecuciones siguientes dieron 20/20.
+
+Antes, el mismo día, con los muñecos y las tres correcciones de la validación crítica, `e2e:smoke`, `e2e:teclado` y `e2e:dos` pasaron y `e2e:duo` pasó entera en 2 de 3 ejecuciones (ver abajo). Las tres primeras fijan en la URL su escenario de 1 jugador con ayudantes, porque el menú propone por defecto 2 jugadores.
 
 | Prueba | Resultado |
 |---|---|
@@ -309,7 +457,7 @@ NODE_PATH=$(npm root -g) npm run e2e:teclado
 
 | Medida | Valor |
 |---|---|
-| Física (`npm run perf`) | 0,11 ms por paso con 2–4 porteadores y 0,16 ms con 6 (el presupuesto es de 16,7 ms) |
+| Física (`npm run perf`) | 0,10–0,14 ms por paso con 2–6 porteadores, con los objetos nuevos (antes 0,11–0,16 ms; el presupuesto es de 16,7 ms) |
 | Carga (Chromium local) | Aproximadamente 1 MB transferido (gzip). Menú listo en 1,9–2,8 s, con render por software |
 | Imagen en este contenedor (render por software, sin GPU) | Unos 6 fotogramas reales por segundo con 4 porteadores a 1280×720, con la resolución adaptable al mínimo (la mitad). Antes del pase visual eran unos 4–5 a resolución completa |
 | Coste por fotograma a resolución completa en este contenedor | 360 ms con sombras; 240 ms sin ellas; 180 ms sin personajes ni sofá; 54 ms a media resolución. Limita la cantidad de píxeles, no el número de objetos |
@@ -321,6 +469,20 @@ NODE_PATH=$(npm root -g) npm run e2e:teclado
   - Sin ella, el pase visual dejaba el contenedor en unos 3 fotogramas por segundo.
   - Con eso, `e2e:teclado` fallaba: mantiene las teclas un tiempo real fijo, y avanzaba menos tiempo de juego. La física no había cambiado.
 - **Geometría estática fundida por material** (`mergeStatic` en `levelView.ts`): de 327 a unas 250 llamadas de dibujo. Personajes y sofá siguen siendo la mayor parte (unas 34 por personaje).
+
+**Coste de la decoración (19-10-2026).** Medido en vistas fijas de cada zona, con la misma partida, antes y después, como media de 20 fotogramas a 1280×720 con render por software:
+
+| Zona | Llamadas de dibujo | Triángulos | Tiempo por fotograma |
+|---|---|---|---|
+| Patio | 210 → 237 | 62 200 → 72 300 | +4 % |
+| Calle | 81 → 111 | 21 100 → 31 300 | +15 % |
+| Escalera | 41 → 60 | 13 000 → 21 900 | +3 % |
+| Arriba | 50 → 74 | 12 100 → 21 300 | +3 % |
+| Entrega | 56 → 77 | 11 200 → 20 300 | +10 % |
+
+- **Por qué crecen los triángulos en todas las zonas.** Lo estático se funde en una malla por material que cubre todo el nivel, así que no se descarta lo que queda fuera de cámara: unos 9 000 triángulos más en cualquier vista.
+- **Fotogramas por segundo:** `e2e:smoke` mantiene unos 10,5–11 en la cifra interna, igual que antes.
+- **Física:** cada caja de choque de los objetos es un collider fijo más. No cambia el coste de forma medible.
 
 ## Pase visual y de animación
 
@@ -384,7 +546,26 @@ Pendientes, por orden de impacto:
 5. **La puerta estrecha:** con la fachada recortada se lee el hueco, pero el apretón contra el marco no se percibe tanto como en un juego comercial.
 6. **Rendimiento:** unas 34 llamadas de dibujo por personaje y sombras de todo el nivel en cada fotograma. Es aceptable para una demo, pero conviene fundir más mallas antes de llegar a 6–10 jugadores.
 
-## Vídeo de gameplay actual (commit 3b50dfb)
+## Vídeo: colisiones corregidas y escenario (commit ff6e5e4)
+
+[`docs/video/mudanza-imposible-colisiones-escenario-ff6e5e4.mp4`](docs/video/mudanza-imposible-colisiones-escenario-ff6e5e4.mp4): 61,1 s, 10,3 MB (10 343 306 bytes), 1280×720 a 30 fps, H.264 con AAC. Se decodifica entero sin errores (1833 fotogramas).
+
+- **Qué se grabó.** El juego del commit `ff6e5e4` (colisiones corregidas y decoración), compilado y servido con `vite preview`, con `record-duo.cjs` y `make-video-duo.sh`.
+- **Cambios del grabador respecto al vídeo anterior:** en el tramo de teclado la cámara va algo más cerca (`REC_ZOOM=0.7`) para que se vea el contacto con el sofá, y el rótulo indica la versión.
+- **Resultado:** entrega a los 61,9 s de juego, con el sofá al 100 % y 3 estrellas, J2 se cayó y sin errores de consola. El contenedor tardó 697 s en dibujarlo.
+
+| Tiempo del vídeo | Qué se ve | Quién controla |
+|---|---|---|
+| 0–3 s | Rótulo con título y versión (imagen fija) | — |
+| 3–13 s | Cuenta atrás. Agarran, tiran juntos y a la contra (el sofá gira con los dos a su lado, sin meterse en ellos). J2 suelta tirando: «¡Uy, uy, uy!» y cae junto al sofá | Pulsaciones enviadas por un script |
+| 13–21 s | Salen del patio, con la decoración de la casa y el jardín | Piloto automático del juego |
+| 21–61 s | Se cortan 9 s de semáforo en rojo. Después: calle, portal a cuadros, escalera con alfombra, pasillo de arriba con cuadros y planta, rampa, entrega con palé y banderines, y «¡Sofá entregado!» | Piloto automático del juego |
+
+**Limitaciones:**
+- **Ninguna persona jugó**, y no es tiempo real del reloj (modo captura).
+- **El vídeo no basta como prueba de las colisiones:** a esta distancia no se aprecian solapes de pocos centímetros. Las medidas numéricas están en [Colisiones con el sofá](#colisiones-con-el-sofá-corregido-el-19-10-2026) y las comparaciones de primer plano en [`docs/capturas/colision/`](docs/capturas/colision/).
+
+## Vídeo de gameplay (commit 3b50dfb)
 
 [`docs/video/mudanza-imposible-gameplay-3b50dfb-2026-10-19.mp4`](docs/video/mudanza-imposible-gameplay-3b50dfb-2026-10-19.mp4): 59,9 s, 9,6 MB (9 578 464 bytes), 1280×720 a 30 fps, H.264 High con AAC. [Fotogramas de muestra](docs/capturas/video-gameplay-3b50dfb.jpg).
 
@@ -509,8 +690,13 @@ Las comprobaciones de arriba son técnicas. Que la demo sea divertida es una **h
 - **Partida a dos:**
   - **No la ha jugado ninguna persona.** Todo lo de arriba son pulsaciones enviadas por scripts y el piloto automático.
   - **Teclados que no registran tantas teclas a la vez.** Algunos teclados no admiten más de unas pocas pulsaciones simultáneas (por ejemplo, WASD, flechas y las dos Mayús). Es una limitación del teclado, no del juego. Con un mando para cada uno no pasa.
-  - **Velocidad del piloto con dos.** Con dos porteadores y la física cooperativa, el piloto automático tarda 46 s (34 s sin el límite de fuerza). La escalera es el tramo más lento.
-  - **Las caídas no usan física de cuerpo.** La cápsula sigue de pie y el muñeco dibujado cae hacia donde se desequilibró. Es la solución estable más sencilla.
+  - **Velocidad del piloto con dos.** Con dos porteadores y la física cooperativa, el piloto automático tarda 42,4 s (46,4 s antes de corregir las colisiones; 34 s sin el límite de fuerza). La escalera es el tramo más lento.
+  - **Las caídas no usan física de cuerpo.** La cápsula sigue de pie y el muñeco dibujado cae hacia donde se desequilibró, o hacia la dirección libre más parecida si ahí hay sofá o pared. Es la solución estable más sencilla.
+  - **Chocar a la carrera con el sofá** mete la cápsula de 5 a 8 cm durante 1–3 pasos de física; el motor lo resuelve enseguida.
+  - **Agarrar y girar el sofá ya no lo atraviesa, pero el giro se siente distinto.** Quien agarra se queda frente a su punto de agarre y el sofá le arrastra al girar. Las medidas de giro, tirones y caídas no cambian, pero falta comprobar con personas si se entiende.
+
+- **Modo con ayudantes:** el choque cuerpo-sofá al agarrar sigue desactivado, como antes (activarlo hacía que los ayudantes lanzaran el sofá). El jugador humano puede solapar el sofá si lo gira agarrado.
+- **Ayudantes despistados:** sus resultados varían mucho entre semillas, y con los colliders nuevos de la decoración algunas partidas cambian. Con 8 semillas, antes y después: 7 entregas y 1 sofá roto en las dos versiones, unas semillas mejor y otras peor. Los golpes ocurren lejos de los objetos nuevos.
   - **El modelo de equilibrio está simplificado** respecto al del laboratorio: no hay tropiezos con bordillos ni torpeza al arrancar y frenar (con la aceleración arcade del juego daba tambaleos constantes).
 
 - Con 6 porteadores, el piloto automático a veces se atasca en el giro del rellano. Para personas también es el punto más difícil.
