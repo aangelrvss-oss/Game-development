@@ -39,6 +39,13 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
       warn: document.getElementById('h-warn').textContent,
     };
   });
+  // Diagnóstico: registra los sucesos de agarre de cada paso de física (agarra, suelta, se le escapa)
+  await p.evaluate(() => {
+    const g = window.__mudanza.game; window.__ev = [];
+    const orig = g.step.bind(g);
+    g.step = (dt, inputs) => { orig(dt, inputs); for (const e of g.out) if (['grab', 'release', 'gripBreak', 'fall', 'stun'].includes(e.type)) window.__ev.push(`${g.time.toFixed(2)} ${e.type} J${e.carrier + 1}`); };
+  });
+  const evSince = async (t) => (await p.evaluate(() => window.__ev)).filter((e) => parseFloat(e) >= t - 1e-6).join(', ');
   let s = await st();
   ok(s.coop && s.cs.length === 2 && s.cs.every((c) => c.human !== null), 'partida a dos con física cooperativa');
   /** Mantiene teclas durante `sec` segundos de juego (y llama a `each` mientras tanto). */
@@ -52,6 +59,14 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
       if (now.t - t0 >= sec) break;
     }
     for (const k of keys) await p.keyboard.up(k);
+  }
+  /**
+   * Espera a que el juego avance al menos 0,1 s (6 pasos de física). Con render por software un fotograma
+   * dura más de 100 ms: una pulsación de 90 ms de reloj podía caer entre dos fotogramas y perderse.
+   */
+  async function tick() {
+    const t0 = (await st()).t;
+    for (let i = 0; i < 100 && (await st()).t - t0 < 0.1; i++) await p.waitForTimeout(20);
   }
   const keys = [{ l: 'KeyA', r: 'KeyD', u: 'KeyW', d: 'KeyS', g: 'Space' }, { l: 'ArrowLeft', r: 'ArrowRight', u: 'ArrowUp', d: 'ArrowDown', g: 'Enter' }];
 
@@ -90,12 +105,12 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
         // A la vez: las dos teclas de agarrar en el mismo fotograma
         const g = s.cs.map((c, i) => (c.h ? null : keys[i].g)).filter(Boolean);
         for (const k of g) await p.keyboard.down(k);
-        await p.waitForTimeout(80);
+        await tick();
         for (const k of g) await p.keyboard.up(k);
         continue;
       }
       for (const k of down) await p.keyboard.down(k);
-      await p.waitForTimeout(90);
+      await tick();
       for (const k of down) await p.keyboard.up(k);
     }
     return false;
@@ -106,23 +121,26 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   // 4a. Juntos hacia arriba
   s = await st();
   let z0 = s.sofa[2], ph = s;
-  await hold(['KeyW', 'ArrowUp'], 1.5);
+  // Juntos y solo se miden igual: 2,5 s de juego desde parados (antes se comparaban 1,5 s juntos, aún
+  // acelerando, con 2,5 s solo)
+  await hold(['KeyW', 'ArrowUp'], 2.5);
   s = await st();
   const together = z0 - s.sofa[2];
-  ok(together > 1.5, 'tirando juntos hacia arriba, el sofá avanza', `${together.toFixed(2)} m en 1,5 s ${bal(ph, s)}`);
+  ok(together > 2.5, 'tirando juntos hacia arriba, el sofá avanza', `${together.toFixed(2)} m en 2,5 s ${bal(ph, s)}`);
   await p.screenshot({ path: 'shots/duo/a1-juntos.png' });
 
-  // 4b. Uno solo: J2 suelta; J1 tira y apenas lo arrastra; aparece el aviso
+  // 4b. Uno solo: J2 suelta; J1 tira (de vuelta hacia el patio) y lo arrastra mucho más despacio; aparece el aviso
   await p.keyboard.press('Enter');
   await hold([], 0.6);
   s = await st();
   z0 = s.sofa[2]; ph = s;
+  const tSolo = (await st()).t - 0.7;
   let sawSolo = false, maxSolo = 0;
-  await hold(['KeyW'], 2.5, async (n) => { maxSolo = Math.max(maxSolo, n.solo); if (/Uno solo/.test(n.warn)) sawSolo = true; });
+  await hold(['KeyS'], 2.5, async (n) => { maxSolo = Math.max(maxSolo, n.solo); if (/Uno solo/.test(n.warn)) sawSolo = true; });
   s = await st();
   const solo = Math.hypot(s.sofa[0] - ph.sofa[0], s.sofa[2] - z0);
-  ok(solo / 2.5 < (together / 1.5) * 0.5, 'uno solo apenas lo arrastra', `${solo.toFixed(2)} m en 2,5 s (juntos: ${together.toFixed(2)} m en 1,5 s) ${bal(ph, s)}`);
-  ok(sawSolo, 'aviso en pantalla: «¡Uno solo apenas puede con él!»', `(contador ${maxSolo.toFixed(2)} s)`);
+  ok(solo < together * 0.5, 'uno solo lo arrastra a menos de la mitad de velocidad', `${solo.toFixed(2)} m en 2,5 s (juntos: ${together.toFixed(2)} m en 2,5 s) ${bal(ph, s)}`);
+  ok(sawSolo, 'aviso en pantalla: «¡Uno solo apenas puede con él!»', `(contador ${maxSolo.toFixed(2)} s; sucesos: ${await evSince(tSolo)})`);
   await p.screenshot({ path: 'shots/duo/a2-uno-solo.png' });
 
   // 4c. Vuelven a agarrar los dos y tiran en sentidos opuestos, de través al sofá (según su orientación real)

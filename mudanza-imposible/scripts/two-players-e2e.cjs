@@ -15,6 +15,11 @@ const { chromium } = require('playwright');
   const st = () => p.evaluate(() => { const g = window.__mudanza.game; return { cs: g.carriers.map((c) => ({ h: c.holding, human: c.human, x: c.pos.x, z: c.pos.z })), sofa: [g.sofaPos.x, g.sofaPos.y, g.sofaPos.z], yaw: g.sofaYaw }; });
   const keys = [{ l: 'KeyA', r: 'KeyD', u: 'KeyW', d: 'KeyS', g: 'Space' }, { l: 'ArrowLeft', r: 'ArrowRight', u: 'ArrowUp', d: 'ArrowDown', g: 'Enter' }];
   // Cada jugador va a un extremo del sofá y agarra
+  // Mantener teclas un tiempo de JUEGO (no de reloj): con render por software el juego avanza más despacio
+  // que el reloj y 2 s de reloj eran 1,1 s de juego
+  const gameTime = () => p.evaluate(() => window.__mudanza.game.time);
+  const holdGame = async (sec) => { const t0 = await gameTime(); while ((await gameTime()) - t0 < sec) await p.waitForTimeout(40); };
+  const tick = async () => { const t0 = await gameTime(); for (let i = 0; i < 100 && (await gameTime()) - t0 < 0.1; i++) await p.waitForTimeout(20); };
   for (let it = 0; it < 80; it++) {
     const s = await st();
     if (s.cs.every((c) => c.h)) break;
@@ -30,7 +35,7 @@ const { chromium } = require('playwright');
       if (Math.abs(dx) <= 0.2 && Math.abs(dz) <= 0.2) await p.keyboard.press(k.g);
     }
     for (const k of down) await p.keyboard.down(k);
-    await p.waitForTimeout(110);
+    await tick();
     for (const k of down) await p.keyboard.up(k);
   }
   let s = await st();
@@ -39,7 +44,7 @@ const { chromium } = require('playwright');
   // Los dos tiran hacia arriba (norte) a la vez
   const z0 = (await st()).sofa[2];
   await p.keyboard.down('KeyW'); await p.keyboard.down('ArrowUp');
-  await p.waitForTimeout(2000);
+  await holdGame(2);
   await p.keyboard.up('KeyW'); await p.keyboard.up('ArrowUp');
   s = await st();
   console.log(z0 - s.sofa[2] > 1.2 ? 'OK  ' : 'FALLA', 'avanzan juntos hacia el norte', (z0 - s.sofa[2]).toFixed(2), 'm');
@@ -47,7 +52,7 @@ const { chromium } = require('playwright');
   // Descoordinación: uno empuja al norte y el otro al sur → el sofá gira sin que nadie pida giro
   const yaw0 = s.yaw;
   await p.keyboard.down('KeyW'); await p.keyboard.down('ArrowDown');
-  await p.waitForTimeout(1500);
+  await holdGame(1.5);
   await p.keyboard.up('KeyW'); await p.keyboard.up('ArrowDown');
   s = await st();
   const dy = Math.abs(Math.atan2(Math.sin(s.yaw - yaw0), Math.cos(s.yaw - yaw0)));
