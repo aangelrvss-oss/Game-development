@@ -135,7 +135,7 @@ Hecha el 19-10-2026 sobre la partida a dos. Punto de partida: rama limpia, 26 de
 - **La espera al semáforo** (hasta 17 s) es tiempo muerto para los dos.
 - **Leve deriva del sofá** agarrado y quieto.
 - **Q/E** hace que quien lo pulsa rodee el sofá. Falta comprobar con personas si se entiende o si basta con tirar a la contra.
-- **Las pruebas con dos pilotos automáticos** a veces se bloquean entre sí: cada piloto retrocede por su cuenta. Es una limitación de las pruebas, no del juego.
+- **Las pruebas con varios pilotos automáticos** se bloqueaban entre sí: cada piloto retrocedía por su cuenta. Corregido en el ciclo 1 (paso 4): los pilotos de un equipo comparten la ruta (ver [Piloto para 2, 3 y 4 humanos](#piloto-para-2-3-y-4-humanos-y-scripts-de-navegador-ciclo-1)).
 
 ## Colisiones con el sofá (corregido el 19-10-2026)
 
@@ -218,6 +218,40 @@ Objetivos T-coh-1 y T-coh-2 de `docs/quality/cycles/ciclo-1.md`. Ya no hay despl
 - Tronco y cabeza dibujados, metidos en algo: 0,1 cm empujando el sofá, 0 llevándolo y girándolo, 0 tambaleándose hacia él (0,7 rad), 1,5 cm andando contra una pared y 1,1 cm pegado a ella.
 - Caídas en 6 direcciones junto al sofá (respaldo y extremo), una pared y otro porteador: el collider se solapa 1,2 cm como mucho, queda tumbado (1,57 rad) y de pie a los 1,27 s. Acorralado en una celda de 1,1 m: recostado 0,37 rad, solape 0,6 cm. Con una balda encima: espera 1,2 s, se aparta y se levanta a 0,96 m.
 - En el navegador (`scripts/sofa-contact-check.cjs`), el cuerpo dibujado ya no entra en el sofá más que la cápsula (como mucho 5,7 cm frente a 6,1 cm de la cápsula, al chocar a la carrera).
+
+## Piloto para 2, 3 y 4 humanos y scripts de navegador (ciclo 1)
+
+Objetivos T-route y T-e2e de `docs/quality/cycles/ciclo-1.md`.
+
+**Piloto para N humanos** (`autopilot.ts`).
+- `Autopilot.team(g)` crea un piloto por cada humano. Comparten la ruta (`PilotCrew`): el punto de paso, la comprobación de atasco, la maniobra de desatasco y a qué asa va cada uno. El movimiento de carga se calcula una vez por paso y lo usan todos.
+- Antes cada jugador tenía un piloto independiente. Quien se soltaba en la puerta se quedaba con un punto de paso anterior y, al volver a agarrar, tiraba del sofá hacia atrás. Con 3 humanos el sofá llegó a bajar la escalera entera (131 s); con 4, 102 s y 10 caídas.
+- **Fallo de `lastDist` corregido.** Al pasar de punto de paso no se reiniciaba, y además se comparaba con la distancia al punto anterior. Frente al punto nuevo, más lejano, el piloto nunca «se acercaba» y retrocedía a los 2,5 s sin motivo; en la escalera dejaba caer el sofá. Ahora hay 0 maniobras de desatasco en el recorrido con 2, 3 y 4 humanos (la auditoría contó 7 retrocesos en el recorrido a dos).
+
+| Recorrido con el piloto (Node) | Antes | Ahora |
+|---|---|---|
+| 2 humanos | 44,5 s | 33,3 s |
+| 3 humanos | 131,4 s | 32,2 s |
+| 4 humanos | 102,1 s, sofá al 97 %, 10 caídas | 31,9 s, 0 caídas |
+| 1 humano con ayudantes (2, 3, 4 atentos; 4 y 6 despistados; semillas 1–8) | 39 de 40 entregas; 44 s con 2 atentos | 40 de 40 entregas; 33 s con 2 atentos |
+
+Con humanos y ayudantes mezclados (2 + 1, 2 + 2, 3 + 1, 4 + 2 atentos y 2 + 2 despistados, semillas 1–3), todas las partidas ganan en 31,6–33,6 s, con el sofá al 100 %.
+
+**Scripts de navegador con los controles nuevos.**
+- `keyboard-e2e.cjs`: ya no usa Mayús. En su lugar comprueba que, al agarrar entre varios, el sofá se levanta solo más de 0,2 m desde el reposo (el mismo umbral que tenía «Con Mayús se alza el sofá»). Las esperas pasan a tiempo de juego, como en `duo-e2e`: con la máquina cargada el juego avanzaba 0,3 s por segundo de reloj y «W durante 2,5 s» eran unos 0,7 s de juego (1,40 m en vez de 6,1). Respeta los parámetros de la URL (antes `url + '?humans=1&carriers=4'` rompía una URL con `?`) y sale con código 1 si falla algo.
+- `duo-e2e.cjs`: sin `coop` (la física es única) y con el aviso nuevo («Pesa mucho»). Correr contra la pared vale contra cualquier cosa fija, según el propio juego (`Game.touchesWall`): antes J1 parado contra la carretilla del patio contaba como fallo.
+- `sofa-contact-check.cjs`, `doll-check.cjs` y `grip-check.ts`, sin `lift` en las entradas. `record-duo.cjs` ya no habla de «física cooperativa».
+
+**El fallo intermitente «J2 se levanta solo» de la línea base.**
+- No se ha podido reproducir: 0 de 7 repeticiones del tramo en el navegador con el código de la línea base y 0 de 4 con el actual. En Node, con el código de la línea base y con el actual, tampoco: 0 de 400 partidas emuladas de la parte A de la prueba (con fotogramas de 1 a 5 pasos al azar) y 0 de unos 800 casos dirigidos (varias direcciones de tirón, el sofá a lo largo de z, tirar los dos hacia el mismo lado, J1 recién agarrado).
+- En el navegador actual, J2 pasa en el suelo 1,28–1,30 s, lo que dice `CARRIER.fallTime`.
+- La comprobación miraba un solo instante, 1,5 s después de la ventana, y no dejaba rastro de qué pasaba. Además, desde el paso 3 levantarse depende de si hay sitio: si no cabe de pie, J2 espera tumbado hasta 4 s (`maxWaitRoom`).
+- Ahora espera sin pulsar nada lo que permiten esas reglas y mide con el registro de pasos cuánto estuvo J2 en el suelo, si esperó a tener sitio y si se vuelve a caer al levantarse. Exige 1,3 s (más 0,05 de tolerancia), o 1,3 s más la espera que el propio juego dice haber hecho por falta de sitio. Si falla, imprime los sucesos y las posiciones.
+
+**Resultados en Chromium** (19-10-2026, build de este paso, `vite preview` en :4174):
+- `duo-e2e.cjs`: **20/20.** Juntos 5,18 m y uno solo 1,63 m en 2,5 s; giro de 1,75 rad; J2 cae y pasa 1,28 s en el suelo; J1 se para contra la alfombra enrollada del patio sin caerse. Con el piloto llevando a los dos: victoria a los 33,3 s, con el sofá al 100 % (antes 42,4 s). Sin errores.
+- `keyboard-e2e.cjs '?carriers=4'`: **todo OK.** Al agarrar entre cuatro, el sofá pasa de 0,20 a 0,65 m sin tecla. Con W, 6,02 m en 2,53 s de juego; con Q, 1,21 rad.
+- `sofa-contact-check.cjs` (cuerpo dibujado / cápsula en el sofá): empujar el lateral 3,7 / 3,7 cm, soltar y empujar 5,7 / 6,1 cm, caer contra el sofá 0,6 / 1,0 cm y el resto 0–0,5 cm. Son los mismos valores que en el paso 3, sin errores.
 
 ## Escenario: decoración por zonas
 
@@ -349,7 +383,7 @@ No se ha construido nada de esta arquitectura todavía: no hacía falta para cor
   - Acompañan los giros que se piden con Q/E.
   - Si empujan contra algo sin avanzar, sueltan el asa y vuelven a agarrar al poco. Así pasan la puerta.
   - En modo «Despistados» reaccionan más tarde y se desvían.
-- **Piloto automático** (`autopilot.ts`): conoce la ruta y lleva al jugador 1. Sirve para el modo demo y para comprobar con la física real que el nivel se puede completar. No es una IA de juego.
+- **Piloto automático** (`autopilot.ts`): conoce la ruta y lleva al jugador 1 (modo demo) o, con `Autopilot.team`, a todos los humanos con la ruta compartida (`PilotCrew`). Sirve para el modo demo y para comprobar con la física real que el nivel se puede completar con 1 a 4 humanos. No es una IA de juego.
 - **Cámara:** cenital oblicua (unos 53°) con el norte siempre arriba, centrada en el sofá con un poco de adelanto y de peso hacia los humanos.
   - Se aleja si el grupo se dispersa.
   - Las paredes que tapan la acción se recortan hasta un zócalo opaco (corte de maqueta). Ventanas, toldos y el dintel de la puerta se ocultan; las jambas quedan a la vista para que se lea lo estrecha que es la puerta.

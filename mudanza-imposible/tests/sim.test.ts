@@ -339,9 +339,16 @@ describe('Dos jugadores sin ayudantes', () => {
     g.dispose(); g2.dispose();
   });
 
-  it('dos jugadores (llevados por el piloto automático) completan el recorrido', () => {
-    const g = new Game(RAPIER, { humans: 2, carriers: 2, botStyle: 'atentos', seed: 1 });
-    const aps = [new Autopilot(0), new Autopilot(1)];
+});
+
+describe('Recorrido completo con 2, 3 y 4 humanos (T-route)', () => {
+  // El piloto lleva a todos los humanos con la ruta compartida (`Autopilot.team`). Con un piloto independiente por
+  // jugador, con 3 humanos el que se soltaba en la puerta seguía con un punto de paso anterior y bajaba el sofá por la
+  // escalera (131 s); con 4, 102 s y 10 caídas. La prueba a dos que había aquí pasa a ser el caso n = 2.
+  it.each([2, 3, 4])('%i jugadores (llevados por el piloto automático) completan el recorrido: todas las etapas en orden y dentro del tiempo', (n) => {
+    const g = new Game(RAPIER, { humans: n, carriers: n, botStyle: 'atentos', seed: 1 });
+    const aps = Autopilot.team(g);
+    expect(aps.map((a) => a.carrierIndex)).toEqual(g.carriers.map((c) => c.id));
     const stages: number[] = [];
     for (let i = 0; i < 60 * (RULES.timeLimit + 5) && (g.phase === 'countdown' || g.phase === 'playing'); i++) {
       g.step(DT, aps.map((a) => a.input(g, DT)));
@@ -349,6 +356,24 @@ describe('Dos jugadores sin ayudantes', () => {
     }
     expect(g.phase).toBe('won');
     expect(stages).toEqual(STAGES.map((_, i) => i).slice(1));
+    expect(g.time).toBeLessThan(RULES.timeLimit);
+    g.dispose();
+  });
+
+  it('al pasar de punto de paso, la comprobación de atasco mide respecto al nuevo (lastDist se reinicia)', () => {
+    // Antes `lastDist` se quedaba con la distancia al punto alcanzado (< 0,8 m): frente al siguiente, más lejano,
+    // nunca «se acercaba» y a los 2,5 s el piloto retrocedía sin motivo
+    const g = new Game(RAPIER, { humans: 2, carriers: 2, botStyle: 'atentos', seed: 1 });
+    const crew = Autopilot.team(g)[0].crew;
+    g.phase = 'playing'; g.countdown = 0;
+    // El sofá a 0,5 m del primer punto de paso (Patio, z = 6,5) y orientado a lo largo de z: se pasa al siguiente
+    // (Acera, z = 3), a 4 m
+    g.sofa.setTranslation({ x: 0, y: 0.6, z: 7 }, true);
+    g.sofa.setRotation(yawQuat(Math.PI / 2), true);
+    crew.carry(g, DT);
+    expect(crew.wp).toBe(1);
+    expect(crew.lastDist).toBeGreaterThan(3.9);
+    expect(crew.stuck).toBe(0);
     g.dispose();
   });
 });

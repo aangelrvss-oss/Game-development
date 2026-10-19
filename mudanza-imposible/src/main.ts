@@ -364,11 +364,11 @@ if (opts.auto) start(true, false);
   },
   get simTime() { return simTime; },
   /**
-   * Pruebas y grabación: el piloto automático lleva a todos los jugadores humanos (uno por jugador).
-   * Uso: `advance(n, fps, 'return window.__mudanza.autoInputs(g)')`.
+   * Pruebas y grabación: el piloto automático lleva a todos los jugadores humanos (uno por jugador, con la ruta
+   * compartida). Uso: `advance(n, fps, 'return window.__mudanza.autoInputs(g)')`.
    */
   autoInputs(g: Game): PlayerInput[] {
-    if (testPilots.game !== g) testPilots = { game: g, list: g.carriers.filter((c) => c.human !== null).map((c) => new Autopilot(c.id)) };
+    if (testPilots.game !== g) testPilots = { game: g, list: Autopilot.team(g) };
     return testPilots.list.map((a) => a.input(g, DT));
   },
   sound: (from: number, to: number) => renderTrack(soundLog.filter((e) => e.t >= from && e.t < to).map((e) => ({ ...e, t: e.t - from })), to - from),

@@ -391,8 +391,8 @@ export class Game {
     if (this.time >= RULES.timeLimit) { this.phase = 'lost'; this.loseReason = 'time'; this.emit({ type: 'lose', reason: 'time' }); }
   }
 
-  /** ¿Choca con una pared u otro objeto fijo (contacto de lado, no el suelo)? */
-  private touchesWall(c: Carrier) {
+  /** ¿Choca con una pared u otro objeto fijo (contacto de lado, no el suelo)? También lo usa `scripts/duo-e2e.cjs`. */
+  touchesWall(c: Carrier) {
     let wall = false;
     this.world.contactPairsWith(c.collider, (other) => {
       if (wall || !other.parent()?.isFixed()) return;
