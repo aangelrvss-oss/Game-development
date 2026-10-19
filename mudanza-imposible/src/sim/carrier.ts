@@ -80,8 +80,11 @@ export class Carrier {
   joint: RAPIER.ImpulseJoint | null = null;
   /** Punto agarrado, en coordenadas locales del sofá. */
   grabLocal: Vec3 | null = null;
-  /** Dirección horizontal mano→agarre en el momento de agarrar. */
+  /** Dirección horizontal mano→agarre. En la partida a dos gira con el sofá (`followSofa`). */
   handDir = { x: 0, z: -1 };
+  /** `handDir` en el momento de agarrar y el giro del sofá entonces (eje largo en horizontal, rad). */
+  private grabDir = { x: 0, z: -1 };
+  private grabYaw = 0;
   handLift = 0; // 0..1 suavizado
   /** Ancla actual de la mano (local al porteador). Se acerca poco a poco a la posición objetivo. */
   anchorCur: Vec3 = { x: 0, y: CARRIER.handY, z: 0 };
@@ -179,13 +182,30 @@ export class Carrier {
     const dist = Math.hypot(dx, dz);
     if (dist > CARRIER.grabReach + CARRIER.radius || Math.abs(target.y - p.y) > 1.3) return false;
     this.handDir = dist > 1e-3 ? { x: dx / dist, z: dz / dist } : { ...this.facing };
+    this.grabDir = { ...this.handDir };
+    this.grabYaw = flatYaw(sofa) ?? 0;
     this.grabLocal = worldToLocal(sofa, target);
     // La mano empieza justo en el punto agarrado y después sube a su altura: sin tirones.
     this.anchorCur = { x: target.x - p.x, y: target.y - p.y, z: target.z - p.z };
     const data = this.R.JointData.spherical(this.anchorCur, this.grabLocal);
     this.joint = this.world.createImpulseJoint(data, this.body, sofa, true);
-    this.joint.setContactsEnabled(false);
+    // Partida a dos: el cuerpo choca con el sofá también mientras lo agarra (antes se desactivaba siempre y, al
+    // girarlo, el sofá se le metía en el cuerpo hasta 0,6 m), y la mano sigue el giro del sofá (`followSofa`).
+    // Con ayudantes sigue como antes: su fuerza no tiene límite y, con el choque activo, empujaban y lanzaban el
+    // sofá (golpes que lo rompían en la mitad de las partidas de prueba).
+    this.joint.setContactsEnabled(this.coop);
     return true;
+  }
+
+  /**
+   * La mano sigue al sofá cuando este gira: quien lo agarra se queda frente a su punto de agarre, como haría
+   * una persona, en vez de dejar que el mueble gire alrededor de la mano y se le meta en el cuerpo.
+   */
+  private followSofa(sofa: RAPIER.RigidBody) {
+    const yaw = flatYaw(sofa);
+    if (yaw === null) return; // de pie o volcado: el eje largo no marca un giro horizontal fiable
+    const d = yaw - this.grabYaw, c = Math.cos(d), s = Math.sin(d), g = this.grabDir;
+    this.handDir = { x: g.x * c - g.z * s, z: g.x * s + g.z * c };
   }
 
   release() {
@@ -245,6 +265,7 @@ export class Carrier {
     // Alzar: sube la mano poco a poco
     const goal = input.lift && this.joint ? 1 : 0;
     this.handLift += Math.sign(goal - this.handLift) * Math.min(Math.abs(goal - this.handLift), dt * 3);
+    if (this.joint && this.coop) this.followSofa(sofa);
     if (this.joint) {
       const t = this.handAnchor(), c = this.anchorCur;
       const dx = t.x - c.x, dy = t.y - c.y, dz = t.z - c.z;
@@ -348,4 +369,11 @@ export class Carrier {
     if (l > CARRIER.loseAt) { this.wobbling = true; this.wobbleTime = 0; this.calmTime = 0; this.wobbles++; return 'wobble'; }
     return null;
   }
+}
+
+/** Giro horizontal del eje largo del sofá (rad), o null si está casi vertical. */
+function flatYaw(sofa: RAPIER.RigidBody): number | null {
+  const o = localToWorld(sofa, { x: 0, y: 0, z: 0 }), a = localToWorld(sofa, { x: 1, y: 0, z: 0 });
+  const x = a.x - o.x, z = a.z - o.z;
+  return Math.hypot(x, z) < 0.3 ? null : Math.atan2(z, x);
 }

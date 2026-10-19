@@ -101,7 +101,7 @@ export class WorldView {
     this.dynamic.clear();
     this.fx.clear();
     this.dynamic.add(this.sofa.group, this.sofa.warning);
-    this.carriers = game.carriers.map((c) => (c.human !== null ? new DollView(c, c.human, game.world, this.camera) : new CarrierView(c, c.human, this.fx)));
+    this.carriers = game.carriers.map((c) => (c.human !== null ? new DollView(c, c.human, game.world, this.camera, game.sofaColliders) : new CarrierView(c, c.human, this.fx)));
     for (const v of this.carriers) { this.dynamic.add(v.group, ...v.worldObjects()); }
     this.cars = game.cars.map((c) => new CarView(c));
     for (const v of this.cars) this.dynamic.add(v.group);

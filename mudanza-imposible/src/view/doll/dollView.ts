@@ -28,6 +28,9 @@ const RECOVER_TIME = 0.6;
 const LIE_ANGLE = 1.45;
 
 const smooth = (t: number) => { const x = Math.min(1, Math.max(0, t)); return x * x * (3 - 2 * x); };
+/** Desplazamiento máximo del dibujo respecto a la cápsula física (m): de pie y tumbado. */
+const MAX_OFF_UP = 0.2;
+const MAX_OFF_DOWN = 0.6;
 
 /**
  * Vista de un jugador humano con el muñeco del laboratorio. Adapta el porteador del juego (cápsula de pie,
@@ -50,7 +53,15 @@ export class DollView {
   private fallDir = { x: 0, z: 1 };
   private effort = 0;
 
-  constructor(readonly carrier: Carrier, playerIndex: number, private world: RAPIER.World, private camera: THREE.Camera) {
+  /**
+   * Desplazamiento del dibujo respecto al cuerpo físico (solo horizontal). La cápsula física es algo más
+   * estrecha que el muñeco (0,32 m frente a 0,36 m de tronco) y el muñeco se inclina y se tumba sin que la
+   * cápsula lo haga: cuando el dibujo se mete en el sofá, se aparta lo justo, de forma suave.
+   */
+  private visOff = new THREE.Vector3();
+  private ball = new RAPIER.Ball(0.25);
+
+  constructor(readonly carrier: Carrier, playerIndex: number, private world: RAPIER.World, private camera: THREE.Camera, private sofaColliders: RAPIER.Collider[] = []) {
     this.rig = new CharacterRig(PLAYER_LOOKS[playerIndex % PLAYER_LOOKS.length]);
     this.group = this.rig.group;
     const color = PLAYER_COLORS[playerIndex] ?? '#ffffff';
@@ -104,7 +115,7 @@ export class DollView {
     if (stunned && !this.wasStunned) {
       // Empieza la caída: hacia donde perdió el equilibrio, o hacia donde le lanzó el golpe (lo decide el juego)
       this.stunTotal = c.knock === 'balance' ? CARRIER.fallTime : CARRIER.stunTime;
-      this.fallDir = { ...c.fallDir };
+      this.fallDir = this.freeFallDir(c.fallDir);
     }
     this.wasStunned = stunned;
     const speed = Math.hypot(v.x, v.z), want = Math.hypot(c.wantVel.x, c.wantVel.z);
@@ -154,15 +165,79 @@ export class DollView {
     s.handDir = c.handDir;
     s.grabWorld = () => (sofaGrab ? { x: sofaGrab.x, y: sofaGrab.y, z: sofaGrab.z } : null);
     this.rig.sync(s, dt, this.camera);
+    // Agarrando, las manos van al asa y el cuerpo ya no solapa (el choque físico está activo): sin desplazar.
+    const offGoal = s.holding ? new THREE.Vector3() : this.pushOut(upright ? MAX_OFF_UP : MAX_OFF_DOWN);
+    this.visOff.lerp(offGoal, 1 - Math.exp(-dt * 18));
+    this.group.position.copy(this.visOff);
 
     // Aro de jugador, punto de agarre, etiqueta y estrellas de mareo
-    this.ring.position.set(p.x, this.footY + 0.04, p.z);
+    const o = this.visOff;
+    this.ring.position.set(p.x + o.x, this.footY + 0.04, p.z + o.z);
     this.grip.visible = !!sofaGrab;
     if (sofaGrab) this.grip.position.copy(sofaGrab);
     const top = upright ? p.y + 1.15 : s.pos.y + 0.7;
-    if (this.label) this.label.position.set(s.pos.x, top + 0.25, s.pos.z);
+    if (this.label) this.label.position.set(s.pos.x + o.x, top + 0.25, s.pos.z + o.z);
     this.stars.visible = stunned && c.stunned > RECOVER_TIME;
-    if (this.stars.visible) { this.stars.position.set(s.pos.x, top - 0.05, s.pos.z); this.stars.rotation.y += dt * 5; }
+    if (this.stars.visible) { this.stars.position.set(s.pos.x + o.x, top - 0.05, s.pos.z + o.z); this.stars.rotation.y += dt * 5; }
+  }
+
+  /** Cuánto entra la esfera en el sofá (m, positivo = dentro) y hacia dónde salir (horizontal). */
+  private sofaDepth(c: THREE.Vector3, r: number): { d: number; nx: number; nz: number } {
+    let best = { d: -Infinity, nx: 0, nz: 0 };
+    for (const col of this.sofaColliders) {
+      const pr = col.projectPoint(c, false);
+      if (!pr) continue;
+      let nx = c.x - pr.point.x, nz = c.z - pr.point.z;
+      const dist = Math.hypot(nx, c.y - pr.point.y, nz);
+      const d = pr.isInside ? r + dist : r - dist;
+      if (d <= best.d) continue;
+      if (pr.isInside) { nx = -nx; nz = -nz; }
+      let l = Math.hypot(nx, nz);
+      if (l < 1e-3) { const o = col.translation(); nx = c.x - o.x; nz = c.z - o.z; l = Math.hypot(nx, nz) || 1; }
+      best = { d, nx: nx / l, nz: nz / l };
+    }
+    return best;
+  }
+
+  /** Desplazamiento horizontal que saca el tronco y la cabeza dibujados del sofá (hasta `max` m). */
+  private pushOut(max: number) {
+    const spheres = this.rig.bodySpheres();
+    const off = new THREE.Vector3();
+    const c = new THREE.Vector3();
+    for (let it = 0; it < 4; it++) {
+      let worst = { d: 0.004, nx: 0, nz: 0 };
+      for (const sp of spheres) {
+        const k = this.sofaDepth(c.copy(sp.c).add(off), sp.r);
+        if (k.d > worst.d) worst = k;
+      }
+      if (worst.nx === 0 && worst.nz === 0) break;
+      off.x += worst.nx * (worst.d + 0.005); off.z += worst.nz * (worst.d + 0.005);
+    }
+    if (off.length() > max) off.setLength(max);
+    return off;
+  }
+
+  /**
+   * Hacia dónde se dibuja la caída: la dirección del golpe si el cuerpo tumbado cabe ahí; si no (el sofá, una
+   * pared), la libre más parecida. Se decide una vez, al empezar la caída.
+   */
+  private freeFallDir(d0: { x: number; z: number }) {
+    const p = this.carrier.pos, feetY = p.y - CENTER_Y;
+    const fits = (dx: number, dz: number) => {
+      for (const h of [0.5, 0.85, 1.15]) {
+        const c = new THREE.Vector3(p.x + dx * h, feetY + 0.32, p.z + dz * h);
+        if (this.sofaDepth(c, 0.28).d > 0) return false;
+        let hit = false;
+        this.world.intersectionsWithShape(c, { x: 0, y: 0, z: 0, w: 1 }, this.ball, () => { hit = true; return false; }, RAPIER.QueryFilterFlags.ONLY_FIXED);
+        if (hit) return false;
+      }
+      return true;
+    };
+    for (const a of [0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2, 2.6, -2.6, Math.PI]) {
+      const cs = Math.cos(a), sn = Math.sin(a), dx = d0.x * cs - d0.z * sn, dz = d0.x * sn + d0.z * cs;
+      if (fits(dx, dz)) return { x: dx, z: dz };
+    }
+    return { ...d0 };
   }
 
   dispose() {

@@ -259,6 +259,31 @@ describe('Dos jugadores sin ayudantes (física cooperativa)', () => {
     g.dispose();
   });
 
+  it('agarrando, girando y llevando el sofá, el cuerpo de los porteadores no lo atraviesa', () => {
+    // Regresión: el agarre desactivaba el choque cuerpo-sofá y, al girarlo, el sofá se metía 0,5–0,6 m en ellos
+    const depth = (g: Game) => {
+      let worst = 0;
+      for (const c of g.carriers) for (const s of g.sofaColliders) {
+        const k = c.collider.contactCollider(s, 0);
+        if (k && k.distance < 0) worst = Math.max(worst, -k.distance);
+      }
+      return worst;
+    };
+    const cases: [string, (g: Game, t: number) => PlayerInput[]][] = [
+      ['giro', () => [inp({ mz: -1 }), inp({ mz: 1 })]],
+      ['uno empuja hacia el sofá alzando y el otro de lado', () => [inp({ mx: -1, lift: true }), inp({ mz: 1 })]],
+      ['llevarlo alzado zigzagueando', (_g, t) => [inp({ mz: -1, mx: Math.sin(t * 2), lift: true }), inp({ mz: -1, mx: -Math.sin(t * 2), lift: true })]],
+    ];
+    for (const [, f] of cases) {
+      const g = duo();
+      g.step(DT, [inp({ grab: true }), inp({ grab: true })]);
+      let worst = 0;
+      for (let i = 0; i < 180; i++) { g.step(DT, f(g, i * DT)); worst = Math.max(worst, depth(g)); }
+      expect(worst).toBeLessThan(0.03);
+      g.dispose();
+    }
+  });
+
   it('tirar en sentidos opuestos hace girar o estira el agarre, sin explotar la física', () => {
     const g = duo();
     g.step(DT, [inp({ grab: true }), inp({ grab: true })]);

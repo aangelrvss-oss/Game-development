@@ -284,6 +284,20 @@ export class CharacterRig {
   /** Coloca de golpe los pies (al reiniciar una prueba). */
   snap() { this.needSnap = true; }
 
+  /**
+   * Volumen del cuerpo dibujado como esferas (centro y radio, en coordenadas del grupo): tronco y cabeza, sin
+   * brazos ni piernas. Sirve para que el muñeco no se dibuje dentro de otros objetos (ver `DollView`).
+   */
+  bodySpheres(): { c: THREE.Vector3; r: number }[] {
+    this.group.updateMatrixWorld(true);
+    const s = this.torso.getWorldScale(new THREE.Vector3()).x;
+    const at = (o: THREE.Object3D, y: number) => o.localToWorld(new THREE.Vector3(0, y, 0)).sub(this.group.position);
+    return [
+      ...([[0.45, 0.33], [0.6, 0.355], [0.75, 0.335], [0.88, 0.27]] as const).map(([y, r]) => ({ c: at(this.torso, y), r: r * s })),
+      { c: at(this.head, 0.25), r: 0.33 * s },
+    ];
+  }
+
   /** Altura del suelo bajo la suela entera (la esquina más alta manda: así nunca se hunde) e inclinación de la suela. */
   private ground(src: DollSource, x: number, z: number, yaw: number) {
     const f = { x: -Math.sin(yaw), z: -Math.cos(yaw) }, r = { x: Math.cos(yaw), z: -Math.sin(yaw) };
