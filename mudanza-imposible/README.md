@@ -1,6 +1,6 @@
 # La Mudanza Imposible · vertical slice físico
 
-Demo jugable en el navegador. Entre varios porteadores hay que llevar un sofá desde una casa hasta un camión de mudanzas. Por el camino hay una calle con tráfico, una puerta estrecha, una escalera con giro de 90° y una rampa de chapa sin barandilla.
+Demo jugable en el navegador **para dos personas en el mismo teclado**. Entre los dos hay que llevar un sofá desde una casa hasta un camión de mudanzas. Por el camino hay una calle con tráfico, una puerta estrecha, una escalera con giro de 90° y una rampa de chapa sin barandilla. El sofá pesa: uno solo apenas lo arrastra, y si uno suelta mientras tira, se tambalea y puede acabar en el suelo.
 
 Todo lo que ocurre sale de la simulación física (Rapier). No hay animaciones prefabricadas que muevan el sofá.
 
@@ -8,25 +8,44 @@ Todo lo que ocurre sale de la simulación física (Rapier). No hay animaciones p
 
 Todas las capturas de `docs/capturas/` son reales: Chromium sin interfaz con render por software. Las de `docs/capturas/pulido/` comparan la misma partida antes y después del pase visual (ver [Pase visual](#pase-visual-y-de-animación)).
 
-**Vídeo de una partida real (40 s):** [`docs/video/mudanza-imposible-partida-real.mp4`](docs/video/mudanza-imposible-partida-real.mp4). Ver [cómo se ha grabado](#vídeo-de-la-partida-real).
+**Vídeo de una partida a dos (62 s):** [`docs/video/mudanza-imposible-dos-jugadores.mp4`](docs/video/mudanza-imposible-dos-jugadores.mp4). Ver [cómo se ha grabado](#vídeo-de-la-partida-a-dos).
 
-## Cómo jugar en 1 minuto
+Vídeo anterior, de 1 jugador con ayudantes (40 s): [`docs/video/mudanza-imposible-partida-real.mp4`](docs/video/mudanza-imposible-partida-real.mp4).
+
+## Cómo jugar en 1 minuto (dos jugadores)
 
 ```bash
 cd mudanza-imposible
-npm install
+npm ci               # instala las versiones exactas del package-lock
 npm run dev          # abre http://localhost:5173
 ```
 
-1. En el menú, pulsa **Intro** o «¡A mover!».
-2. Acércate al sofá con **WASD**, agárralo con **Espacio** y llévalo hacia arriba de la pantalla.
-3. El aro amarillo en el suelo (con una flecha encima) marca el siguiente objetivo.
+1. En el menú ya están elegidos **2 jugadores y 2 porteadores** (sin ayudantes). Pulsa **Intro** o «¡A mover!».
+2. **J1** (Abuela Moño, aro morado): **WASD** para moverse y **Espacio** para agarrar o soltar.
+3. **J2** (Gordo, aro azul): **flechas** para moverse e **Intro** para agarrar o soltar.
+4. Cada uno se pone en un extremo del sofá, lo agarran y lo llevan hacia arriba de la pantalla. El aro amarillo en el suelo marca el siguiente objetivo.
+5. **Objetivo:** dejar el sofá en la zona verde junto al camión en menos de 3 minutos sin destrozarlo. **Retroceso** reinicia en cualquier momento; en la pantalla final, **Intro** vuelve a empezar.
 
-Para ver una partida completa sin tocar nada, usa «Ver demo automática» o abre `http://localhost:5173/?auto=1`.
+Para ver una partida completa sin tocar nada, usa «Ver demo automática» o abre `http://localhost:5173/?auto=1` (1 jugador con ayudantes).
 
 Requisitos: Node 20 o superior y un navegador con WebGL (Chrome, Edge o Firefox). No hay servicios externos ni de pago.
 
 Versión de producción: `npm run build` y después `npm run preview`, que sirve en `http://localhost:4173`.
+
+## Partida a dos: física cooperativa
+
+Cuando todos los porteadores son humanos (por defecto, 2 de 2), se activa la física cooperativa (`isCoop` en `src/sim/game.ts`):
+
+| Qué | Cómo funciona |
+|---|---|
+| **El sofá pesa** | 90 kg nominales (45 con ayudantes) y más roce a rastras. Cada porteador mueve el mueble con una fuerza limitada (200 N, `CARRIER.pullForce`), y en pendiente sostiene además su propio peso. Uno solo apenas lo arrastra (0–0,15 m en 1,5 s en el navegador); los dos juntos lo llevan a unos 2–3 m/s y tarda en arrancar y frenar. Si uno intenta llevarlo solo, la pantalla avisa: «¡Uno solo apenas puede con él! Agarradlo los dos». |
+| **Tirar a la contra** | Si cada uno tira hacia un lado, el sofá gira sobre sí mismo (física, sin animación). |
+| **Equilibrio** | Modelo del laboratorio de personaje (`../mudanza-imposible-character-lab/`), simplificado: un péndulo invertido que empujan las fuerzas que mide la física. Soltar mientras se tira con fuerza (la tensión desaparece de golpe) o que el compañero o el sofá te arrollen a la carrera te hace **tambalearte** («¡Uy, uy, uy!»: pasos apresurados hacia donde te caes, brazos en molinillo). Si no lo recuperas, **caes** («¡PATAPLOF!») hacia ese lado, sueltas el sofá y te levantas a los 1,3 s. Llevar el sofá con normalidad, agarrarlo (también llegando a la carrera: hay medio segundo para hacerse con el peso), alzarlo o chocar con una pared no tumba a nadie. |
+| **Recuperarse** | Nadie se queda bloqueado: el que cae se levanta solo, el sofá volcado se endereza con R (J1) o - (J2), y si el sofá cae fuera del mapa vuelve al último punto. |
+
+Con ayudantes de la máquina se mantiene la física original (sofá ligero, fuerza sin límite y sin pérdidas de equilibrio). Los ayudantes y el piloto automático están ajustados a ella; con la física cooperativa los ayudantes sueltan y reagarran para desatascarse y se caían una y otra vez.
+
+**Por qué esta ruta.** El juego ya tenía partida completa, dos jugadores en un teclado, cronómetro, victoria, reinicio, sonido y pruebas; faltaba que hiciera falta cooperar y que hubiera tropiezos y caídas. Del laboratorio se ha traído el modelo de equilibrio (la física), no el muñeco: depende de datos propios del laboratorio, los personajes del juego ya habían pasado una revisión visual y la prioridad era jugar. La caída reutiliza el estado «tumbado» del juego, ya animado y estable, en lugar de volcar la cápsula física como en el laboratorio.
 
 ## Controles
 
@@ -35,7 +54,7 @@ Versión de producción: `npm run build` y después `npm run preview`, que sirve
 | Moverse | W A S D | Flechas | Stick izquierdo o cruceta |
 | Agarrar / soltar | Espacio | Intro | A |
 | Alzar (mantener) | Mayús izq. | Mayús dcha. | B o gatillos |
-| Girar el sofá (tú y tus ayudantes) | Q / E | , / . | LB / RB |
+| Girar el sofá (rodeándolo; también tus ayudantes) | Q / E | , / . | LB / RB |
 | Enderezar el sofá volcado | R | - | Y |
 | Pausa | Esc | | Start |
 | Reiniciar | Retroceso | | Start (en resultados) |
@@ -108,7 +127,7 @@ mudanza-imposible/
   src/sim/              simulación (sin Three.js)
     level.ts            geometría del recorrido, etapas y puntos de paso
     sofa.ts             cuerpo del sofá, asas y utilidades de rotación
-    carrier.ts          porteador: movimiento, agarre, alzar, soltar
+    carrier.ts          porteador: movimiento, agarre, alzar, soltar y equilibrio
     traffic.ts          coches, carriles y semáforo
     bots.ts             ayudantes de la máquina
     autopilot.ts        piloto automático (demo y pruebas)
@@ -124,6 +143,9 @@ mudanza-imposible/
     record.cjs          graba la partida real fotograma a fotograma con su sonido
     video-cards.cjs     rótulos del vídeo
     make-video.sh       monta el MP4 (ffmpeg)
+    duo-e2e.cjs         partida a dos en Chromium de principio a fin (npm run e2e:duo)
+    record-duo.cjs      graba la partida a dos fotograma a fotograma con su sonido
+    make-video-duo.sh   monta el MP4 de la partida a dos
   docs/capturas/        capturas reales (pulido/: antes y después del pase visual)
   docs/video/           vídeo de una partida real
 ```
@@ -132,10 +154,13 @@ mudanza-imposible/
 
 Todas se ejecutaron en este entorno (contenedor Linux sin GPU) el 18-10-2026, la última vez después del segundo ciclo de pulido visual.
 
-### 1. `npm test`: 18 de 18 pruebas pasan
+### 1. `npm test`: 26 de 26 pruebas pasan
+
+(19-10-2026; las 18 anteriores siguen pasando sin cambiar ningún umbral)
 
 | Grupo | Qué comprueban |
 |---|---|
+| Dos jugadores sin ayudantes (física cooperativa, 8 pruebas nuevas) | La física cooperativa solo se activa sin ayudantes. Uno solo lleva el sofá menos de 3,2 m en 3 s y los dos, más del doble. Tirar a la contra lo gira (>0,5 rad) sin velocidades absurdas. Soltar mientras se tira con fuerza: tambaleo y caída, y a los 1,3 s se levanta. Llevarlo juntos (andar y alzar) no desequilibra a nadie, ni agarrarlo llegando a la carrera (esta prueba falla si se quita el margen tras agarrar). Chocar a la carrera con el compañero desequilibra a los dos, y contra una pared no. Dos jugadores llevados por el piloto automático completan el recorrido, todas las etapas en orden. |
 | Sofá y agarre | En reposo no se mueve ni vibra (<2 cm en 3 s). Los ayudantes agarran y, con el jugador, levantan el sofá (>0,6 m) y lo sacan del patio. Agarrar y soltar funcionan. |
 | Puerta estrecha | De lado se queda en la fachada; de largo pasa. |
 | Tráfico | El semáforo da paso a los peatones solo después del ámbar y del rojo total. Un coche pita, golpea, daña (−12 %) y desplaza el sofá que está en su carril. Un porteador atropellado queda mareado. |
@@ -161,11 +186,16 @@ El último caso es la última medición de una configuración que, en ejecucione
 
 ### 3. Pruebas en Chromium (Playwright, render por software)
 
+Repetidas el 19-10-2026 con la versión final de la partida a dos: todas pasan. Las tres anteriores fijan ahora en la URL su escenario de 1 jugador con ayudantes, porque el menú propone por defecto 2 jugadores.
+
 | Prueba | Resultado |
 |---|---|
+| `e2e:duo` (partida a dos de principio a fin; 20 comprobaciones) | **Pasa las 3 últimas ejecuciones seguidas.** Con teclas reales: <br>• El menú propone 2 jugadores sin ayudantes e Intro empieza la partida. <br>• Los dos se mueven a la vez (W y flecha abajo: ±1,8 m). <br>• Agarran a la vez con Espacio e Intro. <br>• Juntos llevan el sofá 2,5–3,2 m en 1,5 s; uno solo, 0–0,3 m en 2,5 s, con el aviso en pantalla. <br>• Tirando de través cada uno hacia un lado, el sofá gira 0,5–1,6 rad. <br>• Si J2 suelta mientras tira, se tambalea y cae; se levanta solo y vuelve a agarrar. <br>• Correr contra la valla frena sin tumbar. <br>• Retroceso reinicia. <br>Con el piloto automático llevando a los dos (modo captura, misma física y dibujo): <br>• Victoria en 46,4 s con el sofá al 100 %, sin valores no numéricos ni velocidades disparadas. <br>• Pantalla de resultados «¡Sofá entregado!»; Intro (tecla real) empieza otra partida desde cero. <br>• Sin errores de página ni de consola. <br>Capturas en [`docs/capturas/duo/`](docs/capturas/duo/). |
 | `e2e:smoke` (demo automática con 4 porteadores) | La partida se completa en 36,0 s con el sofá al 100 %. Sin errores de página. Queda un aviso benigno de la propia Rapier («deprecated parameters»). Unas 280 llamadas de dibujo y 48 000 triángulos por fotograma (antes del pase visual: 114 y 18 000). |
 | `e2e:teclado` (teclas reales) | Agarrar con Espacio, que los ayudantes agarren, llevar el sofá con W (3,5 m), levantarlo (0,83 m), girarlo con Q (0,59–0,75 rad), alzarlo con Mayús (+0,56 m), soltarlo, pausar con Esc y reiniciar con Retroceso. Todo OK en las 3 últimas ejecuciones. Ver la nota sobre la resolución adaptable en [Rendimiento](#rendimiento). |
-| `e2e:dos` (dos jugadores en el mismo teclado, sin ayudantes) | Los dos agarran, avanzan juntos (3,5–3,6 m) y, si tiran en direcciones opuestas, el sofá gira por pura física (1,4–1,5 rad). |
+| `e2e:dos` (dos jugadores en el mismo teclado, sin ayudantes) | Los dos agarran, avanzan juntos y, si tiran en direcciones opuestas, el sofá gira por pura física. Con la física cooperativa: 1,61 m y 0,83 rad (antes 3,5–3,6 m y 1,4–1,5 rad, con el sofá ligero). |
+
+Con `e2e:duo` las primeras ejecuciones fallaban de forma intermitente: el giro salía corto y el aviso de «uno solo» a veces no aparecía. Los dos casos eran fallos de la propia prueba: a veces tiraba a lo largo del eje del sofá y esperaba demasiado poco. Pero esa investigación destapó un fallo real del juego: agarrar el sofá llegando a la carrera hacía tambalearse. Se ha corregido con medio segundo para hacerse con el peso, y hay una prueba de Vitest que falla sin esa corrección.
 
 Para ejecutarlas hace falta Playwright con Chromium, que no está en las dependencias. Con la demo servida en el puerto 4173:
 
@@ -252,7 +282,17 @@ Pendientes, por orden de impacto:
 5. **La puerta estrecha:** con la fachada recortada se lee el hueco, pero el apretón contra el marco no se percibe tanto como en un juego comercial.
 6. **Rendimiento:** unas 34 llamadas de dibujo por personaje y sombras de todo el nivel en cada fotograma. Es aceptable para una demo, pero conviene fundir más mallas antes de llegar a 6–10 jugadores.
 
-## Vídeo de la partida real
+## Vídeo de la partida a dos
+
+[`docs/video/mudanza-imposible-dos-jugadores.mp4`](docs/video/mudanza-imposible-dos-jugadores.mp4): 62 s, 10 MB, 1280×720 a 30 fps, H.264 High 4.0 con AAC y `faststart`.
+
+- **Cómo se graba.** La demo real en Chromium, en modo captura (`?capture=1`): cada fotograma avanza 1/30 s de juego y después se captura, así que va a velocidad real aunque el contenedor dibuje despacio. El sonido son los efectos del propio juego, renderizados fuera de línea.
+- **Tramo 1 (9 s).** J1 y J2 con el teclado del juego: agarran a la vez (Espacio e Intro), tiran juntos, tiran a la contra (el sofá gira), cada uno tira hacia su lado y J2 suelta sin dejar de tirar: «¡Uy, uy, uy!» y «¡PATAPLOF!». J1 sigue solo y apenas lo mueve («¡Uno solo apenas puede con él!»). **Las pulsaciones las envía un script de Playwright, no dos personas**, pero entran por el mismo teclado que usaría un jugador.
+- **Tramo 2.** El piloto automático del juego lleva a J1 y a J2 (sin ayudantes, con la física cooperativa) por la calle, el portal, la escalera y la rampa hasta el camión: entregado en 63,4 s, con el sofá al 100 % y 3 estrellas. Se corta la espera en la acera con el semáforo en rojo (un rótulo lo indica). No se ha acelerado nada.
+- **Reproducir:** con la demo servida en :4173, `NODE_PATH=$(npm root -g) node scripts/record-duo.cjs` y después `scripts/make-video-duo.sh`.
+- **Una primera toma se descartó.** En ella el tramo de teclado empujaba el sofá hasta la calle con el semáforo en rojo. Los coches lo atropellaron varias veces y el piloto tardó un minuto en sacarlo: entregado en 102,6 s con el sofá al 10 %. Sirvió para comprobar que la partida no se bloquea, pero no como vídeo corto. En la toma buena, el tramo de teclado se queda en el patio.
+
+## Vídeo de la partida real (1 jugador con ayudantes)
 
 [`docs/video/mudanza-imposible-partida-real.mp4`](docs/video/mudanza-imposible-partida-real.mp4): 40 s, 7,7 MB, 1280×720 a 30 fps, H.264 High 4.0 con AAC y `faststart`. Se reproduce en Android.
 
@@ -291,16 +331,18 @@ Ninguno contiene recursos 3D utilizables. Del segundo solo se tomó como referen
   - se daña con golpes, caídas y atropellos (con parches de cinta visibles).
 - Porteadores con agarre por rótula, alzar, soltar, mareo por atropello y retorno si se pierden.
 - Tráfico en movimiento con semáforo, frenada, pitidos y empujones.
-- 1 jugador con 1–5 ayudantes; 2 jugadores en un teclado; mandos para J1–J4.
+- **Partida a dos en el mismo teclado como modo por defecto**, con física cooperativa: sofá pesado (uno solo apenas lo arrastra), fuerza de tiro limitada, giros por tirar a la contra, tambaleos y caídas por soltar tirando o por choques, y levantarse solo.
+- 1 jugador con 1–5 ayudantes (física original); mandos para J1–J4.
 - Interfaz:
   - tiempo, etapas y estado del sofá;
   - avisos de vuelco y atasco, y semáforo de peatones;
   - mensajes de eventos e indicador del siguiente objetivo;
   - menú y resultados con estrellas y mejor tiempo.
-- Sonidos de agarre, soltar, golpe, atropello, pitido, mareo, etapa, victoria y derrota.
+- Sonidos de agarre, soltar, golpe, atropello, pitido, mareo, tambaleo, caída, etapa, victoria y derrota.
 
 **Provisional**
-- La «inteligencia» de los ayudantes: imitan al jugador y no toman decisiones propias.
+- La «inteligencia» de los ayudantes: imitan al jugador y no toman decisiones propias. No pierden el equilibrio y, con ayudantes, se usa la física original: con la cooperativa soltaban y reagarraban para desatascarse, se caían una y otra vez y la partida se perdía.
+- Las constantes de la física cooperativa (`CARRIER.pullForce`, `releaseKick`, `deadZone`, `shoveGain`, `SOFA.coopMass`, `coopFriction`): ajustadas con simulaciones y con el piloto automático, **no con personas**. Pueden resultar demasiado blandas o demasiado castigadoras.
 - La ayuda de muñecas y sus constantes: `RULES.wristK`, `wristDamp` y los umbrales de daño, sin ajustar con jugadores.
 - Los mandos están implementados con la asignación estándar, pero **no se han probado con un mando físico**. Las pruebas automáticas solo usan teclado.
 - Las animaciones son procedurales (ver [Pase visual](#pase-visual-y-de-animación)). No hay animación esquelética ni caídas tipo muñeco de trapo: el porteador sigue siendo una cápsula física y el cuerpo dibujado reacciona a su estado.
@@ -323,7 +365,7 @@ Las comprobaciones de arriba son técnicas. Que la demo sea divertida es una **h
 | ¿Qué decisiones toma el jugador? | Esperar al semáforo o arriesgarse; por qué lado agarrar; cuándo soltar para pasar la puerta; cuándo girar en la escalera; ir por la rampa con cuidado o saltar por el lado. |
 | ¿Qué errores pueden parecer injustos? | Que se escape el agarre sin entender por qué (hay aviso, pero hay que verlo con gente). Que un ayudante de la máquina empuje mal. Atropellos que no se vieron venir: hay pitido y aviso, pero a 10 m/s es poco margen. |
 | ¿Qué momentos dan clip? | Atropellos, el sofá resbalando por la rampa y atascos en la puerta. |
-| ¿Qué puede aburrir? | Con 1 jugador y ayudantes, el núcleo social (discutir y coordinarse) **no existe**: los ayudantes copian lo que haces. El patio y el pasillo superior son tramos de transición sin decisión. El recorrido completo dura solo 36 s con el piloto automático y algo más con personas; puede quedarse corto. |
+| ¿Qué puede aburrir? | Con 1 jugador y ayudantes, el núcleo social (discutir y coordinarse) **no existe**: los ayudantes copian lo que haces. Por eso la partida a dos es ahora el modo por defecto y el sofá exige a los dos. El patio y el pasillo superior son tramos de transición sin decisión. El recorrido completo dura solo 36 s con el piloto automático y algo más con personas; puede quedarse corto. |
 
 **Lo que la demo no valida:** la diversión con amigos reales, la comunicación por voz, el caos de 4–10 personas y la comprensión de los controles por alguien nuevo. Para eso hacen falta sesiones con personas.
 
@@ -334,6 +376,13 @@ Las comprobaciones de arriba son técnicas. Que la demo sea divertida es una **h
 3. **Un segundo tramo con decisión real:** por ejemplo, un ascensor pequeño (hay que poner el sofá de pie) o un atajo arriesgado. Con eso se comprueba si el sistema da variedad sin animaciones prefabricadas, antes de invertir en red para 4–10 jugadores.
 
 ## Problemas conocidos
+
+- **Partida a dos:**
+  - **No la ha jugado ninguna persona.** Todo lo de arriba son pulsaciones enviadas por scripts y el piloto automático.
+  - **Teclados que no registran tantas teclas a la vez.** Algunos teclados no admiten más de unas pocas pulsaciones simultáneas (por ejemplo, WASD, flechas y las dos Mayús). Es una limitación del teclado, no del juego. Con un mando para cada uno no pasa.
+  - **Velocidad del piloto con dos.** Con dos porteadores y la física cooperativa, el piloto automático tarda 46 s (34 s sin el límite de fuerza). La escalera es el tramo más lento.
+  - **Las caídas no usan física de cuerpo.** La cápsula sigue de pie y el muñeco dibujado cae hacia donde se desequilibró. Es la solución estable más sencilla.
+  - **El modelo de equilibrio está simplificado** respecto al del laboratorio: no hay tropiezos con bordillos ni torpeza al arrancar y frenar (con la aceleración arcade del juego daba tambaleos constantes).
 
 - Con 6 porteadores, el piloto automático a veces se atasca en el giro del rellano. Para personas también es el punto más difícil.
 - La consola muestra un aviso de Rapier («deprecated parameters for the initialization function») que viene de la propia librería. No afecta.
