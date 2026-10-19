@@ -30,9 +30,14 @@ Documento persistente de la transformación. Cada ciclo **lo lee al empezar y lo
 | `npm run sim` (1 humano y ayudantes) | 2/3/4 atentos: entregado en 35,6, 36,0 y 35,9 s, al 100 %. Despistados (semillas 1–4): 96 %, 28 %, roto y 92 %. 6 despistados: 87 %. |
 | Reproducción de la auditoría (`scripts/audit/agentes/verify.ts`) | 4 humanos agarrando: el sofá vuelca (sofaUp mínimo −1,00, integridad 84, 2 caídas). Uno solo alzando: 4,85 m en 3 s, con el extremo libre a 2,08 m. Piloto a dos: gana en 42,4 s con 7 retrocesos. |
 
-### Pruebas en el navegador (Chromium por software; salidas en `baseline/navegador.txt`)
+### Pruebas en el navegador (Chromium por software; salidas en [`baseline/navegador.txt`](baseline/navegador.txt))
 
-*En curso.* Se rellena al terminar.
+| Prueba | Resultado |
+|---|---|
+| `e2e:smoke` (4 porteadores, demo automática) | Gana en 35,9 s, sofá al 100 %. 289 llamadas de dibujo y 62 800 triángulos. Solo el aviso de Rapier. |
+| `e2e:dos` | 3,68 m juntos y 1,27 rad de giro. OK. |
+| `e2e:teclado` | Todo OK, incluido «Mayús alza 0,56 m». |
+| `e2e:duo` | **19/20.** Falla «J2 se levanta solo»: tras la caída provocada, a los 1,5 s sigue en el suelo. Es un fallo intermitente previo, sobre el código de referencia sin cambios; se investiga en el ciclo 1. Victoria a los 42,4 s, sin errores de consola. |
 
 ### Pendientes de validación humana
 
