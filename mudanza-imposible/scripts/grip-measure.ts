@@ -4,7 +4,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { Game, RULES } from '../src/sim/game';
 import { CARRIER, CENTER_Y } from '../src/sim/carrier';
-import { FLOOR2, STAIRS } from '../src/sim/level';
+import { CALLE, FLOOR2, STAIRS } from '../src/levels/calle';
 import { SOFA, localToWorld, yawQuat } from '../src/sim/sofa';
 import { NO_INPUT, type GameEvent, type PlayerInput } from '../src/sim/types';
 
@@ -22,7 +22,7 @@ function play(g: Game, seconds: number, input: (g: Game) => PlayerInput[] = () =
 const count = (ev: GameEvent[], t: GameEvent['type']) => ev.filter((e) => e.type === t).length;
 
 function setup(n: number, x = OPEN.x, z = OPEN.z, yaw = 0) {
-  const g = new Game(RAPIER, { humans: n, carriers: n, botStyle: 'atentos', seed: 1 });
+  const g = new Game(RAPIER, { level: CALLE, humans: n, carriers: n, botStyle: 'atentos', seed: 1 });
   g.phase = 'playing'; g.countdown = 0;
   g.sofa.setTranslation({ x, y: 0.25, z }, true);
   g.sofa.setRotation(yawQuat(yaw), true);
@@ -145,7 +145,7 @@ for (const m of [10, 25, 50, 90, 150, 250]) for (const n of [1, 2] as const) {
 
 // T-coop: n humanos desde la salida (0) o desde posiciones variadas (1–7, como en las pruebas)
 function coop(n: number, layout: number, mode: 'quietos' | 'largo' | 'lado' | 'girando') {
-  const g = new Game(RAPIER, { humans: n, carriers: n, botStyle: 'atentos', seed: 1 });
+  const g = new Game(RAPIER, { level: CALLE, humans: n, carriers: n, botStyle: 'atentos', seed: 1 });
   play(g, RULES.countdown + 0.2);
   const s0 = g.sofaPos;
   for (const c of g.carriers) { const p = c.pos, f = { ...c.facing }; c.teleport({ x: p.x - s0.x + OPEN.x, y: p.y, z: p.z - s0.z + OPEN.z }); c.facing = f; }

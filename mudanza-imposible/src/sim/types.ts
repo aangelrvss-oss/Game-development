@@ -26,6 +26,10 @@ export type GameEvent =
   | { type: 'carHit'; pos: Vec3; target: 'item' | 'carrier'; item?: number; carrier?: number }
   /** Un objeto se ha roto (su integridad ha llegado a 0). */
   | { type: 'itemBroken'; item: number; id: ItemId; pos: Vec3 }
+  /** Un objeto queda cargado en el camión (dentro, suelto y quieto `RULES.winHold` s). */
+  | { type: 'itemLoaded'; item: number; id: ItemId; pos: Vec3 }
+  /** Un objeto cargado deja de contar: lo han sacado del camión o alguien lo ha vuelto a agarrar. */
+  | { type: 'itemUnloaded'; item: number; id: ItemId; pos: Vec3 }
   | { type: 'stun'; carrier: number; pos: Vec3 }
   | { type: 'wobble'; carrier: number; pos: Vec3 }
   | { type: 'fall'; carrier: number; pos: Vec3 }
@@ -33,7 +37,8 @@ export type GameEvent =
   | { type: 'light'; ped: 'green' | 'red' }
   | { type: 'stage'; index: number; label: string }
   | { type: 'righted'; pos: Vec3 }
-  | { type: 'respawnSofa'; pos: Vec3 }
+  /** Un objeto se ha caído del mapa y reaparece (`item`: su posición en `Game.items`). */
+  | { type: 'respawnItem'; item: number; pos: Vec3 }
   | { type: 'win' }
   | { type: 'lose'; reason: 'broken' | 'time' };
 

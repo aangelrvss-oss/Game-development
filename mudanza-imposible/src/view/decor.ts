@@ -1,14 +1,14 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { STAIRS, FLOOR2, DOOR } from '../sim/level';
-import { PROPS, type Prop } from '../sim/props';
+import type { LevelDef, Prop, Scenery } from '../levels/types';
 import { mat } from './materials';
 import { signTex } from './textures';
 
-// Decoración del escenario: los objetos de `PROPS` (con choque en la simulación) y detalles planos o fuera de
-// alcance (suelo del portal, apliques, alfombra y pasamanos de la escalera, cuadros, banderines del camión).
-// Geometría sencilla y materiales compartidos de una paleta corta: al construir el nivel se funde todo lo
-// estático por material, así que añade pocas llamadas de dibujo.
+// Decoración del escenario a partir del nivel: sus objetos de decoración (`LevelDef.props`; los que tienen caja de
+// choque chocan en la simulación) y detalles planos o fuera de alcance (`LevelDef.scenery`: suelo del portal, apliques,
+// alfombra y pasamanos de la escalera, cuadros, banderines del camión). Geometría sencilla y materiales compartidos de
+// una paleta corta: al construir el nivel se funde todo lo estático por material, así que añade pocas llamadas de
+// dibujo.
 
 const C = {
   kraft: '#c8a26b', kraftDark: '#b08752', tape: '#a07a46', wood: '#b7793f', woodDark: '#8a5a3c', metal: '#5f7391',
@@ -278,6 +278,65 @@ const build: Record<Prop['type'], (g: THREE.Group) => void> = {
     g.add(mesh(new THREE.CylinderGeometry(0.04, 0.05, 3.2, 8), M(C.white, { rough: 0.5 }), 0, 1.6, 0));
     g.add(mesh(new THREE.SphereGeometry(0.07, 8, 6), M(C.yellow), 0, 3.24, 0));
   },
+  // --- Sin choque ---
+  /** Gnomo de jardín (vigila la mudanza). */
+  gnome(g) {
+    const body = mesh(new THREE.ConeGeometry(0.22, 0.45, 10), M('#2563eb'), 0, 0.22, 0);
+    const head = mesh(new THREE.SphereGeometry(0.13, 10, 8), M('#f5c9a6'), 0, 0.5, 0);
+    const beard = mesh(new THREE.ConeGeometry(0.12, 0.22, 8), M('#ffffff'), 0, 0.42, 0.07);
+    beard.rotation.x = Math.PI;
+    g.add(body, head, beard, mesh(new THREE.ConeGeometry(0.14, 0.4, 10), M('#ef4444'), 0, 0.76, 0));
+  },
+  flowerPot(g) {
+    g.add(mesh(new THREE.CylinderGeometry(0.35, 0.28, 0.5, 10), M('#c2410c'), 0, 0.25, 0));
+    g.add(mesh(new THREE.IcosahedronGeometry(0.4, 1), M('#f472b6'), 0, 0.7, 0));
+  },
+  /** Farola pintada con globo; el brazo sale hacia +z (con `ry` se orienta). */
+  streetLamp(g) {
+    const metal = M(C.metal, { rough: 0.55, metal: 0.2 });
+    g.add(mesh(new THREE.CylinderGeometry(0.06, 0.09, 3.4, 8), metal, 0, 1.7, 0));
+    const arm = mesh(new THREE.TorusGeometry(0.35, 0.04, 6, 12, Math.PI / 2), metal, 0, 3.4, 0.35, false);
+    arm.rotation.y = Math.PI / 2;
+    g.add(arm);
+    g.add(mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.12, 10), metal, 0, 3.62, 0.4));
+    g.add(mesh(new THREE.SphereGeometry(0.2, 12, 8), M('#fff7cc', { emissive: '#fde68a' }), 0, 3.84, 0.4, false));
+  },
+  bench(g) {
+    const wood = M(C.wood);
+    g.add(mesh(new THREE.BoxGeometry(1.6, 0.08, 0.45), wood, 0, 0.45, 0));
+    g.add(mesh(new THREE.BoxGeometry(1.6, 0.4, 0.06), wood, 0, 0.72, 0.22));
+    for (const s of [-0.7, 0.7]) g.add(mesh(new THREE.BoxGeometry(0.06, 0.45, 0.4), M(C.metal, { rough: 0.55, metal: 0.2 }), s, 0.22, 0));
+  },
+  bin(g) {
+    g.add(mesh(new THREE.CylinderGeometry(0.25, 0.22, 0.8, 12), M('#16a34a', { rough: 0.5 }), 0, 0.4, 0));
+    g.add(mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.06, 12), M('#15803d'), 0, 0.83, 0, false));
+  },
+  hydrant(g) {
+    const red = M('#dc2626', { rough: 0.4 });
+    g.add(mesh(new THREE.CylinderGeometry(0.14, 0.17, 0.6, 10), red, 0, 0.3, 0));
+    g.add(mesh(new THREE.SphereGeometry(0.15, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), red, 0, 0.6, 0));
+    const side = mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 8), M('#b91c1c'), 0, 0.4, 0);
+    side.rotation.z = Math.PI / 2;
+    g.add(side);
+  },
+  /** Caja eléctrica amarilla sobre su pie. */
+  elecBox(g) {
+    g.add(mesh(rbox(0.5, 0.9, 0.4, 0.08), M(C.yellow, { rough: 0.5 }), 0, 0.75, 0));
+    g.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4, 6), M(C.metal, { rough: 0.55, metal: 0.2 }), 0, 0.2, 0, false));
+  },
+  /** Aparato de aire acondicionado (en un tejado). */
+  acUnit(g) {
+    g.add(mesh(new RoundedBoxGeometry(1, 0.6, 0.7, 2, 0.06), M('#e5e7eb', { rough: 0.5 }), 0, 0.3, 0));
+    const fan = mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.02, 14), M('#6b7280'), -0.15, 0.3, 0.36, false);
+    fan.rotation.x = Math.PI / 2;
+    g.add(fan);
+  },
+  chimney(g) {
+    g.add(mesh(new THREE.BoxGeometry(0.5, 1, 0.5), M('#c8553d'), 0, 0.5, 0));
+  },
+  waterTank(g) {
+    g.add(mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.1, 14), M('#93c5fd', { rough: 0.4, metal: 0.3 }), 0, 0.55, 0));
+  },
 };
 
 /** Banderines de colores entre dos puntos, con algo de comba. */
@@ -322,60 +381,70 @@ function sconce(g: THREE.Group, x: number, y: number, z: number, nx: number, nz:
   g.add(mesh(new THREE.SphereGeometry(0.1, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), M('#fff4cc', { emissive: '#fbbf24' }), x + nx * 0.08, y + 0.02, z + nz * 0.08, false));
 }
 
-/** Detalles sin choque: casa, portal, escalera, planta de arriba, calle y entrega. */
-function addDetails(g: THREE.Group) {
-  // Casa: felpudo, aplique sobre la puerta y jardineras bajo las ventanas
-  g.add(mesh(new THREE.BoxGeometry(1.3, 0.02, 0.6), M('#ffffff', { map: signTex('BIENVENIDOS', { bg: '#92400e', color: '#fde68a', w: 512, h: 220 }), rough: 0.95 }), 0, 0.015, 16.45, false));
-  sconce(g, 0, 2.45, 16.93, 0, -1);
-  for (const x of [-6.5, -2.6, 2.6, 6.5]) {
-    g.add(mesh(new THREE.BoxGeometry(1.1, 0.18, 0.22), M(C.woodDark), x, 2.0, 16.88, false));
-    for (let i = 0; i < 4; i++) g.add(mesh(new THREE.IcosahedronGeometry(0.1, 0), M(['#f472b6', '#facc15', '#ef4444', '#ffffff'][(i + Math.round(x)) & 3]), x - 0.38 + i * 0.25, 2.15, 16.86, false));
+/** Detalles sin choque: casa, portal, escalera, planta de arriba, calle y camión, donde dice el nivel. */
+function addDetails(g: THREE.Group, sc: Scenery) {
+  const { house, facade, portal, stairs, upstairs, street } = sc;
+  if (house) {
+    // Casa: felpudo, aplique sobre la puerta y jardineras bajo las ventanas
+    const f = house.front;
+    g.add(mesh(new THREE.BoxGeometry(1.3, 0.02, 0.6), M('#ffffff', { map: signTex('BIENVENIDOS', { bg: '#92400e', color: '#fde68a', w: 512, h: 220 }), rough: 0.95 }), house.x, 0.015, f - 0.55, false));
+    sconce(g, house.x, 2.45, f - 0.07, 0, -1);
+    for (const x of house.windowBoxes) {
+      g.add(mesh(new THREE.BoxGeometry(1.1, 0.18, 0.22), M(C.woodDark), x, 2.0, f - 0.12, false));
+      for (let i = 0; i < 4; i++) g.add(mesh(new THREE.IcosahedronGeometry(0.1, 0), M(['#f472b6', '#facc15', '#ef4444', '#ffffff'][(i + Math.round(x)) & 3]), x - 0.38 + i * 0.25, 2.15, f - 0.14, false));
+    }
   }
   // Portal del edificio: apliques a los lados de la puerta, suelo de baldosas a cuadros y buzones
-  for (const x of [DOOR.x0 - 0.45, DOOR.x1 + 0.45]) sconce(g, x, 2.05, DOOR.z + 0.22, 0, 1);
-  const tex = checkerTex().clone();
-  tex.needsUpdate = true;
-  tex.repeat.set(2.8 / 0.7, 8.2 / 0.7);
-  g.add(mesh(new THREE.PlaneGeometry(2.78, 8.2), M('#ffffff', { map: tex, rough: 0.5 }), 0, 0.024, -17.8, false).rotateX(-Math.PI / 2));
-  const brass = M('#b45309', { metal: 0.55, rough: 0.35 });
-  for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) {
-    const b = mesh(new THREE.BoxGeometry(0.04, 0.2, 0.26), brass, -1.38, 1.15 + j * 0.24, -15.2 - i * 0.3, false);
-    g.add(b);
+  if (facade) for (const x of [facade.door.x0 - 0.45, facade.door.x1 + 0.45]) sconce(g, x, 2.05, facade.door.z + 0.22, 0, 1);
+  if (portal) {
+    const t = portal.tiles, tex = checkerTex().clone();
+    tex.needsUpdate = true;
+    tex.repeat.set(t.w / 0.7, t.d / 0.7);
+    g.add(mesh(new THREE.PlaneGeometry(t.w, t.d), M('#ffffff', { map: tex, rough: 0.5 }), t.x, 0.024, t.z, false).rotateX(-Math.PI / 2));
+    const brass = M('#b45309', { metal: 0.55, rough: 0.35 });
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) {
+      g.add(mesh(new THREE.BoxGeometry(0.04, 0.2, 0.26), brass, portal.mailboxes.x, 1.15 + j * 0.24, portal.mailboxes.z - i * 0.3, false));
+    }
+    for (const z of portal.sconces) for (const s of [-1, 1]) sconce(g, s > 0 ? portal.x1 - 0.02 : portal.x0 + 0.02, 2.1, z, -s, 0);
   }
-  for (const z of [-16.6, -20.2]) for (const s of [-1, 1]) sconce(g, s * 1.38, 2.1, z, -s, 0);
-  // Escalera: alfombra roja por el centro de los peldaños y pasamanos de madera en las dos paredes
-  const n = 14, run = (STAIRS.z0 - STAIRS.z1) / n, rise = STAIRS.top / n;
-  const carpet = M('#b91c1c', { rough: 0.95 });
-  for (let i = 0; i < n; i++) g.add(mesh(new THREE.BoxGeometry(1.0, 0.012, run - 0.02), carpet, 0, rise * (i + 1) + 0.006, STAIRS.z0 - run * (i + 0.5), false));
-  const len = Math.hypot(STAIRS.z0 - STAIRS.z1, STAIRS.top);
-  for (const s of [-1, 1]) {
-    const rail = mesh(new THREE.CylinderGeometry(0.035, 0.035, len, 8), M(C.woodDark, { rough: 0.5 }), s * 1.37, STAIRS.top / 2 + 1.05, (STAIRS.z0 + STAIRS.z1) / 2, false);
-    rail.rotation.x = Math.PI / 2 + Math.atan2(STAIRS.top, STAIRS.z0 - STAIRS.z1);
-    g.add(rail);
+  if (stairs) {
+    // Escalera: alfombra roja por el centro de los peldaños y pasamanos de madera en las dos paredes
+    const n = stairs.steps, run = (stairs.z0 - stairs.z1) / n, rise = stairs.top / n, cx = (stairs.x0 + stairs.x1) / 2;
+    const carpet = M('#b91c1c', { rough: 0.95 });
+    for (let i = 0; i < n; i++) g.add(mesh(new THREE.BoxGeometry(1.0, 0.012, run - 0.02), carpet, cx, rise * (i + 1) + 0.006, stairs.z0 - run * (i + 0.5), false));
+    const len = Math.hypot(stairs.z0 - stairs.z1, stairs.top), half = (stairs.x1 - stairs.x0) / 2 - 0.03;
+    for (const s of [-1, 1]) {
+      const rail = mesh(new THREE.CylinderGeometry(0.035, 0.035, len, 8), M(C.woodDark, { rough: 0.5 }), cx + s * half, stairs.top / 2 + 1.05, (stairs.z0 + stairs.z1) / 2, false);
+      rail.rotation.x = Math.PI / 2 + Math.atan2(stairs.top, stairs.z0 - stairs.z1);
+      g.add(rail);
+    }
   }
-  // Planta de arriba: cuadros y apliques en la pared del pasillo (alterna colores de la paleta)
-  const art: [string, string][] = [[C.teal, C.yellow], [C.purple, '#fb7185'], [C.orange, C.blue]];
-  [2.6, 5.6, 8.4].forEach((x, i) => {
-    g.add(mesh(new THREE.BoxGeometry(0.9, 0.7, 0.04), M('#3f2a1f'), x, FLOOR2 + 1.2, -32.37, false));
-    g.add(mesh(new THREE.BoxGeometry(0.76, 0.56, 0.02), M(art[i][0]), x, FLOOR2 + 1.2, -32.34, false));
-    g.add(mesh(new THREE.CircleGeometry(0.16, 14), M(art[i][1]), x + 0.12 * (i - 1), FLOOR2 + 1.18, -32.325, false));
-  });
-  for (const x of [4.1, 7.0]) sconce(g, x, FLOOR2 + 1.35, -32.38, 0, 1);
-  // Entrega: plataforma elevadora del camión bajada y banderines desde el mástil hasta el camión
-  g.add(mesh(new THREE.BoxGeometry(0.75, 0.02, 2.6), M('#9ca3af', { metal: 0.5, rough: 0.4 }), 27.62, 0.035, -30.25));
-  for (const s of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.75, 0.024, 0.12), M(C.yellow), 27.62, 0.036, -30.25 + s * 1.24, false));
-  bunting(g, new THREE.Vector3(23.1, 3.1, -35.4), new THREE.Vector3(28.05, 3.3, -33.5), 9);
+  if (upstairs) {
+    // Planta de arriba: cuadros y apliques en la pared del pasillo (alterna colores de la paleta)
+    const art: [string, string][] = [[C.teal, C.yellow], [C.purple, '#fb7185'], [C.orange, C.blue]];
+    const y = upstairs.y, z = upstairs.wallZ;
+    upstairs.art.forEach((x, i) => {
+      const [a, b] = art[i % art.length];
+      g.add(mesh(new THREE.BoxGeometry(0.9, 0.7, 0.04), M('#3f2a1f'), x, y + 1.2, z + 0.03, false));
+      g.add(mesh(new THREE.BoxGeometry(0.76, 0.56, 0.02), M(a), x, y + 1.2, z + 0.06, false));
+      g.add(mesh(new THREE.CircleGeometry(0.16, 14), M(b), x + 0.12 * (i - 1), y + 1.18, z + 0.075, false));
+    });
+    for (const x of upstairs.sconces) sconce(g, x, y + 1.35, z + 0.02, 0, 1);
+  }
+  // Banderines (en «La calle», del mástil al camión)
+  for (const b of sc.bunting ?? []) bunting(g, new THREE.Vector3(b.from.x, b.from.y, b.from.z), new THREE.Vector3(b.to.x, b.to.y, b.to.z), b.n);
   // Calle: rejillas de desagüe junto al bordillo
-  for (const [x, z] of [[-10.5, 0.75], [7.5, 0.75], [-8.5, -8.75], [11, -8.75]] as const) g.add(mesh(new THREE.BoxGeometry(0.6, 0.02, 0.28), M('#1f2937', { metal: 0.3, rough: 0.6 }), x, 0.014, z, false));
+  for (const [x, z] of street?.drains ?? []) g.add(mesh(new THREE.BoxGeometry(0.6, 0.02, 0.28), M('#1f2937', { metal: 0.3, rough: 0.6 }), x, 0.014, z, false));
 }
 
-export function addDecor(g: THREE.Group) {
-  for (const p of PROPS) {
+/** Decoración del nivel: sus objetos (`props`) y sus detalles (`scenery`). */
+export function addDecor(g: THREE.Group, level: LevelDef) {
+  for (const p of level.props) {
     const o = new THREE.Group();
     build[p.type](o);
     o.position.set(p.x, p.y ?? 0, p.z);
     o.rotation.y = p.ry ?? 0;
     g.add(o);
   }
-  addDetails(g);
+  addDetails(g, level.scenery);
 }

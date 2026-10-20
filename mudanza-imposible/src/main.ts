@@ -1,5 +1,8 @@
 import RAPIER from '@dimforge/rapier3d-compat';
+import { inRegion } from './levels/geometry';
+import { levelFromParam } from './levels';
 import { Game, RULES, type GameOptions } from './sim/game';
+import { ITEMS } from './sim/items';
 import { Autopilot } from './sim/autopilot';
 import type { BotStyle } from './sim/bots';
 import type { GameEvent, PlayerInput } from './sim/types';
@@ -18,6 +21,8 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 const params = new URLSearchParams(location.search);
 const opts: GameOptions & { auto: boolean } = {
+  // Nivel: `?nivel=pruebas` (patio de pruebas) o, por defecto, «La calle» (`?nivel=calle`)
+  level: levelFromParam(params.get('nivel')),
   // Por defecto, dos jugadores en el mismo teclado y sin ayudantes (física cooperativa)
   humans: clampInt(params.get('humans'), 1, 4, 2),
   carriers: clampInt(params.get('carriers'), 2, 6, 2),
@@ -104,6 +109,12 @@ function drawPadsNote() {
     + (input.hasNonStandardPad() ? ' Algún mando no tiene la distribución estándar: sus botones pueden no coincidir.' : '');
 }
 drawAll();
+if (opts.level.test) {
+  // Escena de prueba: se dice que no es uno de los niveles del juego y qué hay que cargar (de los datos del nivel)
+  const names = (req: boolean) => opts.level.items.filter((it) => it.required === req).map((it) => ITEMS[it.id].name.toLowerCase()).join(', ');
+  $('menu-sub').textContent = `«${opts.level.name}»: escena de prueba de los objetos con el camión, no es un nivel del juego. `
+    + `Cargad en el camión lo obligatorio (${names(true)}); lo opcional (${names(false)}) no hace falta. Tenéis ${opts.level.timeLimit / 60} minutos.`;
+}
 
 $('btn-start').onclick = () => start(false);
 $('btn-demo').onclick = () => start(true);
@@ -185,7 +196,7 @@ function start(auto: boolean, fromGesture = true) {
   if (fromGesture) sfx.unlock();
   game?.dispose();
   const humans = auto ? 1 : opts.humans;
-  game = new Game(RAPIER, { humans, carriers: Math.max(opts.carriers, humans), botStyle: opts.botStyle, seed: Math.floor(Math.random() * 1e9) });
+  game = new Game(RAPIER, { level: opts.level, humans, carriers: Math.max(opts.carriers, humans), botStyle: opts.botStyle, seed: Math.floor(Math.random() * 1e9) });
   autopilot = auto ? new Autopilot(0) : null;
   view.attach(game);
   // Mandos repartidos para este número de jugadores; lo pulsado en el menú (Intro, A…) no cuenta en la partida
@@ -210,6 +221,9 @@ function cooled(key: string, s: number) {
   return true;
 }
 
+/** ¿Importa el semáforo? Con el objeto principal cerca de la calle (si el nivel la tiene). */
+const nearStreet = (g: Game) => !!g.level.traffic && inRegion(g.level.traffic.near, g.sofaPos);
+
 function handle(e: GameEvent, g: Game) {
   const who = (i: number) => g.carriers[i];
   switch (e.type) {
@@ -223,7 +237,7 @@ function handle(e: GameEvent, g: Game) {
     case 'impact':
       sfx.play('impact', e.strength);
       view.fx.dust(e.pos, 5 + Math.min(8, Math.round(e.strength)), 0.8);
-      if (e.item === g.sofaItem.index) view.sofa.bump(e.strength);
+      view.bumpItem(e.item, e.strength);
       if (e.strength > 3) view.fx.ring(e.pos, '#fff7d6', Math.min(1.6, 0.6 + e.strength * 0.12));
       view.fx.shake = Math.min(0.8, view.fx.shake + e.strength * 0.05);
       // Tras un atropello, el «¡CATAPUM!» ya lo dice: el texto de daño pequeño se taparía con él
@@ -236,7 +250,7 @@ function handle(e: GameEvent, g: Game) {
       view.fx.ring(e.pos, '#fde047', 1.4);
       view.fx.dust(e.pos, 8, 1.2);
       const hit = e.target === 'item' ? g.items[e.item!] : null;
-      if (hit === g.sofaItem) view.sofa.bump(10);
+      if (hit) view.bumpItem(hit.index, 10);
       view.fx.shake = Math.min(1, view.fx.shake + 0.6);
       if (hit) {
         view.fx.text(e.pos, '¡CATAPUM!', '#ffffff', 50, '#dc2626', 2.3);
@@ -246,6 +260,18 @@ function handle(e: GameEvent, g: Game) {
       break;
     }
     case 'itemBroken': sfx.play('crash'); hud.toast(`¡Se ha roto: ${g.items[e.item].def.name}!`, 'bad'); break;
+    case 'itemLoaded': {
+      // Aviso, sonido y una pequeña celebración al cargar un objeto
+      // (al cargar el último obligatorio se gana en el mismo paso: lo celebra «¡ENTREGADO!»)
+      sfx.play('load');
+      if (g.phase !== 'playing') break;
+      view.fx.confetti(e.pos, 24);
+      view.fx.text(e.pos, '¡CARGADO!', '#ffffff', 42, '#16a34a', 1.6);
+      const it = g.items[e.item];
+      hud.toast(`¡Al camión: ${it.def.name}!${it.required ? ` (${g.loadedRequired}/${g.requiredCount})` : ''}`, 'good');
+      break;
+    }
+    case 'itemUnloaded': sfx.play('unload'); hud.toast(`Fuera del camión: ${g.items[e.item].def.name}`, 'bad'); break;
     case 'stun': sfx.play('stun'); view.fx.stars(e.pos, 5); break;
     case 'wobble':
       sfx.play('wobble');
@@ -262,13 +288,16 @@ function handle(e: GameEvent, g: Game) {
       if (cooled(`honk${e.car}`, 1.5)) { sfx.play('honk'); view.fx.text({ ...e.pos, y: e.pos.y + 0.8 }, '¡PIIII!', '#fef08a', 40); }
       break;
     case 'light': {
-      const s = g.sofaPos;
-      if (e.ped === 'green' && s.z < 7 && s.z > -12) { hud.toast('Semáforo en verde: ¡cruzad!', 'good'); sfx.play('beep', 1); }
+      if (e.ped === 'green' && nearStreet(g)) { hud.toast('Semáforo en verde: ¡cruzad!', 'good'); sfx.play('beep', 1); }
       break;
     }
     case 'stage': sfx.play('checkpoint'); if (e.index > 0) hud.toast(`¡${e.label}!`, 'good'); break;
     case 'righted': sfx.play('hop'); view.fx.dust(e.pos, 8, 1); hud.toast(`Sofá enderezado (−${RULES.rightCost}%)`); break;
-    case 'respawnSofa': hud.toast(`El sofá vuelve al último punto (−${RULES.respawnCost}% y +5 s)`, 'bad'); break;
+    case 'respawnItem': {
+      const it = g.items[e.item];
+      hud.toast(`${it === g.sofaItem && it.def.id === 'sofa' ? 'El sofá vuelve al último punto' : `${it.def.name}: vuelve a su sitio`} (−${RULES.respawnCost}% y +5 s)`, 'bad');
+      break;
+    }
     case 'win':
       sfx.play('win');
       view.fx.confetti(g.sofaPos, 70);
@@ -290,15 +319,20 @@ function results(g: Game) {
       localStorage.setItem('mudanza.best', String(best));
     } catch { best = null; }
   }
-  $('r-title').textContent = won ? '¡Sofá entregado!' : g.loseReason === 'broken' ? 'El sofá ha quedado destrozado' : 'El camión se ha ido sin el sofá';
-  $('r-sub').textContent = won ? 'Lo habéis dejado en el camión. ¿Más rápido y más entero?' : g.loseReason === 'broken' ? 'Demasiados golpes. Probad a cruzar con el semáforo y a no dejarlo caer.' : `Límite: ${RULES.timeLimit / 60} minutos.`;
-  const stars = won ? 1 + (g.time <= RULES.parTime ? 1 : 0) + (g.integrity >= 70 ? 1 : 0) : 0;
+  // Con el sofá como único objeto obligatorio («La calle»), los textos hablan del sofá
+  const required = g.items.filter((it) => it.required), onlySofa = required.length === 1 && required[0].def.id === 'sofa';
+  const broken = required.find((it) => it.state === 'broken');
+  $('r-title').textContent = won ? (onlySofa ? '¡Sofá entregado!' : '¡Mudanza entregada!')
+    : g.loseReason === 'broken' ? (broken?.def.id === 'sofa' ? 'El sofá ha quedado destrozado' : `Se ha roto: ${broken?.def.name ?? 'un objeto'}`)
+    : onlySofa ? 'El camión se ha ido sin el sofá' : 'El camión se ha ido sin la mudanza';
+  $('r-sub').textContent = won ? 'Lo habéis dejado dentro del camión. ¿Más rápido y más entero?' : g.loseReason === 'broken' ? 'Demasiados golpes. Probad a cruzar con el semáforo y a no dejarlo caer.' : `Límite: ${g.level.timeLimit / 60} minutos.`;
+  const stars = won ? 1 + (g.time <= g.level.parTime ? 1 : 0) + (g.integrity >= 70 ? 1 : 0) : 0;
   $('r-stars').textContent = '★'.repeat(stars) + '☆'.repeat(3 - stars);
   const t = `${Math.floor(g.time / 60)}:${(g.time % 60).toFixed(1).padStart(4, '0')}`;
   $('r-grid').innerHTML = [
-    ['Tiempo', t, `★ si ≤ ${RULES.parTime} s`],
-    ['Estado del sofá', `${Math.round(g.sofaItem.integrity)}%`, '★ si ≥ 70 %'],
-    ['Etapa alcanzada', g.stageLabel, ''],
+    ['Tiempo', t, `★ si ≤ ${g.level.parTime} s`],
+    onlySofa ? ['Estado del sofá', `${Math.round(g.sofaItem.integrity)}%`, '★ si ≥ 70 %'] : ['Estado de la carga', `${Math.round(g.integrity)}%`, '★ si ≥ 70 %'],
+    g.level.stages.length > 1 ? ['Etapa alcanzada', g.stageLabel, ''] : ['Cargados', `${g.loadedRequired}/${g.requiredCount}`, 'obligatorios'],
     ...(best !== null ? [['Mejor tiempo', `${best.toFixed(1)} s`, 'en este navegador']] : []),
   ].map(([a, b, c]) => `<div><small>${a}</small>${b}<small>${c}</small></div>`).join('');
   show('results', true);
@@ -331,13 +365,13 @@ function frame(now: number) {
         simTime += DT;
         for (const e of g.out) handle(e, g);
       });
-      if (g.light.ped === 'green' && cooled('pedtick', 0.5) && g.sofaPos.z < 7 && g.sofaPos.z > -12) sfx.play('pedTick');
+      if (g.light.ped === 'green' && cooled('pedtick', 0.5) && nearStreet(g)) sfx.play('pedTick');
     }
     hud.update(g);
     view.render(g, now / 1000, paused ? 0 : dtReal);
   } else {
     // De fondo en el menú: la escena quieta
-    if (!game) { game = new Game(RAPIER, { humans: 0, carriers: opts.carriers, botStyle: 'atentos' }); view.attach(game); }
+    if (!game) { game = new Game(RAPIER, { level: opts.level, humans: 0, carriers: opts.carriers, botStyle: 'atentos' }); view.attach(game); }
     view.render(game, now / 1000, dtReal);
   }
   requestAnimationFrame(frame);
@@ -369,7 +403,7 @@ if (opts.auto) start(true, false);
         for (const e of g.out) handle(e, g);
       }
       if (pendingResults && simTime >= pendingResults.at) { const r = pendingResults; pendingResults = null; results(r.g); }
-      if (g.light.ped === 'green' && cooled('pedtick', 0.5) && g.sofaPos.z < 7 && g.sofaPos.z > -12) sfx.play('pedTick');
+      if (g.light.ped === 'green' && cooled('pedtick', 0.5) && nearStreet(g)) sfx.play('pedTick');
       hud.update(g);
       view.render(g, simTime, 1 / fps);
     }

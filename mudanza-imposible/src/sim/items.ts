@@ -255,8 +255,11 @@ const PIANO: ItemDef = {
   draw: 'piano',
 };
 
-/** Estado de un objeto en la partida: nadie lo lleva, alguien lo lleva o roto. */
-export type ItemState = 'pending' | 'carried' | 'broken';
+/**
+ * Estado de un objeto en la partida: pendiente (nadie lo lleva y no está cargado), en camino (alguien lo lleva),
+ * cargado (dentro del camión, suelto y quieto; ver `Game`) o roto.
+ */
+export type ItemState = 'pending' | 'carried' | 'loaded' | 'broken';
 
 /** Un objeto en la partida: su cuerpo, su definición, su integridad y su estado. */
 export interface Item extends Grabbable {
@@ -273,6 +276,24 @@ export interface Item extends Grabbable {
   impactCooldown: number;
   /** Último atropello (tiempo de reloj): un atropello toca varias piezas a la vez y cuenta una sola vez por segundo. */
   lastCarHit: number;
+  /** Dónde se colocó al empezar (vuelve ahí si se cae del mapa, salvo el objeto principal, que usa las etapas). */
+  readonly start: { pos: Vec3; yaw: number };
+  /** Caja envolvente de su forma, en coordenadas locales. */
+  readonly bounds: { min: Vec3; max: Vec3 };
+  /** Dentro de la caja de carga del camión (su centro y al menos `RULES.loadFraction` de su caja envolvente). */
+  inHold: boolean;
+  /** Tiempo que lleva dentro, suelto y quieto (al llegar a `RULES.winHold`, queda cargado). */
+  loadTime: number;
+}
+
+/** Caja envolvente de la forma de un objeto, en coordenadas locales. */
+export function shapeBounds(def: ItemDef): { min: Vec3; max: Vec3 } {
+  const min = v(Infinity, Infinity, Infinity), max = v(-Infinity, -Infinity, -Infinity);
+  for (const b of def.shape) {
+    min.x = Math.min(min.x, b.p.x - b.h.x); min.y = Math.min(min.y, b.p.y - b.h.y); min.z = Math.min(min.z, b.p.z - b.h.z);
+    max.x = Math.max(max.x, b.p.x + b.h.x); max.y = Math.max(max.y, b.p.y + b.h.y); max.z = Math.max(max.z, b.p.z + b.h.z);
+  }
+  return { min, max };
 }
 
 /** Catálogo completo, por identificador. */

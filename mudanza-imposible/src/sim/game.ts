@@ -1,20 +1,21 @@
 // Estado de la partida y paso de simulación. No depende de Three.js ni del DOM:
 // se puede ejecutar en Node para las pruebas.
 import type RAPIER from '@dimforge/rapier3d-compat';
+import { inRegion } from '../levels/geometry';
+import { cargoHold, truckBoxes } from '../levels/truck';
+import type { Kind, LevelDef, Waypoint } from '../levels/types';
 import { BotBrain, BOT, type BotStyle } from './bots';
 import { CAST, CARRIER, CENTER_Y, Carrier, type Grabbable } from './carrier';
 import { HAND, solveHands } from './hand';
-import { ITEMS, createItem, type Item, type ItemDef } from './items';
-import { LEVEL, SOFA_START, STAGES, ZONE, FLOOR2, RAMP } from './level';
-import { localToWorld, rotate, sofaUp, sofaYaw, yawQuat } from './sofa';
+import { ITEMS, createItem, restHeight, shapeBounds, type Item, type ItemDef } from './items';
+import { rotate, sofaUp, sofaYaw, yawQuat } from './sofa';
 import { Car, CAR_COLORS, lightAt, stepTraffic } from './traffic';
 import { NO_INPUT, type GameEvent, type PlayerInput, type Vec3 } from './types';
 
 type R = typeof RAPIER;
 
+/** Reglas comunes a todos los niveles (el límite de tiempo es de cada nivel: `LevelDef.timeLimit`). */
 export const RULES = {
-  timeLimit: 180,
-  parTime: 90,
   countdown: 3,
   /**
    * Golpe mínimo (cambio brusco de velocidad, m/s) que se nota (suceso `impact`: sonido y polvo) en un objeto que los
@@ -25,7 +26,16 @@ export const RULES = {
   carDamage: 12,
   rightCost: 3,
   respawnCost: 15,
+  /** Tiempo que un objeto pasa dentro del camión, suelto y quieto, hasta quedar cargado (s). */
   winHold: 1.0,
+  /**
+   * Entrega: un objeto cuenta como cargado cuando su centro y al menos esta fracción de su caja envolvente están dentro
+   * de la caja de carga, nadie lo agarra y lleva `winHold` s quieto (más despacio que `loadedSpeed` m/s y que
+   * `loadedSpin` rad/s).
+   */
+  loadFraction: 0.8,
+  loadedSpeed: 0.25,
+  loadedSpin: 0.6,
   /** Par estabilizador por mano (N·m por unidad de inclinación) y amortiguación del balanceo. */
   wristK: 22,
   wristDamp: 5,
@@ -44,6 +54,8 @@ export const RULES = {
 };
 
 export interface GameOptions {
+  /** Nivel que se juega: escenario, objetos, salidas, camión, etapas, tráfico y límite de tiempo. */
+  level: LevelDef;
   humans: number;
   carriers: number;
   botStyle: BotStyle;
@@ -52,16 +64,14 @@ export interface GameOptions {
 
 export type Phase = 'countdown' | 'playing' | 'won' | 'lost';
 
-/** Puntos de reaparición del sofá según la etapa alcanzada. */
-const CHECKPOINTS: { p: Vec3; yaw: number }[] = [
-  { p: { x: 0, y: 0.6, z: 9 }, yaw: 0 },
-  { p: { x: 0, y: 0.6, z: 2.6 }, yaw: Math.PI / 2 },
-  { p: { x: 0, y: 0.6, z: -16 }, yaw: Math.PI / 2 },
-  { p: { x: 0, y: 0.6, z: -20.5 }, yaw: Math.PI / 2 },
-  { p: { x: 4, y: FLOOR2 + 0.6, z: -30.6 }, yaw: 0 },
-  { p: { x: RAMP.x0 - 1, y: FLOOR2 + 0.6, z: -30.6 }, yaw: 0 },
-  { p: { x: 25.5, y: 0.6, z: -30.3 }, yaw: 0 },
-];
+/**
+ * Rozamiento de las cajas fijas según su tipo (las demás, 0,6). La rampa de la terraza es de chapa: resbala, y si se
+ * suelta el sofá encima, baja deslizándose. La rampa de carga del camión tiene tacos: agarra como la escalera.
+ */
+const FRICTION: Partial<Record<Kind, number>> = { ramp: 0.15, stairs: 0.9, truckRamp: 0.9 };
+
+/** Puntos por eje con los que se mide qué parte de la caja envolvente de un objeto está dentro del camión (5³). */
+const HOLD_SAMPLES = 5;
 
 function mulberry32(a: number) {
   return () => {
@@ -73,11 +83,15 @@ function mulberry32(a: number) {
 }
 
 export class Game {
+  /** Nivel que se juega (lo da `GameOptions.level`). */
+  readonly level: LevelDef;
+  /** Caja de carga del camión por dentro, en el mundo. */
+  readonly hold: { min: Vec3; max: Vec3 };
   world!: RAPIER.World;
   events!: RAPIER.EventQueue;
   /**
-   * Objetos de la mudanza, cada uno con su definición, su integridad y su estado. El sofá del nivel es uno de ellos
-   * (`sofaItem`); `sofa` y `sofaColliders` son atajos a su cuerpo y a sus piezas.
+   * Objetos de la mudanza, cada uno con su definición, su integridad y su estado. `sofaItem`, `sofa` y `sofaColliders`
+   * son atajos al objeto principal del nivel (`LevelDef.main`), a su cuerpo y a sus piezas: en «La calle», el sofá.
    */
   items: Item[] = [];
   sofaItem!: Item;
@@ -91,7 +105,6 @@ export class Game {
   clock = 0; // tiempo total simulado (semáforo)
   countdown = RULES.countdown;
   stage = 0;
-  inZone = 0;
   stuckTime = 0;
   /**
    * Objetos que se pueden agarrar: los de `items` y los que se añadan con `addGrabbable`. Una sola física para todos
@@ -111,9 +124,13 @@ export class Game {
   private handleOwner = new Map<number, { kind: 'item'; i: number } | { kind: 'carrier'; i: number } | { kind: 'car'; i: number }>();
   /** Velocidad media pedida por los humanos que cargan (la usan los ayudantes). */
   lead = { x: 0, z: 0, w: 0, active: false };
+  /** Tiempo que llevan parados los humanos que cargan (para que los ayudantes dejen el objeto en el camión). */
+  private leadStill = 0;
   private loads = new Set<number>();
 
   constructor(private R: R, readonly opts: GameOptions) {
+    this.level = opts.level;
+    this.hold = cargoHold(opts.level.truck);
     this.rng = mulberry32(opts.seed ?? 12345);
     this.build();
   }
@@ -135,6 +152,7 @@ export class Game {
     const item: Item = {
       body, colliders, maxHands: def.handles.length, index: this.items.length, def, required,
       integrity: 100, state: 'pending', prevVel: { x: 0, y: 0, z: 0 }, impactCooldown: 0, lastCarHit: -10,
+      start: { pos: { ...pos }, yaw }, bounds: shapeBounds(def), inHold: false, loadTime: 0,
     };
     this.items.push(item);
     this.grabbables.push(item);
@@ -161,6 +179,13 @@ export class Game {
     return Math.max(0, 100 - this.damageTotal);
   }
 
+  /** Objetos obligatorios: cuántos hay y cuántos están cargados (se gana al cargarlos todos). */
+  get requiredCount() { return this.items.filter((it) => it.required).length; }
+  get loadedRequired() { return this.items.filter((it) => it.required && it.state === 'loaded').length; }
+
+  /** Ruta del objeto principal para el piloto automático. */
+  get mainRoute(): Waypoint[] { return this.level.items[this.level.main].route; }
+
   /** ¿Es un objeto movible (agarrable)? Empujarlo con el cuerpo cuenta como cargar. */
   private isLoad = (b: RAPIER.RigidBody) => this.loads.has(b.handle);
 
@@ -169,50 +194,49 @@ export class Game {
     this.world = new R.World({ x: 0, y: -9.81, z: 0 });
     this.world.integrationParameters.numSolverIterations = 8;
     this.events = new R.EventQueue(true);
-    for (const b of LEVEL) {
+    // Escenario y camión (caja de carga abierta, rampa, bajos y cabina: cada pieza, un collider)
+    for (const b of [...this.level.boxes, ...truckBoxes(this.level.truck)]) {
       if (!b.solid) continue;
       const body = this.world.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(...b.p).setRotation(eulerQuat(b.rx ?? 0, b.rz ?? 0)));
-      // La rampa es de chapa: resbala. Si se suelta el sofá encima, baja deslizándose.
-      const cd = R.ColliderDesc.cuboid(...b.h).setFriction(b.kind === 'ramp' ? 0.15 : b.kind === 'stairs' ? 0.9 : 0.6);
+      const cd = R.ColliderDesc.cuboid(...b.h).setFriction(FRICTION[b.kind] ?? 0.6);
       if (b.kind === 'ramp') cd.setFrictionCombineRule(R.CoefficientCombineRule.Min);
       this.world.createCollider(cd, body);
     }
-    // El sofá del nivel, obligatorio: un objeto del catálogo como los demás
-    this.sofaItem = this.addItem(ITEMS.sofa, { x: SOFA_START.x, y: SOFA_START.y, z: SOFA_START.z }, SOFA_START.yaw, true);
+    // Objetos de la mudanza, del catálogo: sin `y`, apoyados en el suelo
+    for (const pl of this.level.items) {
+      const def = ITEMS[pl.id];
+      this.addItem(def, { x: pl.pos.x, y: pl.pos.y ?? restHeight(def) + 0.01, z: pl.pos.z }, pl.yaw, pl.required);
+    }
+    this.sofaItem = this.items[this.level.main];
     this.sofa = this.sofaItem.body;
     this.sofaColliders = this.sofaItem.colliders;
     const handles = this.sofaItem.def.handles;
     const n = Math.max(1, Math.min(6, this.opts.carriers));
     const humans = Math.max(0, Math.min(n, this.opts.humans));
-    // Posiciones de salida: alrededor del sofá, frente a sus asas
+    // Salidas de los porteadores, las del nivel
+    const spawns = this.level.spawns;
     for (let i = 0; i < n; i++) {
-      const slot = handles[i % handles.length];
-      const a = localToWorld(this.sofa, slot.p);
-      const out = rotate(this.sofa.rotation(), slot.out);
-      const p = { x: a.x + out.x * 1.3, y: CENTER_Y + 0.05, z: a.z + out.z * 1.3 };
-      const c = new Carrier(R, this.world, i, CAST[i], i < humans ? i : null, p);
-      c.facing = { x: -out.x, z: -out.z };
+      const s = spawns[i % spawns.length];
+      const c = new Carrier(R, this.world, i, CAST[i], i < humans ? i : null, { x: s.x, y: CENTER_Y + 0.05, z: s.z });
+      c.facing = { x: s.facing.x, z: s.facing.z };
       this.carriers.push(c);
       this.handleOwner.set(c.collider.handle, { kind: 'carrier', i });
       if (c.human === null) this.bots.set(i, new BotBrain(i % handles.length, this.opts.botStyle, this.rng));
     }
-    let id = 0;
-    for (let lane = 0; lane < 2; lane++) {
-      for (let k = 0; k < 3; k++) {
-        const x = -40 + k * 30 + lane * 13;
-        const car = new Car(R, this.world, id, lane, x, CAR_COLORS[id % CAR_COLORS.length]);
-        this.cars.push(car);
-        this.handleOwner.set(car.collider.handle, { kind: 'car', i: id });
-        id++;
-      }
-    }
+    // Tráfico del nivel (si tiene calle)
+    const tr = this.level.traffic;
+    tr?.cars.forEach((cd, id) => {
+      const car = new Car(R, this.world, id, tr.lanes[cd.lane], cd.x, CAR_COLORS[id % CAR_COLORS.length]);
+      this.cars.push(car);
+      this.handleOwner.set(car.collider.handle, { kind: 'car', i: id });
+    });
   }
 
   get light() { return lightAt(this.clock); }
   get sofaPos(): Vec3 { return this.sofa.translation(); }
   get sofaYaw() { return sofaYaw(this.sofa); }
   get sofaUp() { return sofaUp(this.sofa); }
-  get stageLabel() { return STAGES[this.stage].label; }
+  get stageLabel() { return this.level.stages[this.stage]?.label ?? ''; }
 
   /** Uno solo lleva un rato arrastrando algo que pesa demasiado para una persona: hay que avisar. */
   get heavyAlone(): Carrier | null {
@@ -232,7 +256,7 @@ export class Game {
     } else if (playing) {
       this.time += dt;
     }
-    // Los ayudantes van a por el sofá (con sus asas, las de su definición)
+    // Los ayudantes van a por el objeto principal (con sus asas, las de su definición)
     const target = this.sofaItem;
 
     // Mando de los humanos y lo que deben imitar los ayudantes
@@ -247,6 +271,13 @@ export class Game {
       if (inp.right) this.tryRight();
     }
     this.lead = { x: nl ? lx / nl : 0, z: nl ? lz / nl : 0, w: lw, active: nl > 0 };
+    // Dentro del camión, los ayudantes dejan el objeto cuando ningún jugador lo lleva o cuando los que lo llevan llevan
+    // un momento parados (`stowAfter`), y no lo vuelven a agarrar (`stow`). Que suelten antes que los jugadores evita
+    // que uno se quede solo con todo el peso, se tambalee al soltar y empuje el objeto hacia la abertura
+    const humanHolds = this.carriers.some((c) => c.human !== null && c.heldBody === target.body);
+    const still = this.lead.active && Math.hypot(this.lead.x, this.lead.z) < 0.05 && this.lead.w === 0;
+    this.leadStill = still ? this.leadStill + dt : 0;
+    const stow = target.inHold && (!humanHolds || this.leadStill > BOT.stowAfter);
 
     // Asas ocupadas: las de los ayudantes que cargan y las que tienen al lado los humanos que agarran el objeto
     const taken = new Set<number>();
@@ -263,7 +294,7 @@ export class Game {
       if (brain) {
         const wasHolding = c.holding;
         const others = this.carriers.filter((o) => o !== c).map((o) => o.pos);
-        inp = playing ? brain.think(c, target, this.lead, taken, dt, others) : NO_INPUT;
+        inp = playing ? brain.think(c, target, this.lead, taken, dt, others, stow) : NO_INPUT;
         if (inp.grab && wasHolding) {
           c.release();
           this.emit({ type: 'release', carrier: c.id, pos: c.handWorld() });
@@ -305,7 +336,7 @@ export class Game {
       this.emit({ type: 'honk', car: car.id, pos: car.body.translation() });
     }
     const ped = this.light.ped;
-    if (ped !== this.lastPed) { this.lastPed = ped; this.emit({ type: 'light', ped }); }
+    if (this.level.traffic && ped !== this.lastPed) { this.lastPed = ped; this.emit({ type: 'light', ped }); }
 
     this.world.step(this.events);
     this.clampLoads();
@@ -432,16 +463,17 @@ export class Game {
         c.teleport({ x: ip.x + (this.rng() - 0.5) * 2, y: Math.max(ip.y, 0) + 1.2, z: ip.z + 1.5 });
       }
     }
-    // Estado de cada objeto: roto, alguien lo lleva o pendiente
-    for (const it of this.items) {
-      if (it.state !== 'broken') it.state = this.carriers.some((c) => c.heldBody === it.body) ? 'carried' : 'pending';
-    }
-    // Sofá fuera del mapa
-    if (sp.y < -3) this.respawnSofa();
-    // Etapas
-    while (this.stage + 1 < STAGES.length && STAGES[this.stage + 1].reached(sp.x, sp.y, sp.z)) {
+    // Estado de cada objeto: pendiente, en camino, cargado o roto (con los sucesos de carga)
+    for (const it of this.items) this.updateLoad(it, dt);
+    // Objetos fuera del mapa
+    for (const it of this.items) if (it.body.translation().y < -3) this.respawnItem(it);
+    // Etapas (del objeto principal)
+    const stages = this.level.stages;
+    while (this.stage + 1 < stages.length) {
+      const when = stages[this.stage + 1].when;
+      if (when && !inRegion(when, sp)) break;
       this.stage++;
-      this.emit({ type: 'stage', index: this.stage, label: STAGES[this.stage].label });
+      this.emit({ type: 'stage', index: this.stage, label: stages[this.stage].label });
     }
     // Atasco: los humanos empujan y el sofá no avanza
     const speed = Math.hypot(v.x, v.z);
@@ -461,13 +493,57 @@ export class Game {
     if (solo) this.soloDragCarrier = solo.id;
     else if (this.soloDrag === 0) this.soloDragCarrier = null;
     if (this.phase !== 'playing') return;
-    // Entrega
-    const inZone = sp.x > ZONE.x0 && sp.x < ZONE.x1 && sp.z > ZONE.z0 && sp.z < ZONE.z1 && sp.y < 1.6;
-    this.inZone = inZone && speed < 1.5 ? this.inZone + dt : 0;
-    if (this.inZone >= RULES.winHold) { this.phase = 'won'; this.emit({ type: 'win' }); return; }
+    // Entrega: se gana al tener cargados todos los obligatorios
+    const required = this.items.filter((it) => it.required);
+    if (required.length && required.every((it) => it.state === 'loaded')) { this.phase = 'won'; this.emit({ type: 'win' }); return; }
     // Un objeto obligatorio roto hace perder; uno opcional roto solo cuenta como daño
     if (this.items.some((it) => it.required && it.state === 'broken')) { this.phase = 'lost'; this.loseReason = 'broken'; this.emit({ type: 'lose', reason: 'broken' }); return; }
-    if (this.time >= RULES.timeLimit) { this.phase = 'lost'; this.loseReason = 'time'; this.emit({ type: 'lose', reason: 'time' }); }
+    if (this.time >= this.level.timeLimit) { this.phase = 'lost'; this.loseReason = 'time'; this.emit({ type: 'lose', reason: 'time' }); }
+  }
+
+  /**
+   * Parte de la caja envolvente de un objeto que está dentro de la caja de carga (0 a 1; 0 si su centro está fuera).
+   * Se mide con una rejilla de puntos repartidos por la caja envolvente (en coordenadas locales, girada con el objeto).
+   */
+  holdFraction(it: Item): number {
+    const { min, max } = it.bounds, h = this.hold;
+    const q = it.body.rotation(), t = it.body.translation();
+    const inside = (l: Vec3) => {
+      const r = rotate(q, l), x = t.x + r.x, y = t.y + r.y, z = t.z + r.z;
+      return x > h.min.x && x < h.max.x && y > h.min.y && y < h.max.y && z > h.min.z && z < h.max.z;
+    };
+    if (!inside({ x: (min.x + max.x) / 2, y: (min.y + max.y) / 2, z: (min.z + max.z) / 2 })) return 0;
+    const N = HOLD_SAMPLES, at = (a: number, b: number, i: number) => a + ((b - a) * (i + 0.5)) / N;
+    let n = 0;
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) for (let k = 0; k < N; k++) {
+      if (inside({ x: at(min.x, max.x, i), y: at(min.y, max.y, j), z: at(min.z, max.z, k) })) n++;
+    }
+    return n / (N * N * N);
+  }
+
+  /**
+   * Estado de un objeto tras el paso: roto; cargado (dentro del camión, nadie lo agarra y lleva `winHold` s quieto);
+   * en camino (alguien lo lleva) o pendiente. Uno cargado deja de contar si sale del camión o alguien lo agarra.
+   */
+  private updateLoad(it: Item, dt: number) {
+    if (it.state === 'broken') { it.inHold = false; it.loadTime = 0; return; }
+    const held = this.carriers.some((c) => c.heldBody === it.body);
+    it.inHold = this.holdFraction(it) >= RULES.loadFraction;
+    if (it.state === 'loaded') {
+      if (it.inHold && !held) return;
+      it.state = held ? 'carried' : 'pending';
+      it.loadTime = 0;
+      this.emit({ type: 'itemUnloaded', item: it.index, id: it.def.id, pos: it.body.translation() });
+      return;
+    }
+    it.state = held ? 'carried' : 'pending';
+    const v = it.body.linvel(), w = it.body.angvel();
+    const still = Math.hypot(v.x, v.y, v.z) < RULES.loadedSpeed && Math.hypot(w.x, w.y, w.z) < RULES.loadedSpin;
+    it.loadTime = this.phase === 'playing' && it.inHold && !held && still ? it.loadTime + dt : 0;
+    if (it.loadTime >= RULES.winHold) {
+      it.state = 'loaded';
+      this.emit({ type: 'itemLoaded', item: it.index, id: it.def.id, pos: it.body.translation() });
+    }
   }
 
   /** ¿Choca con una pared u otro objeto fijo (contacto de lado, no el suelo)? También lo usa `scripts/duo-e2e.cjs`. */
@@ -497,17 +573,22 @@ export class Game {
     return true;
   }
 
-  private respawnSofa() {
-    const cp = CHECKPOINTS[Math.min(this.stage, CHECKPOINTS.length - 1)];
-    for (const c of this.carriers) if (c.heldBody === this.sofa) c.release(true);
-    this.sofa.setTranslation(cp.p, true);
-    this.sofa.setRotation(yawQuat(cp.yaw), true);
-    this.sofa.setLinvel({ x: 0, y: 0, z: 0 }, true);
-    this.sofa.setAngvel({ x: 0, y: 0, z: 0 }, true);
-    this.sofaItem.prevVel = { x: 0, y: 0, z: 0 };
-    this.damage(this.sofaItem, RULES.respawnCost);
+  /**
+   * Un objeto se ha caído del mapa: reaparece (con `respawnCost` de daño y 5 s más). El principal, en el punto de su
+   * etapa; los demás, donde empezaron.
+   */
+  private respawnItem(it: Item) {
+    const stages = this.level.stages;
+    const cp = it === this.sofaItem ? stages[Math.min(this.stage, stages.length - 1)].respawn : { p: it.start.pos, yaw: it.start.yaw };
+    for (const c of this.carriers) if (c.heldBody === it.body) c.release(true);
+    it.body.setTranslation(cp.p, true);
+    it.body.setRotation(yawQuat(cp.yaw), true);
+    it.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    it.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    it.prevVel = { x: 0, y: 0, z: 0 };
+    this.damage(it, RULES.respawnCost);
     this.time += 5;
-    this.emit({ type: 'respawnSofa', pos: cp.p });
+    this.emit({ type: 'respawnItem', item: it.index, pos: cp.p });
   }
 
   dispose() { this.world.free(); this.events.free(); }

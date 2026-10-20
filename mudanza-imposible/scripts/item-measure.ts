@@ -3,6 +3,7 @@
 // Uso: npx vite-node scripts/item-measure.ts
 import RAPIER from '@dimforge/rapier3d-compat';
 import { CARRIER, CENTER_Y } from '../src/sim/carrier';
+import { CALLE } from '../src/levels/calle';
 import { Game } from '../src/sim/game';
 import { HAND } from '../src/sim/hand';
 import { ITEMS, restHeight, type Item, type ItemDef } from '../src/sim/items';
@@ -24,7 +25,7 @@ const count = (ev: GameEvent[], t: GameEvent['type']) => ev.filter((e) => e.type
 
 /** Partida en juego con n humanos, el sofá del nivel aparcado a un lado y el objeto `def` en el descampado. */
 function setup(def: ItemDef, n: number) {
-  const g = new Game(RAPIER, { humans: n, carriers: Math.max(1, n), botStyle: 'atentos', seed: 1 });
+  const g = new Game(RAPIER, { level: CALLE, humans: n, carriers: Math.max(1, n), botStyle: 'atentos', seed: 1 });
   g.phase = 'playing'; g.countdown = 0;
   g.sofa.setTranslation({ x: OPEN.x - 12, y: 0.25, z: OPEN.z - 8 }, true);
   const it = g.addItem(def, { x: OPEN.x, y: restHeight(def) + 0.01, z: OPEN.z }, 0);

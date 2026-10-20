@@ -4,10 +4,8 @@ import type { Vec3 } from './types';
 type R = typeof RAPIER;
 
 export const CAR = { hx: 2.1, hy: 0.65, hz: 0.95, cruise: 10, slow: 3.2, brake: 7 };
-export const LANES = [
-  { z: -1.6, dir: 1, stopX: -4.2 },
-  { z: -6.4, dir: -1, stopX: 4.2 },
-];
+/** Carril de una calle (lo da el nivel, `LevelDef.traffic`): dónde está, en qué sentido va y su línea de detención. */
+export interface Lane { z: number; dir: 1 | -1; stopX: number }
 export const X_LIMIT = 46;
 
 /** Semáforo: los coches tienen verde, luego ámbar y después se para el tráfico para que crucen los peatones. */
@@ -32,9 +30,8 @@ export class Car {
   honkCooldown = 0;
   /** Para que la vista sepa si frena. */
   braking = false;
-  constructor(R: R, world: RAPIER.World, readonly id: number, readonly lane: number, public x: number, readonly color: string) {
-    const l = LANES[lane];
-    this.body = world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(x, CAR.hy + 0.15, l.z));
+  constructor(R: R, world: RAPIER.World, readonly id: number, readonly lane: Lane, public x: number, readonly color: string) {
+    this.body = world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(x, CAR.hy + 0.15, lane.z));
     this.collider = world.createCollider(
       R.ColliderDesc.roundCuboid(CAR.hx - 0.15, CAR.hy - 0.15, CAR.hz - 0.15, 0.15)
         .setActiveEvents(R.ActiveEvents.COLLISION_EVENTS)
@@ -43,8 +40,8 @@ export class Car {
     );
   }
 
-  get z() { return LANES[this.lane].z; }
-  get dir() { return LANES[this.lane].dir; }
+  get z() { return this.lane.z; }
+  get dir() { return this.lane.dir; }
 }
 
 /**
@@ -56,7 +53,7 @@ export function stepTraffic(cars: Car[], t: number, dt: number, obstacles: Vec3[
   const light = lightAt(t);
   const honks: Car[] = [];
   for (const car of cars) {
-    const lane = LANES[car.lane];
+    const lane = car.lane;
     let target = CAR.cruise;
     // Semáforo
     const toLine = lane.dir * (lane.stopX - car.x) - CAR.hx;

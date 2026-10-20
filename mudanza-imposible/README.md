@@ -26,9 +26,11 @@ npm run dev          # abre http://localhost:5173
 2. **J1** (muñeco de peto y gorra rojos, aro amarillo): **WASD** para moverse y **Espacio** para agarrar o soltar.
 3. **J2** (muñeco de peto y gorra turquesa, aro azul claro): **flechas** para moverse e **Intro** para agarrar o soltar. **J3** usa **IJKL** y **U**; **J4**, el teclado numérico (**8 4 5 6** y **0**). Con mandos, el teclado lleva a los primeros jugadores y los mandos, a los últimos.
 4. Cada uno se pone en un extremo del sofá, lo agarran y lo llevan hacia arriba de la pantalla. El aro amarillo en el suelo marca el siguiente objetivo. **No hay tecla de alzar:** al agarrar, las manos suben el sofá solas. Uno solo apenas lo arrastra por un extremo; entre dos va en el aire y sube la escalera.
-5. **Objetivo:** dejar el sofá en la zona verde junto al camión en menos de 3 minutos sin destrozarlo. Para reiniciar, **Esc** (pausa) y **Retroceso**: en juego, Retroceso no hace nada, porque en el teclado español está encima de Intro, la tecla de agarrar de J2. En la pantalla final, **Intro** vuelve a empezar.
+5. **Objetivo:** meter el sofá dentro del camión (subiendo su rampa de carga) y dejarlo allí, suelto y quieto, en menos de 3 minutos sin destrozarlo. Para reiniciar, **Esc** (pausa) y **Retroceso**: en juego, Retroceso no hace nada, porque en el teclado español está encima de Intro, la tecla de agarrar de J2. En la pantalla final, **Intro** vuelve a empezar.
 
 Para ver una partida completa sin tocar nada, usa «Ver demo automática» o abre `http://localhost:5173/?auto=1` (1 jugador con ayudantes).
+
+**Niveles.** Por defecto se juega «La calle» (`?nivel=calle`). Con `?nivel=pruebas` se abre el «Patio de pruebas»: una escena pequeña y llana con el camión y siete objetos del catálogo (la mesa, dos cajas, la lámpara de pie y la silla, obligatorias; la nevera y el piano, opcionales). No es uno de los niveles del juego: sirve para probar los objetos. Los niveles son datos (`LevelDef`, en `src/levels/`): el juego, la vista y el piloto automático reciben el nivel y no conocen ningún recorrido concreto.
 
 Requisitos: Node 20 o superior y un navegador con WebGL (Chrome, Edge o Firefox). No hay servicios externos ni de pago.
 
@@ -271,6 +273,8 @@ El recorrido y la disposición funcional no cambian: ni paredes, ni puertas, ni 
 
 ## Propuesta para la siguiente fase: niveles cortos y varios objetos
 
+*(Histórico. En el ciclo 2 se hizo: catálogo `ItemDef` en `src/sim/items.ts` y niveles como datos en `src/levels/`; ver `docs/quality/cycles/ciclo-2.md`.)*
+
 **Cómo está hecho ahora:**
 - **Nivel:** son constantes de módulo en `src/sim/level.ts` (`LEVEL`, `DOOR`, `STAIRS`, `ZONE`, `ROUTE`, `STAGES`, `SOFA_START`). `levelView.ts` dibuja con funciones que leen esas constantes. Los objetos de decoración ya son datos (`PROPS`).
 - **Objeto transportable:** hay uno solo. Lo forman la constante `SOFA` y `createSofa`, más `Game.sofa`, `sofaColliders` e `integrity`. Las asas de los ayudantes (`SLOTS`) y la ruta del piloto también son del sofá.
@@ -333,7 +337,7 @@ No se ha construido nada de esta arquitectura todavía: no hacía falta para cor
 - **Pulsaciones.** Agarrar y enderezar se guardan hasta el siguiente paso de física: no se pierden en pantallas de más de 60 Hz, donde hay fotogramas sin ningún paso. La lógica está en `src/input/inputCore.ts`, sin DOM, y la prueban `tests/input.test.ts`.
 - Cuatro personas en un mismo teclado pueden saturarlo (fantasmas de teclas, según el teclado). Con mandos no pasa.
 
-**Objetivo:** dejar el sofá en la zona amarilla junto al camión en menos de 3 minutos, sin que su estado llegue a 0 %.
+**Objetivo:** dejar el sofá dentro del camión en menos de 3 minutos, sin que su estado llegue a 0 %. Un objeto cuenta como cargado cuando su centro y al menos el 80 % de su caja envolvente están dentro de la caja de carga, nadie lo agarra y lleva 1 s quieto; si se vuelve a sacar (o alguien lo agarra), deja de contar. Se gana con todos los obligatorios cargados. La lista de la derecha dice «Cargados N/M» y el estado de cada objeto (pendiente, en camino, cargado o roto); al cargar uno suena una campanilla.
 
 **Estrellas:**
 - una por entregar;
@@ -359,7 +363,7 @@ No se ha construido nada de esta arquitectura todavía: no hacía falta para cor
 | Escalera | Rampa de 20° con peldaños visuales. Arriba, un rellano obliga a girar 90°. |
 | Pasillo de arriba y terraza | Las paredes que tapan la acción se recortan hasta un zócalo, como en una maqueta. |
 | Rampa | Chapa resbaladiza, 17° y sin barandilla. Si soltáis el sofá, baja deslizándose; si se cae por un lado, recibe daño (y a veces ahorra camino). |
-| Entrega | El sofá tiene que reposar dentro de la zona 1 s. |
+| Camión | Caja de carga abierta por detrás, con rampa de carga de 14° (con tacos: no resbala). Hay que subir el sofá en línea con la rampa, meterlo dentro y soltarlo: cuenta cuando lleva 1 s quieto y suelto dentro. |
 
 ## Decisiones técnicas
 
@@ -398,17 +402,23 @@ mudanza-imposible/
   index.html            menú, interfaz, pausa y resultados (DOM + CSS)
   src/main.ts           bucle de juego, menú, eventos → sonido/efectos/mensajes
   src/sim/              simulación (sin Three.js)
-    level.ts            geometría del recorrido, etapas y puntos de paso
-    props.ts            objetos de decoración: posición y caja de choque (la vista los dibuja)
+    items.ts            catálogo de objetos (ItemDef): forma, masa, rozamiento, asas y fragilidad
     sofa.ts             cuerpo del sofá, asas y utilidades de rotación
     carrier.ts          porteador: movimiento, agarre, alzar, soltar y equilibrio
     traffic.ts          coches, carriles y semáforo
     bots.ts             ayudantes de la máquina
     autopilot.ts        piloto automático (demo y pruebas)
     game.ts             estado de la partida, daños, recuperación, victoria/derrota
+  src/levels/           niveles como datos (sin Three.js)
+    types.ts            LevelDef: cajas, decoración, salidas, objetos y sus rutas, camión, etapas, tráfico, tiempo
+    calle.ts            «La calle», el nivel de referencia
+    patio.ts            «Patio de pruebas» (?nivel=pruebas)
+    truck.ts            camión: caja de carga abierta (suelo, paredes y techo) y rampa, como cajas de choque
+    index.ts            registro de niveles y selección por la url
   src/view/             dibujo con Three.js (escena, sofá, personajes, coches, efectos, cámara)
     textures.ts         texturas procedurales (asfalto, baldosa, ladrillo, tablas, tejas, chapa, tela, fachadas)
-    decor.ts            decoración por zonas: objetos de props.ts y detalles sin choque
+    decor.ts            decoración del nivel: sus objetos (props) y detalles sin choque (scenery)
+    itemView.ts         dibujo provisional de los objetos del catálogo: las cajas de su forma
     doll/               muñeco del laboratorio adaptado a los jugadores (dibuja la cápsula física: anchura, altura y pose)
   src/input/inputCore.ts  entradas sin DOM: teclas de J1–J4, mandos por Gamepad.index, pulsaciones retenidas y paso fijo
   src/input/input.ts    conexión con los eventos de teclado y la Gamepad API del navegador

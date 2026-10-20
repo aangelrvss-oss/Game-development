@@ -3,6 +3,7 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CARRIER, CENTER_Y } from '../src/sim/carrier';
+import { CALLE } from '../src/levels/calle';
 import { Game, RULES } from '../src/sim/game';
 import { HAND } from '../src/sim/hand';
 import { ITEMS, boxVolume, createItem, restHeight, type Item, type ItemBox, type ItemDef } from '../src/sim/items';
@@ -25,7 +26,7 @@ const count = (ev: GameEvent[], t: GameEvent['type']) => ev.filter((e) => e.type
 
 /** Partida en juego con n humanos, el sofá del nivel aparcado a un lado y el objeto `def` de pie en el descampado. */
 function setup(def: ItemDef, n: number, required = false) {
-  const g = new Game(RAPIER, { humans: n, carriers: Math.max(1, n), botStyle: 'atentos', seed: 1 });
+  const g = new Game(RAPIER, { level: CALLE, humans: n, carriers: Math.max(1, n), botStyle: 'atentos', seed: 1 });
   g.phase = 'playing'; g.countdown = 0;
   g.sofa.setTranslation({ x: OPEN.x - 12, y: 0.25, z: OPEN.z - 8 }, true);
   const it = g.addItem(def, { x: OPEN.x, y: restHeight(def) + 0.01, z: OPEN.z }, 0, required);
@@ -164,7 +165,7 @@ describe('Catálogo de objetos (T-item-1)', () => {
     expect(b.body.isCcdEnabled()).toBe(a.body.isCcdEnabled());
     expect(b.body.additionalSolverIterations()).toBe(a.body.additionalSolverIterations());
     // Y el sofá de la partida es ese objeto del catálogo, obligatorio
-    const g = new Game(RAPIER, { humans: 1, carriers: 1, botStyle: 'atentos' });
+    const g = new Game(RAPIER, { level: CALLE, humans: 1, carriers: 1, botStyle: 'atentos' });
     expect(g.items[0]).toBe(g.sofaItem);
     expect(g.sofaItem.def).toBe(ITEMS.sofa);
     expect(g.sofaItem.required).toBe(true);

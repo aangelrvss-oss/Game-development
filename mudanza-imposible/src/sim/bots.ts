@@ -9,7 +9,9 @@
 // estar bloqueados, primero dejan de tirar y acompañan al sofá un momento (`letGo`): soltar de golpe con el
 // sofá tirando de ellos los tumbaría, igual que a un jugador. Y si notan que empiezan a perder el equilibrio
 // (`steady`), dejan de imitar y se dejan llevar por el sofá hasta recuperarlo: imitan con retraso, y cuando el
-// jugador frena de golpe seguirían empujando contra todos.
+// jugador frena de golpe seguirían empujando contra todos. Y cuando el objeto ya está dentro del camión y ningún
+// jugador lo lleva, o los que lo llevan se paran ahí (`stow`), lo sueltan con cuidado y no lo vuelven a agarrar: si no,
+// nunca quedaría cargado.
 import { CARRIER, type Carrier } from './carrier';
 import type { Item } from './items';
 import { localToWorld, rotate } from './sofa';
@@ -30,6 +32,8 @@ export const BOT = {
   /** Desviación del tronco (rad) a partir de la cual dejan de tirar y acompañan al sofá, y a la que vuelven. */
   steady: 0.1,
   steadyBack: 0.04,
+  /** Dentro del camión, tiempo con los jugadores que cargan parados tras el que dejan el objeto (s). */
+  stowAfter: 0.4,
 };
 
 export class BotBrain {
@@ -48,14 +52,19 @@ export class BotBrain {
   yielding = false;
   constructor(slot: number, readonly style: BotStyle, private rng: () => number) { this.slot = slot; }
 
-  /** Calcula el mando del ayudante para este paso. `item`: el objeto que lleva o al que va; `taken`: sus asas ocupadas. */
-  think(me: Carrier, item: Item, lead: { x: number; z: number; w: number; active: boolean }, taken: Set<number>, dt: number, others: Vec3[] = []): PlayerInput {
+  /**
+   * Calcula el mando del ayudante para este paso. `item`: el objeto que lleva o al que va; `taken`: sus asas ocupadas;
+   * `stow`: el objeto ya está dentro del camión y ningún jugador lo lleva (se suelta y se deja).
+   */
+  think(me: Carrier, item: Item, lead: { x: number; z: number; w: number; active: boolean }, taken: Set<number>, dt: number, others: Vec3[] = [], stow = false): PlayerInput {
     const input: PlayerInput = { mx: 0, mz: 0, grab: false, turn: 0, right: false };
     const body = item.body, handles = item.def.handles;
     if (me.stunned > 0) { this.letGo = 0; return input; }
     const p = me.pos;
     if (!me.holding) {
       this.letGo = 0;
+      // Ya está cargado (o a punto): no se vuelve a agarrar
+      if (stow) { this.regrab = 0; return input; }
       // Su asa la ha cogido otro (también un jugador): busca otra libre
       if (taken.has(this.slot)) {
         const free = handles.map((_, i) => i).filter((i) => !taken.has(i));
@@ -104,6 +113,8 @@ export class BotBrain {
       return input;
     }
     this.tryTime = 0;
+    // Dentro del camión y sin jugadores que lo lleven: lo suelta con cuidado (acompaña al objeto y después suelta)
+    if (stow && this.letGo <= 0) this.letGo = BOT.letGo;
     const lean = Math.hypot(me.lean.x, me.lean.z);
     this.yielding = lean > BOT.steady || (this.yielding && lean > BOT.steadyBack) || me.wobbling;
     if (this.yielding && this.letGo <= 0) {

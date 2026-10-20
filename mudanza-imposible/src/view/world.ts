@@ -1,6 +1,9 @@
 import * as THREE from 'three';
+import type { LevelDef } from '../levels/types';
 import type { Game } from '../sim/game';
+import { sofaUp } from '../sim/sofa';
 import { buildLevel, type LevelView } from './levelView';
+import { ItemView } from './itemView';
 import { SofaView } from './sofaView';
 import { CarrierView } from './carrierView';
 import { DollView } from './doll/dollView';
@@ -13,9 +16,12 @@ export class WorldView {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(42, 1, 0.1, 400);
-  level: LevelView;
+  /** Escenario del nivel de la partida (se construye al enganchar una partida de otro nivel). */
+  level: LevelView | null = null;
+  private levelDef: LevelDef | null = null;
   fx = new Fx();
-  sofa = new SofaView();
+  /** Vista de cada objeto de la partida (el sofá, con su modelo; los demás, con `ItemView`), en el orden de `Game.items`. */
+  items: (SofaView | ItemView)[] = [];
   /** Jugadores humanos: muñeco del laboratorio; ayudantes de la máquina: el reparto original. */
   carriers: (CarrierView | DollView)[] = [];
   cars: CarView[] = [];
@@ -56,8 +62,7 @@ export class WorldView {
     sc.left = -26; sc.right = 26; sc.top = 26; sc.bottom = -26; sc.near = 1; sc.far = 90;
     this.sun.shadow.bias = -0.0006;
     this.scene.add(this.sun, this.sun.target);
-    this.level = buildLevel();
-    this.scene.add(this.level.group, this.dynamic, this.fx.group);
+    this.scene.add(this.dynamic, this.fx.group);
     this.resize();
     window.addEventListener('resize', () => this.resize());
   }
@@ -92,15 +97,28 @@ export class WorldView {
     this.camera.updateProjectionMatrix();
   }
 
-  /** Crea las vistas para una partida nueva. */
+  /** Crea las vistas para una partida nueva (y el escenario, si es de otro nivel). */
   attach(game: Game) {
+    if (this.levelDef !== game.level) {
+      if (this.level) {
+        this.scene.remove(this.level.group);
+        this.level.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+      }
+      this.level = buildLevel(game.level);
+      this.levelDef = game.level;
+      this.scene.add(this.level.group);
+    }
     // Libera las vistas de la partida anterior (reiniciar no debe ir acumulando memoria de vídeo)
     for (const v of this.carriers) v.dispose();
     for (const v of this.cars) v.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
-    this.sofa.reset();
+    for (const v of this.items) {
+      v.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+      if (v instanceof SofaView) v.warning.geometry.dispose();
+    }
     this.dynamic.clear();
     this.fx.clear();
-    this.dynamic.add(this.sofa.group, this.sofa.warning);
+    this.items = game.items.map((it) => (it.def.draw === 'sofa' ? new SofaView() : new ItemView(it.def)));
+    for (const v of this.items) this.dynamic.add(v.group, ...(v instanceof SofaView ? [v.warning] : []));
     this.carriers = game.carriers.map((c) => (c.human !== null ? new DollView(c, c.human, game.world, this.camera, this.fx) : new CarrierView(c, c.human, this.fx, game.world)));
     for (const v of this.carriers) { this.dynamic.add(v.group, ...v.worldObjects()); }
     this.cars = game.cars.map((c) => new CarView(c));
@@ -109,8 +127,15 @@ export class WorldView {
     this.camTarget.set(s.x, s.y, s.z);
   }
 
+  /** Golpe a un objeto: se aplasta y rebota un instante. */
+  bumpItem(index: number, strength: number) { this.items[index]?.bump(strength); }
+
   render(game: Game, t: number, dt: number) {
-    this.sofa.sync(game.sofa, game.sofaItem.integrity, game.sofaUp, t, dt);
+    game.items.forEach((it, i) => {
+      const v = this.items[i];
+      if (v instanceof SofaView) v.sync(it.body, it.integrity, sofaUp(it.body), t, dt);
+      else v?.sync(it.body, dt);
+    });
     for (const v of this.carriers) {
       const g = v.carrier.grabWorld();
       v.sync(g ? new THREE.Vector3(g.x, g.y, g.z) : null, t, dt);
@@ -119,7 +144,7 @@ export class WorldView {
     // Atasco: aviso flotante una vez por atasco
     if (game.phase === 'playing' && game.stuckTime > 1.5 && !this.jam) { this.jam = true; this.fx.text(game.sofaPos, '¡ATASCO!', '#ffffff', 42, '#ea580c', 2); }
     if (game.stuckTime < 0.2) this.jam = false;
-    this.level.update(t, game.light, game.stage >= 5, game.stage, game.sofaPos);
+    this.level?.update(t, game.light, game.stage, game.sofaPos);
     this.fx.update(dt);
     this.updateCamera(game, dt);
     this.renderer.render(this.scene, this.camera);
@@ -178,14 +203,14 @@ export class WorldView {
       const to = new THREE.Vector3(p.x, p.y + 0.4, p.z);
       const dist = to.distanceTo(from);
       this.ray.ray.set(from, to.sub(from).normalize());
-      for (const m of this.level.fadeables) {
+      for (const m of this.level?.fadeables ?? []) {
         const box = m.userData.box as THREE.Box3;
         if (this.ray.ray.intersectBox(box, tmp) && tmp.distanceTo(from) < dist - 0.3) hit.add(m);
       }
     }
     const s = game.sofaPos;
     const k = 1 - Math.exp(-Math.max(dt, 1 / 60) * 10);
-    for (const m of this.level.fadeables) {
+    for (const m of this.level?.fadeables ?? []) {
       const rule = m.userData.fadeRule as ((x: number, y: number, z: number) => boolean) | undefined;
       if (rule && rule(s.x, s.y, s.z)) hit.add(m);
       const u = m.userData as { cut: number; mode: 'cut' | 'hide'; box: THREE.Box3 };

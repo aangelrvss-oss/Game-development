@@ -1,10 +1,11 @@
 // Simulación sin interfaz con el piloto automático: imprime el progreso.
 import RAPIER from '@dimforge/rapier3d-compat';
+import { CALLE } from '../src/levels/calle';
 import { Game } from '../src/sim/game';
 import { Autopilot } from '../src/sim/autopilot';
 await RAPIER.init();
 const carriers = Number(process.argv[2] ?? 4), style = (process.argv[3] ?? 'atentos') as any, seed = Number(process.argv[4] ?? 1);
-const g = new Game(RAPIER, { humans: 1, carriers, botStyle: style, seed });
+const g = new Game(RAPIER, { level: CALLE, humans: 1, carriers, botStyle: style, seed });
 const ap = new Autopilot(0);
 const dt = 1 / 60;
 let lastLog = -1;

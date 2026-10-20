@@ -1,10 +1,11 @@
 import RAPIER from '@dimforge/rapier3d-compat';
+import { CALLE } from '../src/levels/calle';
 import { Game } from '../src/sim/game';
 import { SLOTS, localToWorld } from '../src/sim/sofa';
 await RAPIER.init();
 let breaks = 0, runs = 0;
 for (let seed = 1; seed <= 12; seed++) for (const n of [3, 4, 6]) {
-  const g = new Game(RAPIER, { humans: 1, carriers: n, botStyle: 'atentos', seed });
+  const g = new Game(RAPIER, { level: CALLE, humans: 1, carriers: n, botStyle: 'atentos', seed });
   const me = g.carriers[0];
   let grabbed = false;
   for (let i = 0; i < 60 * 8; i++) {

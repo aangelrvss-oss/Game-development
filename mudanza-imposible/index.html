@@ -31,6 +31,21 @@
   #h-light { position:absolute; top:96px; right:12px; display:none; font-weight:900; font-size:16px; padding:8px 12px; border-radius:14px; }
   #h-light.go { background:#16a34a; } #h-light.stop { background:#b91c1c; }
   #h-toasts { position:absolute; top:150px; left:12px; display:flex; flex-direction:column; gap:6px; }
+  /* Lista de la mudanza: arriba a la derecha, bajo el semáforo; nunca baja hasta los paneles de jugador */
+  #h-load { position:absolute; top:150px; right:12px; width:262px; max-height:calc(100% - 290px); overflow:hidden; font-size:13px; font-weight:800; }
+  #h-load .ttl { font-size:17px; font-weight:900; margin-bottom:4px; }
+  #h-load .it { display:flex; align-items:center; gap:6px; padding:3px 0; border-top:1px solid rgba(255,255,255,.12); }
+  #h-load .it svg { flex:none; }
+  #h-load .nm { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #h-load .nm small { opacity:.7; font-weight:700; }
+  #h-load .hv { display:flex; align-items:center; font-size:11px; opacity:.85; }
+  #h-load .hv svg { width:13px; height:13px; }
+  #h-load .st { padding:1px 7px; border-radius:8px; background:rgba(255,255,255,.14); font-size:12px; }
+  #h-load .carried .st { background:var(--accent); color:var(--ink); }
+  #h-load .loaded .st { background:#22c55e; color:var(--ink); }
+  #h-load .broken { color:#fca5a5; }
+  #h-load .broken .nm { text-decoration:line-through; }
+  #h-load .broken .st { background:#ef4444; color:#fff; }
   .toast { background:var(--panel); padding:7px 12px; border-radius:12px; font-weight:800; font-size:15px; animation: pop .25s ease-out; }
   .toast.bad { background:#b91c1c; } .toast.good { background:#15803d; }
   @keyframes pop { from { transform:scale(.6); opacity:0 } to { transform:scale(1); opacity:1 } }
@@ -59,7 +74,7 @@
   .res-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:14px 0; }
   .res-grid div { background:#f3ecdc; border-radius:14px; padding:10px; font-weight:800; }
   .res-grid small { display:block; opacity:.7; font-weight:700; }
-  @media (max-width:700px) { #h-center.big { font-size:72px } #h-players { display:none } #h-hint { display:none } }
+  @media (max-width:700px) { #h-center.big { font-size:72px } #h-players { display:none } #h-hint { display:none } #h-load .it { display:none } }
 </style>
 </head>
 <body>
@@ -69,8 +84,9 @@
   <div id="h-top">
     <div class="pill" id="h-time">0:00.0</div>
     <div class="pill" id="h-stages"></div>
-    <div class="pill" id="h-sofa"><div class="lbl"><span>Estado del sofá</span><span id="h-bar-txt">100%</span></div><div class="track"><div id="h-bar"></div></div></div>
+    <div class="pill" id="h-sofa"><div class="lbl"><span id="h-bar-lbl">Estado del sofá</span><span id="h-bar-txt">100%</span></div><div class="track"><div id="h-bar"></div></div></div>
   </div>
+  <div id="h-load" class="pill"></div>
   <div id="h-center"></div>
   <div id="h-warn"></div>
   <div id="h-light"></div>
@@ -82,7 +98,7 @@
 <div class="overlay" id="menu" style="display:flex">
   <div class="card">
     <h1>LA MUDANZA <span>IMPOSIBLE</span></h1>
-    <p class="sub">Demo para 1 a 4 jugadores, en el mismo teclado o con mandos · Llevad entre todos el sofá desde la casa hasta la zona verde del camión: calle con tráfico, puerta estrecha, escalera con giro y rampa sin barandilla. Tenéis 3 minutos.</p>
+    <p class="sub" id="menu-sub">Demo para 1 a 4 jugadores, en el mismo teclado o con mandos · Llevad entre todos el sofá desde la casa hasta dentro del camión: calle con tráfico, puerta estrecha, escalera con giro, rampa sin barandilla y la rampa de carga del camión. Tenéis 3 minutos.</p>
     <div class="row"><label>Jugadores humanos</label><div class="seg" id="opt-humans"></div></div>
     <div class="row"><label>Porteadores en total</label><div class="seg" id="opt-carriers"></div></div>
     <div class="row"><label>Ayudantes de la máquina</label><div class="seg" id="opt-style"></div></div>
@@ -98,7 +114,7 @@
     <p class="note"><b>No hay tecla de alzar.</b> El sofá pesa de verdad: al agarrarlo, las manos lo suben solas a la altura de carga. Uno solo levanta un extremo y lo arrastra despacio; entre dos se lleva en el aire. Si soltáis mientras tiráis, o el compañero os arrolla, os tambaleáis y podéis acabar en el suelo un momento.</p>
     <p class="note"><b>Con ayudantes de la máquina:</b> agarran un asa libre e imitan cómo te mueves cuando tú también cargas; si quieres, les pides que giren (<kbd>Q</kbd>/<kbd>E</kbd> o LB/RB). Tienen la misma fuerza y el mismo equilibrio que los jugadores.</p>
     <p class="note"><b>Mandos:</b> el teclado lleva a los primeros jugadores y los mandos, a los últimos (con 2 jugadores y un mando: J1 con WASD y J2 con el mando). Cuatro en un mismo teclado pueden saturarlo y perder teclas; con mandos no pasa.</p>
-    <p class="note">Durante la partida: <kbd>Esc</kbd> o Start pausa (en la pausa, <kbd>Retroceso</kbd> reinicia) · <kbd>M</kbd> sonido. Gana quien deja el sofá en la zona verde antes de 3 minutos y sin destrozarlo.</p>
+    <p class="note">Durante la partida: <kbd>Esc</kbd> o Start pausa (en la pausa, <kbd>Retroceso</kbd> reinicia) · <kbd>M</kbd> sonido. Gana quien deja el sofá dentro del camión (suelto y quieto) antes de 3 minutos y sin destrozarlo.</p>
     <p class="note" id="pads-note"></p>
   </div>
 </div>

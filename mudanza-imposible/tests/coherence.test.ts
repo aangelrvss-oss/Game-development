@@ -9,6 +9,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CARRIER, CENTER_Y, DOLL_HEIGHT, DOLL_MODEL, DOLL_SCALE, type Carrier } from '../src/sim/carrier';
+import { CALLE } from '../src/levels/calle';
 import { Game } from '../src/sim/game';
 import { SOFA, yawQuat } from '../src/sim/sofa';
 import { NO_INPUT, type PlayerInput } from '../src/sim/types';
@@ -88,7 +89,7 @@ function axis(c: Carrier) {
  * del sofá vuelve junto a él (`Game`): las pruebas junto a la pared de la casa ponen el sofá en el patio.
  */
 function setup(n: number, at = OPEN) {
-  const g = new Game(RAPIER, { humans: n, carriers: n, botStyle: 'atentos', seed: 1 });
+  const g = new Game(RAPIER, { level: CALLE, humans: n, carriers: n, botStyle: 'atentos', seed: 1 });
   g.phase = 'playing';
   g.countdown = 0;
   g.sofa.setTranslation({ x: at.x, y: 0.25, z: at.z }, true);
@@ -336,7 +337,7 @@ describe('T-coh-1: los ayudantes, dentro de su cápsula', () => {
   it('cada ayudante cabe en su cápsula casi a su tamaño: de pie, cayendo y tumbado hacia delante y hacia atrás, no sale ni se mete bajo el suelo más de 3 cm', () => {
     // Todos los del reparto (sin humanos: también la abuela del moño, que sale en el fondo del menú), separados en el
     // descampado y sin cerebro. Antes: perro 67 cm fuera de pie y 61 cm bajo el suelo tumbado, alien 47, gordo 20
-    const g = new Game(RAPIER, { humans: 0, carriers: 6, botStyle: 'atentos', seed: 1 });
+    const g = new Game(RAPIER, { level: CALLE, humans: 0, carriers: 6, botStyle: 'atentos', seed: 1 });
     g.bots.clear();
     g.phase = 'playing'; g.countdown = 0;
     g.sofa.setTranslation({ x: OPEN.x, y: 0.25, z: OPEN.z - 4 }, true);
