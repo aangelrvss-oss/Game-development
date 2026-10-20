@@ -95,7 +95,7 @@ Matices de la verificación sobre los críticos:
 | Ciclo | Objetivo | Estado |
 |---|---|---|
 | 0 | Diagnóstico: auditoría protegida, línea base, dirección artística, checkpoint, estado persistente | **Cerrado** el 19-10-2026, ~21:05 UTC |
-| 1 | **Núcleo fiable**: entradas sin pérdidas (incluidos mandos y 4 jugadores); mano blanda con fuerza limitada y física única; alzado automático; cápsula a la anchura del muñeco y caída física sin `visOff`; pruebas de partida completa con 2, 3 y 4 jugadores. Especificación: [`cycles/ciclo-1.md`](cycles/ciclo-1.md) | **En curso** (flujo `wf_5b4f2ec4-c74`, en el worktree aislado `rebirth/ciclo-1`) |
+| 1 | **Núcleo fiable**: entradas sin pérdidas (incluidos mandos y 4 jugadores); mano blanda con fuerza limitada y física única; alzado automático; cápsula a la anchura del muñeco y caída física sin `visOff`; pruebas de partida completa con 2, 3 y 4 jugadores. Especificación: [`cycles/ciclo-1.md`](cycles/ciclo-1.md) | **Implementado e integrado** (`e0d8561`: tsc OK, Vitest 62/62, build OK). **Revisión en curso**, con un defecto CRÍTICO abierto (ver sección 9). |
 | 2 | Sistema de objetos (`ItemDef`) y entrega en el camión con progreso; nivel como datos (`LevelDef`) con el recorrido actual como nivel de referencia | Pendiente |
 | 3 | Nivel 1 completo («Una casa imposible»), con aprendizaje integrado | Pendiente |
 | 4 | Personajes y assets con Blender (muebles, camión) siguiendo la dirección artística | Pendiente |
@@ -146,3 +146,18 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
   - etiqueta anotada local, cuya publicación está bloqueada por la política (HTTP 403);
   - todo en commits y publicado.
   - **Incidencia:** 3 verificadores fallaron por el límite de uso de la sesión («resets 8:30pm UTC») y se repitieron con éxito. **Riesgo para los ciclos siguientes:** el límite de uso puede interrumpir flujos largos; si ocurre, se reanuda el flujo (los agentes terminados quedan en caché) y se registra.
+- **Ciclo 1** (19–20-10-2026, en curso):
+  - **Pasos implementados en el worktree `rebirth/ciclo-1`** (informes de los implementadores en [`reviews/ciclo-1/`](reviews/ciclo-1/)):
+    - `d328602`: mano blanda y física única. Uno solo arrastra el sofá 1,12 m en 3 s; dos lo llevan 6,90 m y suben la escalera en 3,87 s sin tecla; 4 jugadores, 0 vuelcos; con ayudantes, 39/40.
+    - `a3dae8f`: entradas retenidas, 4 jugadores y mandos por índice (18 pruebas nuevas).
+    - `eadedff`: muñeco a escala 0,891 = cápsula de 1,38 m, caída con collider tumbado y `visOff` eliminado.
+    - `e0a1711`: piloto para 2, 3 y 4 humanos (unos 32 s, 0 caídas), `lastDist` corregido y e2e sin Mayús (`duo-e2e` 20/20).
+  - **Incidencia:** el contenedor se reinició (~23:50 UTC) durante la revisión. El disco se conservó, pero se perdieron las revisiones de diseño, QA y arte en curso.
+    - Para protegerlo, el ciclo se integró en la rama publicada (`e0d8561`) tras validar tsc, Vitest 62/62 y build.
+    - El flujo se reanudó desde caché (`wf_5b4f2ec4-c74`).
+  - **Revisión de física (rol B), [`reviews/ciclo-1/revision-fisica.json`](reviews/ciclo-1/revision-fisica.json): 5/10.**
+    - Confirma que la mordaza ha desaparecido, que la física es idéntica bit a bit entre modos, que es estable de 10 a 250 kg y que se completa con 2, 3 y 4 jugadores.
+    - **CRÍTICO:** piernas, brazos y manos del muñeco se dibujan desplazados hacia el origen del mundo (`DOLL_SCALE` aplicada dos veces). Es una regresión introducida en `eadedff`.
+    - **Mayores:** tirando de lado, uno solo mueve el sofá demasiado deprisa (T-grip-2); y la correa hace inalcanzable «¡Se escapa!» en un tira y afloja.
+    - Además, 4 menores.
+    - **No se avanza al ciclo 2 hasta corregir el crítico.**
