@@ -274,3 +274,7 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
     1. Revisión independiente del ciclo 2 con revisores que no lo implementaron (diversión y controles, física cooperativa y sabotaje, IA y modos de 1 a 4, estabilidad e2e y regresiones, arte y clipping, rendimiento y contenido).
     2. Después, prueba humana.
     - No se corrige nada ni se empieza el ciclo 3 sin decisión humana.
+  - **Revisión independiente en curso** (desde ~10:55 UTC): flujo `wf_5062ee7a-d85` sobre el worktree desprendido `Game-development-rc2` en `04da4c4`.
+    - 6 revisores que no implementaron nada (e2e y regresiones; física y sabotaje; IA y modos de 1 a 4; diversión y controles; arte y clipping; rendimiento y contenido) y un árbitro de contraste.
+    - Solo miden; no corrigen.
+    - Si el contenedor se reinicia, se reanuda con `resumeFromRunId`.
