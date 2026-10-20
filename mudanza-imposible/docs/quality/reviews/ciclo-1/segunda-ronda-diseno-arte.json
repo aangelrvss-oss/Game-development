@@ -1,0 +1,131 @@
+{
+ "score": 6.5,
+ "justification": "Nota 6,5/10 para los roles A, G, C y E sobre el estado actual (5505243, corrección f8efb59). En la primera ronda fueron 4 (diseño) y 3 (arte).\n\n**Lo que sube la nota**\n\n- El crítico está cerrado de verdad. Lo medí por mi cuenta en el MUNDO, no en el espacio del grupo: tubo de cada miembro frente a su punto en el tronco o en la bota.\n  - Recorrido a 2 en Chromium (330 muestras, hasta 40,8 m del origen): hombro, cadera y tobillo a 0,000 m; mano a 0,053 m, que es el desfase de diseño 0,06 × 0,891.\n  - Caída forzada en la Rampa, a 37 m del origen: uniones a ≤ 0,018 m al tambalearse, al caer, tumbado y al levantarse.\n  - En Node, 8 caídas en (26,9; −36) y (−35; 25): ≤ 1,78 cm.\n  - Las capturas del camión, de la escalera y de la caída (agce/mie-2j-07-Camión.png, caida-cerca-4.png) muestran brazos y piernas unidos al cuerpo y las manos en el asa.\n- Retroceso: en juego ya no reinicia, avisa una sola vez y desde la pausa sí reinicia.\n- El aviso «Pesa mucho» desaparece al instante cuando llega ayuda (0,00 s tras 2, 5, 10 y 20 s arrastrando solo).\n- Ayudantes en reposo dentro de su cápsula (≤ 2,8 cm). El perro tumbado queda en horizontal. En movimiento no se meten en nada más de 3,5 cm.\n\n**Lo que impide llegar a 8,5**\n\n1. Con 4 jugadores, el 3.º y el 4.º siguen sin aportar nada: 33,0–33,5 s con 2, 3 o 4 activos. Es la promesa del producto y sigue abierta.\n2. Las nuevas señales de esfuerzo están saturadas. En una partida a 2 bien jugada, con los dos agarrando:\n   - rayas sobre la cabeza el 82 % del tiempo;\n   - sudor el 58 %;\n   - bola roja el 38 %.\n\n   En las capturas, J1 y J2 llevan las rayas cuando lo llevan bien entre dos. Desde la cámara de juego, el muñeco no distingue «falta ayuda» de «vamos bien»: solo lo dice el cartel rojo del HUD.\n3. Regresión del HUD con 4 jugadores. La ayuda alargada («en la pausa, Retroceso reinicia») tapa la pastilla de J4:\n   - a 1280×720, 60 px en reposo y 139 px agarrando; antes de la corrección quedaban 9 px de hueco;\n   - a 1366×768, 53 px agarrando.\n4. Siguen abiertos todos los menores de diseño de la primera ronda, y el registro no los recoge:\n   - dos jugadores en el mismo extremo y uno agarrado quieto no reciben aviso;\n   - la X del teclado no lanza la demo;\n   - el menú necesita desplazarse a 720p;\n   - con mando no se puede reiniciar ni ir al menú desde la pausa;\n   - Intro se salta los resultados;\n   - el README contradice la física actual;\n   - la animación de levantarse dura 0,85 s y la física 0,6 s.\n5. Arte de los ayudantes:\n   - el perro, ahora de pie, pierde la silueta de salchicha: desde arriba es un muñeco marrón;\n   - TiltFit, con el radio exacto, deja rígidos al perro y al enano en un 41–51 % de los fotogramas en que se inclinarían.\n\nEl resto de los efectos de la física sobre el producto es aceptable:\n- de lado, entre dos, 4,31 m frente a 6,07 m;\n- partida a 2 en 33,4 s, sin escapes ni caídas;\n- en el tira y afloja, el que va solo se suelta a los 1,8–1,9 s, sin caerse.\n\n**Cómo lo comprobé**\n\n- tsc limpio y Vitest 71/71 (pasado por mí).\n- Build servido en :4176, ya detenido.\n- Scripts en /home/user/Game-development-r1b/mudanza-imposible/scripts/audit/review-c1b/rol-agce/.\n- Capturas en /tmp/claude-0/review-c1b/agce/.",
+ "claims": [
+  {
+   "claim": "Crítico: brazos, mangas, manos y piernas ya no se dibujan desplazados hacia el origen (CharacterRig.local); uniones a menos de 2 cm de pie, agarrando, cayendo y levantándose, lejos del origen",
+   "verdict": "CONFIRMADO",
+   "evidence": "miembros.cjs (Chromium, 2 jugadores con el piloto). Mide en el mundo la distancia entre el tubo de cada miembro y su punto en el tronco o en la bota. 330 muestras, hasta 40,8 m del origen: hombro, cadera y tobillo 0,000 m; mano 0,053 m (desfase de diseño 0,06·0,891).\ncaida-lejos.cjs: caída forzada en la Rampa, a 37 m del origen. Uniones ≤ 0,018 m al tambalearse, caer, estar tumbado y levantarse; ningún error de página.\ncaida-node.ts: 8 caídas (4 direcciones, en (26,9; −36) y en (−35; 25)), uniones ≤ 1,78 cm, iguales en los dos sitios: ya no dependen del origen.\nCapturas: mie-2j-07-Camión.png y mie-2j-04-Escalera.png, brazos hasta el asa y piernas unidas; caida-cerca-4.png, brazos unidos en las cuatro fases."
+  },
+  {
+   "claim": "El aviso «Pesa mucho» tiene tope de 1 s y se borra al llegar ayuda (antes seguía hasta 9,68 s)",
+   "verdict": "CONFIRMADO",
+   "evidence": "aviso.ts:\n- tras 2, 5, 10 y 20 s arrastrando solo, J2 agarra y el aviso sigue 0,00 s;\n- tras 20 s solo y pararse, se va en 0,22 s;\n- si J2 vuelve a soltar, reaparece a los 0,57 s.\nQuedan huecos de diseño (ver defectos): con tirones intermitentes no sale nunca, y no avisa con dos en el mismo extremo ni con uno agarrado y quieto."
+  },
+  {
+   "claim": "Retroceso solo reinicia desde la pausa; en juego muestra un aviso",
+   "verdict": "CONFIRMADO",
+   "evidence": "retroceso.cjs, con teclas reales y en modo normal:\n- Retroceso en juego: misma partida, el tiempo sigue y sale «Para reiniciar: pausa (Esc) y Retroceso»;\n- 5 Retrocesos más: un solo aviso en pantalla (enfriamiento de 3 s);\n- Intro y Retroceso alternados 6 veces: misma partida;\n- con Esc se pausa y el tiempo se congela (0,57 → 0,57); Retroceso da partida nueva en cuenta atrás.\nLa pausa dice «Reiniciar (Retroceso)» (ret-3-pausa.png)."
+  },
+  {
+   "claim": "El esfuerzo del muñeco se ve desde la cámara de juego (rayas, bola de agarre que crece y enrojece, aro que late, sudor, inclinación 0,28)",
+   "verdict": "PARCIAL",
+   "evidence": "Se ve. esfuerzo.cjs (Chromium), J1 arrastrando solo: esfuerzo medio 0,94, rayas el 96 %, bola ×1,12–2,12, tronco 15,2° de media. En reposo, nada.\nPero no discrimina. esfuerzo-ruta.ts, partida a 2 bien jugada con los dos agarrando (3986 muestras muñeco·fotograma):\n- rayas el 82 %;\n- bola roja el 38 %;\n- esfuerzo > sweatAt (sudor) el 58 %.\nCon 4: rayas el 74 %.\nEn llano entre dos (Chromium): rayas el 36 %, bola hasta ×2,05 (J2) y tronco 7–16°.\nCaptura esf-comparativa.png: las mismas rayas sobre J1 solo que sobre J1 y J2 llevándolo bien. La prueba nueva de coherence.test.ts no comprueba el caso negativo entre dos."
+  },
+  {
+   "claim": "Los ayudantes caben en su cápsula: tronco y cabeza sobresalen ≤ 1,4 cm de pie y tumbados, 0 cm bajo el suelo; escalas mono 0,95, gordo 0,99, rulos 0,97, alien 1,00, enano 0,97, perro 1,00; el perro tumbado ya no es vertical",
+   "verdict": "PARCIAL",
+   "evidence": "ayudantes-reposo.ts (sin cerebro):\n- de pie: 0,0 cm;\n- tumbados: hasta 2,6–2,8 cm el enano y 1,2–1,3 cm la abuela de los rulos. Por debajo de 3 cm, pero no ≤ 1,4 cm;\n- escalas idénticas a las del informe;\n- piernas y botas: 3,0–5,7 cm.\nChromium (ayudantes.cjs), tumbados: cuerpo 0 cm y 0 cm bajo el suelo. Captura ayu-despistados-perro-tumbado-delante-cerca.png: el perro, horizontal sobre el suelo.\nayudantes-ruta.ts, en partida (atentos y despistados): se meten en otros como mucho 3,5 cm (> 3 cm en el 0,4 % de las muestras del enano).\nEfectos secundarios (ver defectos): rigidez por TiltFit y silueta del perro."
+  },
+  {
+   "claim": "Pendiente: con 4 humanos, el 3.º y el 4.º no aportan (33,2–33,4 / 33,3–33,5 / 33,0 s con 2/3/4 activos)",
+   "verdict": "CONFIRMADO",
+   "evidence": "cuatro-utiles.ts de la primera ronda, ejecutado de nuevo: 2 activos, 33,2–33,4 s; 3 activos, 33,3–33,5 s; 4 activos, 33,0 s. Siempre al 100 % y sin caídas. Sigue abierto."
+  },
+  {
+   "claim": "Elipse lateral de la mano: entre dos, de lado, el sofá recorre menos (4,47 frente a 6,29 m) sin romper el recorrido",
+   "verdict": "CONFIRMADO",
+   "evidence": "efectos-fisica.ts: dos agarrando, 3 s en llano.\n- a lo largo, 6,07 m; en diagonal, 5,14 m; de lado, 4,31 m;\n- el centro del sofá siempre ≥ 0,61 m, sin aviso de atasco y con tensión de la mano de 0,29–0,34.\nPartida a 2 con el piloto, semillas 1–4: 33,4 s, 0 escapes y 0 caídas. Impacto en el producto: bajo y verosímil."
+  },
+  {
+   "claim": "La correa cede en un tira y afloja: «¡Se escapa!» alcanzable (tres contra uno a los 0,55 s); dos contra dos, tablas",
+   "verdict": "CONFIRMADO",
+   "evidence": "efectos-fisica.ts, con humanos:\n- 1 contra 1: nadie se suelta;\n- 2 contra 1: gripBreak del que va solo a los 1,93 s;\n- 3 contra 1: a los 1,77 s.\nCero caídas en todos los casos. Los tiempos difieren de los 0,55 s del informe porque la colocación es distinta, pero el mecanismo funciona y no castiga con caídas."
+  },
+  {
+   "claim": "Con 6 despistados, 34–52 s al 100 %; «el piloto ahora suelta el sofá y cae cuando cinco ayudantes se lo llevan a otro lado»",
+   "verdict": "PARCIAL",
+   "evidence": "efectos-fisica.ts, 1 humano con el piloto y 5 despistados, semillas 1–8: 8 de 8 entregas, en 34–52 s.\nEl humano: 0 escapes y 0 caídas en las 8. Los ayudantes caen de 1 a 7 veces por partida.\nLa parte de que el piloto «suelta y cae» no se reproduce."
+  },
+  {
+   "claim": "tsc sin errores y Vitest 71/71",
+   "verdict": "CONFIRMADO",
+   "evidence": "`npx tsc --noEmit -p .` sin salida. `npx vitest run`: «Tests 71 passed (71)», en 24,5 s."
+  },
+  {
+   "claim": "Esfuerzo en Chromium (J1 solo): 0 en reposo, 0,84 al agarrar, 0,93–0,99 arrastrando",
+   "verdict": "CONFIRMADO",
+   "evidence": "esfuerzo.cjs: 0 en reposo; arrastrando solo, 0,12–1,0 (media 0,94; el 0,12 es el arranque al agarrar)."
+  }
+ ],
+ "defects": [
+  {
+   "severity": "major",
+   "title": "Con 4 jugadores locales, el 3.º y el 4.º siguen sin aportar nada (pendiente, sin corregir)",
+   "evidence": "`npx vite-node scripts/audit/review-c1/rol-ag-producto/cuatro-utiles.ts`, 4 humanos con el piloto: 2 activos, 33,2–33,4 s; 3 activos, 33,3–33,5 s; 4 activos, 33,0 s (semillas 1–3, siempre al 100 %). Ninguna etapa necesita más de dos personas.",
+   "suggestion": "Es el objetivo del ciclo 2: objetos de 3–4 manos o tareas paralelas (sujetar la puerta, guiar en la escalera, parar el tráfico). Medir que con 4 activos se tarde claramente menos, o que haya fallos sin el 3.º y el 4.º."
+  },
+  {
+   "severity": "major",
+   "title": "Las señales de esfuerzo nuevas están encendidas casi siempre que se carga bien entre dos: no distinguen «falta ayuda» de «vamos bien»",
+   "evidence": "`npx vite-node scripts/audit/review-c1b/rol-agce/esfuerzo-ruta.ts`, partida a 2 con el piloto con los dos agarrando: rayas el 82 %, bola roja el 38 %, sudor el 58 %. Con 4: rayas el 74 %.\nCausa en dollView.ts: effortGoal = 0,35 + 0,9·strain, y las rayas salen con esfuerzo > 0,545 (e > 0,3 con calm 0,35). La tensión normal de dos cargando es 0,29–0,34 (efectos-fisica.ts), así que la condición se cumple al cargar con normalidad.\nCaptura /tmp/claude-0/review-c1b/agce/esf-comparativa.png: J1 solo y J1 y J2 bien entre dos llevan las mismas rayas.\nLa prueba de coherence.test.ts solo cubre «solo» y «reposo».",
+   "suggestion": "Reservar rayas, rojo y sudor para cuando la mano está saturada (satH/satV) o para cuando uno solo carga algo pesado (la misma condición que heavyAlone). Entre dos, que se vea relajado (esfuerzo < 0,5). Añadir a la prueba el caso negativo: dos llevándolo en llano, rayas < 10 % de los fotogramas."
+  },
+  {
+   "severity": "minor",
+   "title": "Regresión: con 4 jugadores, la ayuda de abajo a la derecha tapa la pastilla de J4 a 1280×720 y a 1366×768",
+   "evidence": "`node scripts/audit/review-c1b/rol-agce/hint-ancho.cjs`: el borde izquierdo de #h-hint pasa de 927 a 858 px con el texto nuevo («en la pausa, Retroceso reinicia»). El hueco con J4 en reposo pasa de 9 px a −60 px.\nhud4.cjs, solape con J4:\n- 1280×720: 60 px en reposo y 139 px agarrando;\n- 1366×768: 53 px agarrando;\n- 1920×1080: sin solape.\nCaptura hud4-1280-agarrando.png: «agarrar Num 0 · enderezar +» de J4 queda bajo la ayuda.",
+   "suggestion": "Con 3–4 jugadores, poner las pastillas en dos filas, acortar la ayuda (solo «Esc pausa · M sonido» y dejar Retroceso en la propia pausa) u ocultarla tras los primeros segundos."
+  },
+  {
+   "severity": "minor",
+   "title": "El perro salchicha, ahora de pie, pierde su silueta: desde la cámara de juego es un muñeco marrón",
+   "evidence": "Capturas ayu-despistados-fila-juego.png, ayu-fila-zoom.png y ayu-despistados-5-cerca.png: una cápsula marrón vertical con orejas y patas como brazos. No se reconoce una salchicha. El README (línea 569) sigue diciendo «salchicha de cuatro patas».",
+   "suggestion": "Para el ciclo 4 de personajes: buscar una silueta de perro que quepa en la cápsula (por ejemplo, sentado sobre las patas traseras, con hocico largo y orejas caídas grandes) y corregir el README."
+  },
+  {
+   "severity": "minor",
+   "title": "Regresión de animación: TiltFit deja rígidos al perro y al enano en la mitad de los fotogramas en que se inclinarían",
+   "evidence": "`npx vite-node scripts/audit/review-c1b/rol-agce/ayudantes-ruta.ts`. Con la inclinación pedida > 0,1 rad:\n- perro: se dibuja de media el 0,46–0,55 y se recorta por debajo del 30 % en el 41–51 % de los fotogramas;\n- enano: 0,47–0,74 de media y recortado en el 24–51 %.\nOtros: 4–35 %. Antes se inclinaban de 0,5 a 0,7 rad sin mirar.\nCausa: tiltFit.ts prueba con el radio exacto (CARRIER.radius, sin fitTol) y con la parte de arriba del muñeco, no la del ayudante. En contacto en reposo (asa ocupada, vecinos), no cabe ninguna inclinación. Es el menor de la primera ronda («fitTilt cancela toda la inclinación»), ahora extendido a los ayudantes.",
+   "suggestion": "Probar con radio − fitTol, o medir solo el aumento de penetración respecto a la pose erguida. Usar para cada ayudante su altura real (top·fit) en vez de la del muñeco."
+  },
+  {
+   "severity": "minor",
+   "title": "El aviso «Pesa mucho» no sale si se tira a tirones, ni con dos en el mismo extremo, ni con uno agarrado y quieto",
+   "evidence": "`npx vite-node scripts/audit/review-c1b/rol-agce/aviso.ts`:\n- D) tirones de 0,5 s con pausas de 0,4 s durante 10 s: aviso 0,00 s y 0 cambios;\n- E) dos en el mismo extremo: el sofá se arrastra 2,88 m en 3 s y el aviso sale 0,00 s;\n- F) J1 agarra y se queda quieto 3 s: 0,00 s, y el HUD no da otra indicación a los demás.\nE y F son menores de la primera ronda que siguen abiertos.",
+   "suggestion": "Decidir el aviso por el estado del objeto (un extremo a rastras con alguien agarrando) y no por el número de manos ni por el movimiento continuo. Mientras haya un objeto pesado agarrado por un solo extremo, decir a los libres «J2: agarra el otro extremo (INTRO)»."
+  },
+  {
+   "severity": "minor",
+   "title": "Con mando no se puede reiniciar ni ir al menú (y Retroceso ahora solo funciona desde la pausa)",
+   "evidence": "main.ts, padAction en la rama 'play': Start pausa; A o B solo reanudan. Los botones «Reiniciar (Retroceso)» y «Menú» de la pausa solo responden a teclado o ratón (ret-3-pausa.png). Un grupo de 4 con mandos no puede reiniciar sin teclado ni ratón.",
+   "suggestion": "Mover el foco con la cruceta en la pausa, como en el menú, o asignar X = reiniciar y Back = menú, y decirlo en las etiquetas."
+  },
+  {
+   "severity": "minor",
+   "title": "Siguen abiertos los menores de menú, resultados y README de la primera ronda (no están en el registro de abiertos)",
+   "evidence": "- menu.cjs: «Ver demo automática (X)», y la X del teclado deja la pantalla en 'menu'. A 1280×720 la tarjeta tiene 841 px de contenido y se ven 688; la línea de Retroceso queda bajo el pliegue (menu-720.png).\n- inputCore.ts, globalKeyAction: en 'results', Enter o KeyR → 'again' sin la espera de 800 ms que sí tienen los mandos.\n- README.md:39-48 y 709-719 aún hablan de `isCoop`, 200 N `CARRIER.pullForce`, «física original con ayudantes» y del aviso «¡Uno solo apenas puede con él!»; 336 dice «zona amarilla»; 436 dice «29 de 29».",
+   "suggestion": "Tratar KeyX en el menú, compactar la tarjeta, aplicar resultsShownAt a las teclas y reescribir esas secciones del README con la física única. Añadirlos a la lista de menores abiertos de QUALITY_STATE."
+  },
+  {
+   "severity": "minor",
+   "title": "La etiqueta J# salta 0,4 m cada vez que aparecen o desaparecen las rayas de esfuerzo",
+   "evidence": "dollView.ts: `this.label.position.set(head.x, top + (this.marks.visible ? 0.8 : 0.4), head.z)`. esfuerzo-ruta.ts: 18 cambios en 33 s con 2 jugadores y 33 con 4 (0,25–0,27 por muñeco y segundo).",
+   "suggestion": "Suavizar la altura de la etiqueta (damp), o poner las rayas a un lado de la cabeza para que la etiqueta no tenga que moverse."
+  },
+  {
+   "severity": "minor",
+   "title": "Al levantarse, la animación sigue durando 0,85 s y la física 0,6 s (menor de la primera ronda, sin tocar)",
+   "evidence": "dollRig.ts:401: `rec = ... Math.min(1, this.stateT / 0.85)`. carrier.ts:124: `riseTime: 0.6`.",
+   "suggestion": "Usar CARRIER.riseTime en lugar de la constante 0,85."
+  }
+ ],
+ "strengths": [
+  "Crítico cerrado y comprobado: uniones de 0,000 a 0,018 m, medidas en el mundo, en todo el recorrido (hasta 40,8 m del origen) y en caídas lejos del origen, en el navegador y en Node. Las capturas del camión y de la caída muestran brazos y piernas unidos.",
+  "El aviso «Pesa mucho» desaparece al instante al llegar ayuda (0,00 s, frente a 9,68 s antes) y se va en 0,22 s al dejar de arrastrar.",
+  "Retroceso ya no tira la partida: en juego da un único recordatorio, la pausa congela el tiempo y Retroceso reinicia desde ella. La lógica está en globalKeyAction, sin DOM y con prueba.",
+  "Ayudantes coherentes: dentro de su cápsula en reposo (≤ 2,8 cm), sin meterse bajo el suelo, el perro tumbado en horizontal y, en partidas reales, no se meten en el sofá ni en los demás más de 3,5 cm.",
+  "La física nueva no estropea el producto: la partida a 2 sigue en 33,4 s sin escapes ni caídas. «¡Se escapa!» por fin aparece en un 2 contra 1 y un 3 contra 1, sin derribar a nadie. Con 6 despistados, 8 de 8 entregas.",
+  "La inclinación del muñeco al tirar se dibuja entera en casi todo el recorrido (mediana 1,0; solo en la escalera se recorta en el 7 % de los fotogramas)."
+ ]
+}

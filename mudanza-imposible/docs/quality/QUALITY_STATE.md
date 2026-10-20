@@ -205,3 +205,28 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
     3. revisión independiente con 3 revisores;
     4. corrección.
   - Si el contenedor se reinicia, se reanuda con `resumeFromRunId`.
+  - **Segunda ronda de revisión del ciclo 1** (sobre `5505243`, que tiene el mismo código que `f8efb59`; los scripts están en `scripts/audit/review-c1b/`). **Sin críticos**, así que el flujo siguió con la implementación.
+    - **Física y QA (roles B y F), [`reviews/ciclo-1/segunda-ronda-fisica-qa.json`](reviews/ciclo-1/segunda-ronda-fisica-qa.json): 6,5/10** (antes, 5 y 6,5).
+      - De las afirmaciones de la corrección: 15 confirmadas, 4 parciales y 1 refutada.
+      - Confirma que el crítico está cerrado (con la mutación, 5,27 m); que las pruebas nuevas detectan 14 de 18 mutaciones; Vitest 71/71 en 5 ejecuciones, 3 barajadas; física idéntica bit a bit entre humanos y ayudantes; recorridos con 2, 3 y 4 humanos 48/48.
+      - **Mayores:**
+        1. **Regresión de la corrección.** La elipse lateral, sumada a la correa que cede, pierde 7 de 512 partidas con despistados o mixtas; el árbol anterior no perdía ninguna. En el lote mixto se pasa de 112/112 a 110/112, y aparecen partidas de 58 y 77 s. Se refuta el «siempre al 100 %» del informe.
+        2. **`e2e:duo` inestable:** 20/21 en 1 de 2 ejecuciones («J2 se tambalea y cae» depende del giro del sofá).
+        3. **T-grip-2 se burla** agarrando por el respaldo: uno solo, 3,12 m en 3 s. Es anterior a la corrección; la prueba solo mira el extremo.
+        4. **Tira y afloja a medias:** en 2 contra 1 el que pierde es arrastrado 1 m sin «¡Se escapa!», y la prueba positiva se suelta por la regla «de golpe», no por la de tiempo.
+    - **Diseño, producto, arte y animación (roles A, G, C y E), [`reviews/ciclo-1/segunda-ronda-diseno-arte.json`](reviews/ciclo-1/segunda-ronda-diseno-arte.json): 6,5/10** (antes, 4 y 3).
+      - De las afirmaciones: 8 confirmadas y 3 parciales.
+      - Confirma, midiendo en el mundo hasta 40,8 m del origen, que el crítico está cerrado; que Retroceso y el aviso «Pesa mucho» están corregidos; y que los ayudantes caben (≤ 2,8 cm).
+      - **Mayores:**
+        1. el 3.º y el 4.º jugador siguen sin aportar (objetivo del ciclo 2);
+        2. las señales de esfuerzo están saturadas: con dos cargando bien, rayas el 82 % del tiempo, así que no distinguen «falta ayuda» de «vamos bien».
+      - **Menores:**
+        - regresión: la ayuda tapa la pastilla de J4 (60–139 px a 1280×720);
+        - el perro pierde su silueta;
+        - TiltFit deja rígidos al perro y al enano;
+        - el aviso «Pesa mucho» no sale a tirones, con dos en el mismo extremo ni con uno quieto;
+        - con mando no se puede reiniciar;
+        - siguen abiertos los menores de menú, resultados y README;
+        - la etiqueta J# salta;
+        - levantarse dura 0,85 s en el dibujo y 0,6 s en la física.
+    - **Esta ronda no es satisfactoria (6,5 < 8,5).** Los 6 mayores pasan al agente de corrección del ciclo 2, junto con los de su propia revisión.

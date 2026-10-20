@@ -1,0 +1,160 @@
+{
+ "score": 6.5,
+ "justification": "Mido el estado actual (5505243; src y tests idénticos a f8efb59) frente al árbol anterior a la corrección (e0a1711), con mis propios scripts. Están en /home/user/Game-development-r1b/mudanza-imposible/scripts/audit/review-c1b/fisica-qa/ y los registros, en /tmp/claude-0/review-c1b/fq/.\n\n**Lo que la corrección arregla de verdad:**\n- El crítico de las extremidades está cerrado: piernas a 0,04–0,05 m del cuerpo en cuatro posiciones, también a 43 m del origen. La prueba nueva detecta que vuelva el fallo (mutación RIG: 5,27 m).\n- 14 de 18 mutaciones son detectadas por las pruebas nuevas: M4, M8 ×3 y ×1,3, M13a/b, M14 a 15 cm, a 2 cm y tumbado, sin elipse y con elipse 0,6 y 0,75, sin correa que ceda, correa que cede siempre, aviso sin tope.\n- tsc limpio. Vitest 71/71 en 5 ejecuciones, 3 de ellas barajadas. Ningún umbral rebajado.\n- La física sigue idéntica bit a bit entre humanos y ayudantes.\n- help-batch 40/40; `sim-run` con despistados 8/8; recorridos con 2, 3 y 4 humanos 48/48.\n- Contactos en Chromium: cuerpo dibujado ≤ 3,7 cm y cápsula ≤ 4,4 cm en fotogramas sueltos.\n\n**Por qué no llega a 8,5:**\n1. **Regresión de robustez no detectada.** La combinación de la elipse lateral y la correa que cede pierde 7 de 512 partidas con despistados o mixtas (semillas 1–48); el árbol anterior pierde 0. En el conjunto mixto de la primera revisión de QA se pasa de 112/112 a 110/112. Con ayudantes atentos aparecen partidas de 58 y 77 s, frente a 37 y 33 s antes. Si se quita cualquiera de los dos cambios, esas semillas vuelven a ganar.\n2. **`e2e:duo` inestable por la elipse.** Falló 1 de 2 ejecuciones (20/21, «J2 se tambalea y cae»). Lo reproduzco en Node: con el sofá girado 1,0–1,4 rad, J2 ya no cae y antes sí.\n3. **T-grip-2 se burla agarrando por otro punto.** Agarrando el respaldo por el centro, uno solo arrastra el sofá 3,12 m en 3 s (11,4 m en 10 s). Es anterior a la corrección, pero la prueba solo mira el extremo y el informe afirma «en cualquier dirección».\n4. **El tira y afloja de 2 contra 1 sigue sin «¡Se escapa!».** El que pierde es arrastrado 1,0 m en 4 s contra su mando. Y en la prueba de 3 contra 1 la mano se suelta por la regla «de golpe» (más de 2·gripBreak), no por la de tiempo: quitar la regla de gripHold no rompe ninguna prueba.\n\nAdemás hay huecos de prueba menores (H2, M8c) y scripts de navegador frágiles bajo carga.",
+ "claims": [
+  {
+   "claim": "Crítico cerrado: caderas, hombros, tobillos y manos en el espacio del grupo (CharacterRig.local). Piernas a 0,03–0,05 m del cuerpo. La prueba nueva, a 43 m del origen, falla con el código anterior (5,27 m)",
+   "verdict": "CONFIRMADO",
+   "evidence": "`scripts/audit/review-c1/fisica/piernas-escala.ts`: piernas a 0,05 m en (0,0), (0,10) y (−35,25), y a 0,04 m en (26,92,−36); antes, 1,12–4,89 m. `caida-escala.ts`: botas y manos junto a la cápsula tumbada. Mutación RIG-doble-escala (`local()` sin `applyMatrix4(groupInv)`): «de pie: miembros separados del cuerpo: expected 5.27 to be less than 0.02». La captura /tmp/claude-0/review-c1b/contacto/3-llevan-girando-cerca.png muestra los miembros unidos al cuerpo."
+  },
+  {
+   "claim": "T-coh-1 comprueba que los pies del muñeco están en el extremo del eje de su cápsula (< 1 cm), de pie y tumbado. La mutación M14 (15 cm) falla",
+   "verdict": "CONFIRMADO",
+   "evidence": "mutar.py, tres variantes: M14 a 15 cm, 2 de 10 pruebas fallan («expected 0.15 to be less than 0.01»); M14b a 2 cm, 2 fallan («expected 0.020»); M14c, 15 cm solo tumbado, 3 fallan."
+  },
+  {
+   "claim": "Elipse lateral (HAND.lateral 0,45): uno solo mueve el sofá como máximo 1,26 m en 3 s en cualquier dirección. Sin la elipse, la prueba falla a 75° (1,52 m)",
+   "verdict": "PARCIAL",
+   "evidence": "Agarrando el extremo, se cumple:\n- `grip-dirs.ts` (2 sitios × 3 giros): 0,73–1,22 m;\n- mi barrido de 24 direcciones × 2 giros: 0,73–1,26 m;\n- E1 (lateral = 1) falla: «75°: expected 1.5177 to be less than 1.5».\n\nAgarrando por otros puntos, no: `barrido-agarres.ts` da 82 de 240 combinaciones fuera de 0,3–1,5 m. Respaldo por el centro, andando hacia atrás: 3,12 m en 3 s. Esquina: 2,12 m. Cuarto del costado: 2,04 m.\n\nAdemás, con el extremo y a 90°, el extremo agarrado recorre 2,41 m en 3 s (`grip-measure.ts`)."
+  },
+  {
+   "claim": "La correa cede en un tira y afloja: tres contra uno, «¡Se escapa!» a los 0,55 s; el que va solo avanza +2,29 m y solo le arrastran 9 cm. Dos contra dos, nadie es arrastrado más de 9 cm",
+   "verdict": "PARCIAL",
+   "evidence": "Lo que se cumple:\n- `oposicion.ts`: «3 contra 1: +2.29 m, separación máx 1.078, gripBreak 1»;\n- `tira-afloja.ts`: se suelta a los 0,53 s, arrastrado −0,09 m;\n- la prueba de 2 contra 2 pasa.\n\nLo que no: en 2 contra 1 «no se suelta en 4 s… arrastrado −1.00 m» (antes, −2,08). El sofá va a 0,23 m/s, por debajo de tugAway (0,4), así que la correa no cede y le sigue arrastrando contra lo que pide."
+  },
+  {
+   "claim": "«¡Se escapa!» ya tiene prueba positiva: exige gripBreak en menos de 2 s con separación mayor que gripBreak. Con la condición de soltar anulada (M4) falla",
+   "verdict": "PARCIAL",
+   "evidence": "M4 (`if (false)`) sí falla: «expected −1 to be greater than 0».\n\nPero en esa prueba la mano se suelta por la regla «de golpe»: separación 1,14 m, mayor que 2·gripBreak (1,10). Solo pasa 0,17 s por encima de gripBreak, menos que gripHold (0,3 s). Por eso M4b, que quita solo la regla de gripHold (la de «durante un tiempo» de T-grip-1), pasa 41/41 en sim.test.ts."
+  },
+  {
+   "claim": "T-phys-unify con un ayudante de verdad: arrastra solo el sofá 0,64 m frente a 0,72 del humano, con fuerza ≤ HAND.maxH. Con ayudantes de triple fuerza (M8) falla con 3,94",
+   "verdict": "CONFIRMADO",
+   "evidence": "`ayudante-fuerza.ts`: a lo largo, humano 0,72 m y 242 N, ayudante 0,64 m y 292 N. De lado: 1,09 frente a 1,03 m.\n\nMutaciones: M8 «expected 3.9379 to be less than 0.25»; M8b, con ×1,3, también falla (0,678).\n\nHueco: M8c, ayudantes sin elipse, pasa 41/41 (la prueba solo tira a lo largo).\n\n`unificacion.ts`: diferencia 0,00e+0 m entre 2 humanos y 1 humano + 1 ayudante."
+  },
+  {
+   "claim": "El aviso «Pesa mucho» dura 1 s como máximo y se borra al llegar ayuda",
+   "verdict": "CONFIRMADO",
+   "evidence": "`hint-linger.ts`: tras 2, 5, 10 y 20 s en solitario, el aviso sigue 0,00 s. H1 (sin tope) falla: «expected 1.2 to be less than 0.3».\n\nHueco: H2, que quita el borrado al llegar ayuda, pasa 41/41. El tope y la caída ya lo bajan en 0,2 s, por debajo del margen de 0,3 s de la prueba."
+  },
+  {
+   "claim": "`stepFrame` compartido por main.ts y las pruebas. Las dos variantes de M13 hacen fallar la suite",
+   "verdict": "CONFIRMADO",
+   "evidence": "M13a (`stepFrame` lee una vez por fotograma): fallan 4 de 20 pruebas de input.test.ts, entre ellas las de 144 Hz. M13b (main.ts lee antes de los pasos): falla la comprobación de fuente."
+  },
+  {
+   "claim": "duo-e2e ya no usa el campo privado waitRoom como oráculo: mide con consultas de forma",
+   "verdict": "CONFIRMADO",
+   "evidence": "duo-e2e.cjs, líneas 46–78: `roomToStand` con `intersectionsWithShape`, usando campos públicos (`tilt`, `fallDir`, `down`). El límite es `base + min(up.w, 4) + 0,05`. Queda `g.touchesWall`, del propio juego, en la comprobación de la pared (menor de la primera ronda, sin corregir)."
+  },
+  {
+   "claim": "Retroceso solo reinicia desde la pausa",
+   "verdict": "CONFIRMADO",
+   "evidence": "En Chromium, `e2e:duo` (2 ejecuciones): «Retroceso en juego no reinicia la partida t 23.95 → 24.28» y «en la pausa, Retroceso reinicia» OK. `e2e:teclado` igual. Hay prueba de `globalKeyAction` en input.test.ts."
+  },
+  {
+   "claim": "tsc sin errores; Vitest 71/71",
+   "verdict": "CONFIRMADO",
+   "evidence": "`npx tsc --noEmit -p .`: salida vacía. Vitest 71/71 en 5 ejecuciones: 2 normales y 3 con `--sequence.shuffle` (semillas 11, 4242 y 99)."
+  },
+  {
+   "claim": "`e2e:duo` 21/21",
+   "verdict": "PARCIAL",
+   "evidence": "Ejecución 1: 20/21, con «FALLA soltar mientras tira: J2 se tambalea y cae tambaleo true, caída false» tras girar el sofá 1,40 rad. Ejecución 2: 21/21. Ver el defecto de inestabilidad."
+  },
+  {
+   "claim": "`e2e:teclado` OK",
+   "verdict": "CONFIRMADO",
+   "evidence": "«TODO OK» en una ejecución en solitario. Otra, con la máquina cargada, se cortó por el tiempo de espera de 15 s del script en la cuenta atrás (keyboard-e2e.cjs:35), un fallo del entorno."
+  },
+  {
+   "claim": "Ningún umbral rebajado",
+   "verdict": "CONFIRMADO",
+   "evidence": "`git show f8efb59 -- tests scripts`: solo hay pruebas añadidas. Los dos `ok`/`check` sustituidos son de la mecánica de Retroceso, que cambia. `git diff 837dca7..HEAD`: sim-run.ts y perf.ts sin cambios. Los `expect` quitados (isCoop, needsLiftAtStairs) prueban mecánicas eliminadas."
+  },
+  {
+   "claim": "Entre dos, 6,89 m en 3 s. Escalera entre dos en 3,73 s; uno solo no la sube en 20 s",
+   "verdict": "CONFIRMADO",
+   "evidence": "`grip-measure.ts`: «6.89 m (6.16 veces)», «arriba en 3.73 s», y uno solo, delante o detrás, «no sube en 20 s». `escalera-solo.ts`: ninguno de 8 puntos de agarre la sube solo en 20 s."
+  },
+  {
+   "claim": "T-coop: con 3 humanos, giro mínimo 1,85 rad y sofaUp ≥ 0,90; con 4, 2,72 rad y ≥ 0,94. Caja de 90 kg entre dos al 74 %",
+   "verdict": "CONFIRMADO",
+   "evidence": "`grip-measure.ts`: «3 humanos… sofaUp ≥0.90; caídas 0; sueltan 0… giro mínimo 1.85 rad», «4 humanos… ≥0.94… 2.72 rad» y «Caja de 90 kg, 2 persona(s)… 74 %»."
+  },
+  {
+   "claim": "help-batch 40/40",
+   "verdict": "CONFIRMADO",
+   "evidence": "`scripts/help-batch.ts`: TOTAL 40/40. Con 6 despistados, 34–52 s."
+  },
+  {
+   "claim": "Riesgo declarado: los despistados son algo más lentos, «siempre al 100 %»",
+   "verdict": "REFUTADO",
+   "evidence": "Con `batch.ts` (16 semillas, 20 configuraciones), el árbol actual gana 317/320 y el anterior (e0a1711), 320/320. Con `lote.ts` (semillas 17–48, configuraciones con despistados), 188/192 frente a 192/192. Perdidas por tiempo: s10 1h+3b, s12 3h+3b, s5 4h+2b, s26 1h+4b, s39 y s41 3h+3b, s36 4h+2b."
+  },
+  {
+   "claim": "El 3.º y el 4.º humanos no aportan: 33,2–33,4 s, 33,3–33,5 s y 33,0 s con 2, 3 y 4 activos",
+   "verdict": "CONFIRMADO",
+   "evidence": "`batch.ts` con 16 semillas: medias de 33,4, 33,1 y 33,0 s con 2, 3 y 4 humanos."
+  },
+  {
+   "claim": "sofa-contact-check: cuerpo dibujado ≤ 3,7 cm en fotogramas sueltos; la cápsula, hasta 4,4 cm al caer",
+   "verdict": "CONFIRMADO",
+   "evidence": "En Chromium: «1-empuja-lateral» con cápsula 3,7 y cuerpo 3,7 cm (2 % de fotogramas); «7-cae-contra-sofa» con cápsula 4,4 y cuerpo 3,3 cm (1 %). En la ruta, cápsula ≤ 0,8 cm y cuerpo 0,0 cm. Errores: 0."
+  }
+ ],
+ "defects": [
+  {
+   "severity": "major",
+   "title": "Regresión introducida por la corrección: la elipse lateral junto con la correa que cede hace que partidas con ayudantes no se terminen y otras tarden mucho más",
+   "evidence": "Mismas configuraciones y semillas en el árbol actual y en el anterior (e0a1711):\n- `npx vite-node scripts/audit/review-c1b/fisica-qa/batch.ts all 16`: 317/320 frente a 320/320. En el conjunto mixto de la primera revisión de QA (7 configuraciones), 110/112 frente a 112/112.\n- `lote.ts 17 48` con despistados: 188/192 frente a 192/192.\n- Perdidas por tiempo: 1h+3b s10 (@Arriba, 20 caídas), 3h+3b s12 (@Rampa, integridad 77), 4h+2b s5 (@Arriba, 40 caídas), y s26, s39, s41 y s36.\n\nAtribución: en copias con HEAD y `lateral: 1` (E1), o sin la cesión de la correa (L1), las tres semillas de 1–16 ganan (E1: 33,4, 35,8 y 31,3 s; L1: 56,4, 41,1 y 50,6 s).\n\nMecanismo (`replay-fallo.ts 1 4 despistados 10`):\n- 48,58 «gripBreak A3» en la escalera;\n- 50,65 «gripBreak J1»;\n- el sofá vuelve de z = −26,9 a −20 y la integridad baja de 100 a 86;\n- antes, la misma partida se ganaba a los 33,4 s.\nEn 4h+2b s5, el sofá queda atascado 140 s en (9,5; 3,1; −31,8).\n\nTambién con ayudantes atentos (`TIEMPOS=1 lote.ts 1 16`): 1h+4b en las semillas 8, 9 y 16 tarda 58, 53 y 46 s (antes 37, 39 y 34); 4h+2b en la semilla 5, 77 s (antes 33). Con despistados hay el doble de «¡Se escapa!» y caídas por partida (3h+3b: 4,50 y 4,91 frente a 2,19 y 2,53).\n\nhelp-batch no lo ve: solo usa las semillas 1–8 y, con ayudantes atentos, como mucho 3.",
+   "suggestion": "Que la correa ceda solo en un tira y afloja real: otro porteador tira en sentido contrario, la mano está saturada durante gripHold y crece la separación. Hoy basta con que el objeto se aleje, cosa que también pasa cuando el sofá resbala escalera abajo. Revisar la elipse para quien agarra por el costado y lleva el sofá a lo largo (los ayudantes de los costados pierden el 55 % de su fuerza en el caso más común). Añadir una prueba de lote que falle: 1–4 humanos y 2–6 porteadores, atentos y despistados, semillas 1–32, ≥ 99 % de victorias y p95 del tiempo ≤ 45 s."
+  },
+  {
+   "severity": "major",
+   "title": "`e2e:duo` inestable por la elipse: «soltar mientras tira: J2 se tambalea y cae» falla según el giro con que quede el sofá",
+   "evidence": "En Chromium (vite preview en :4175), la ejecución 1 dio 20/21: «FALLA soltar mientras tira: J2 se tambalea y cae tambaleo true, caída false», tras «girar el sofá 1.40 rad». La ejecución 2 dio 21/21. El informe dice 21/21.\n\nReproducción en Node (`soltar-tirando.ts`):\n- con el sofá girado 1,4 rad y 1,2 s tirando, el árbol actual da «T-» (se tambalea y no cae); el anterior y E1 (sin elipse) dan «TC»;\n- con 1,0 rad y 0,6–0,9 s, el actual da «T-» y el anterior «TC»;\n- L1 (elipse sin la cesión de la correa) se comporta como el actual.\n\nAl tirar de lado respecto a donde mira, la elipse baja la tensión, y la comprobación queda justo en el límite.",
+   "suggestion": "Que el paso 4d tire a lo largo del eje del sofá (`handDir` de cada uno) y no por x del mundo, o fijar el giro antes de tirar. Ejecutar `e2e:duo` varias veces seguidas antes de dar el ciclo por cerrado. Decidir y documentar si soltar tirando de lado debe tumbar."
+  },
+  {
+   "severity": "major",
+   "title": "T-grip-2 solo se cumple agarrando por el extremo: por el respaldo o una esquina, uno solo arrastra el sofá a más de 1 m/s (anterior a la corrección; la prueba y el informe dan una cobertura engañosa)",
+   "evidence": "`barrido-agarres.ts` (5 puntos de agarre × 24 direcciones × 2 giros): «82/240 fuera de 0,3–1,5 m; peor centro 3.12 m (centro respaldo −z, dirección 270°)».\n\n`detalle-agarres.ts`, con agarre en (0,00; 0,66; −0,45):\n- 3,12 m en 3 s, sofaUp ≥ 0,95, fuerza de la mano 156 N (sin saturar), integridad 100;\n- en 6 s, 6,65 m;\n- antes de la corrección, igual (3,13 m).\n\n`escalera-solo.ts`, en llano y agarrando el respaldo: 11,43 m en 10 s, con el aviso «Pesa mucho» en pantalla.\n\nOtros puntos: esquina, 2,12 m; cuarto del costado, 2,04 m.\n\nCausa: con maxV = 600 N, quien agarra cerca del centro de masas sostiene el 68 % de los 883 N del sofá y apenas queda roce. La prueba (sim.test.ts, `soloToward`) solo agarra el extremo −x. En la escalera, ningún punto la sube solo en 20 s.",
+   "suggestion": "Limitar lo que alza una mano según el par respecto al centro de masas: una persona no levanta un sofá de 90 kg por el centro. Otra opción es repartir maxV según la palanca. Ampliar la prueba T-grip-2 a esquinas, respaldo y asiento, y medir también el extremo agarrado (a 90° recorre 2,41 m en 3 s)."
+  },
+  {
+   "severity": "major",
+   "title": "Tira y afloja a medio arreglar: en 2 contra 1 el que pierde sigue arrastrado contra su mando sin «¡Se escapa!», y la prueba positiva no ejercita la regla de tiempo de T-grip-1",
+   "evidence": "`tira-afloja.ts`: «2 contra 1: no se suelta en 4 s, separación máx 0.26… arrastrado −1.00 m» (antes, −2,08). El sofá se mueve a 0,23 m/s, por debajo de tugAway (0,4), así que la correa no cede.\n\nEn el 3 contra 1 de la prueba: «se suelta a los 0.53 s, separación antes 1.14… tiempo separado > gripBreak 0.17 s, regla: de golpe (> 2·gripBreak)». Mutación M4b, que quita solo `this.gripStrain > CARRIER.gripHold`: sim.test.ts 41/41.\n\nEn 1 contra 1, el que tira en diagonal a 45° es arrastrado 1,80 m en 4 s: el umbral tugBack de 0,7 lo excluye por poco.",
+   "suggestion": "Que la correa ceda cuando la mano lleva gripHold saturada y otro tira en contra, sea cual sea la velocidad del objeto, como sugería la primera revisión. Añadir una prueba de 2 contra 1 que exija «¡Se escapa!» o, al menos, que el que pierde no recule más de 0,3 m, y otra en la que la separación pase de gripBreak sin llegar a 2·gripBreak durante más de gripHold (para que falle M4b)."
+  },
+  {
+   "severity": "minor",
+   "title": "Mutaciones que las pruebas nuevas no detectan",
+   "evidence": "`python3 scripts/audit/review-c1b/fisica-qa/mutar.py` (sim.test.ts, 41/41 en las tres):\n- H2 (sin `if (helped && !solo) { this.soloDrag = 0 … }`): el aviso no se borra al llegar ayuda, y la prueba no lo ve porque el tope y la caída a 2/s lo bajan en 0,2 s, por debajo de su margen de 0,3 s;\n- M8c (ayudantes sin elipse): T-phys-unify solo tira a lo largo;\n- M4b (sin la regla de gripHold): ver el defecto anterior.\n\nE2 (lateral 0,6) solo falla por 2 cm («135°: expected 1.5199 to be less than 1.5»).",
+   "suggestion": "En la prueba del aviso, medir que se va en ≤ 1 paso al agarrar el compañero. En T-phys-unify, hacer arrastrar también de lado y en diagonal (con mi script, 1,09 frente a 1,03 m). Añadir la prueba de gripHold."
+  },
+  {
+   "severity": "minor",
+   "title": "Los scripts de navegador dependen de tiempos de reloj y fallan con la máquina cargada",
+   "evidence": "`keyboard-e2e.cjs:35`: «page.waitForFunction: Timeout 15000ms exceeded» en la cuenta atrás, con otro Chromium en marcha; en solitario, «TODO OK». `sofa-contact-check.cjs:29`: «page.screenshot: Timeout 30000ms exceeded» y se cae el script entero; en solitario, termina con errores 0.",
+   "suggestion": "Esperar en tiempo de juego (`window.__mudanza.game.time`) con márgenes generosos, y capturar con try/catch para no perder las mediciones."
+  },
+  {
+   "severity": "minor",
+   "title": "Siguen abiertos solapes del dibujo y físicos (no se declaran corregidos)",
+   "evidence": "`scripts/audit/review-c1/fisica/dibujo.ts`:\n- «J1 a la carrera contra el costado del sofá: … botas 0.195 (19 fot. > 3 cm)» y «piernas 0.139»;\n- «J2 y J3 llevan el sofá contra J1, que está quieto: … brazos 0.108 (67 fot. > 3 cm)».\n\nsofa-contact-check: cápsula a 4,4 cm al caer contra el sofá.",
+   "suggestion": "Incluir botas y brazos en T-coh-1 con su propia tolerancia, y rechazar apoyos del pie dentro de colliders."
+  }
+ ],
+ "strengths": [
+  "El crítico de las extremidades está cerrado: piernas a 0,04–0,05 m del cuerpo en cuatro posiciones, también a 43 m del origen. La prueba de coherence.test.ts detecta que vuelva el fallo (5,27 m).",
+  "Las pruebas nuevas detectan las regresiones de la primera ronda: M4, M8 (×3 y ×1,3), M13a/b, M14 (15 cm, 2 cm y tumbado), elipse quitada o debilitada (lateral 1, 0,6 y 0,75), correa que no cede o que cede siempre, y aviso sin tope.",
+  "`duo-e2e` ya no usa el campo privado `waitRoom`: mide por su cuenta, con consultas de forma, si cabía de pie.",
+  "El bucle de main.ts usa `stepFrame`, la misma función que las pruebas, y una comprobación de fuente impide volver a leer las entradas fuera del paso.",
+  "La física sigue siendo única: la diferencia entre humanos y ayudantes es de 0,00e+0 m, y hand.ts y carrier.ts no distinguen entre ellos.",
+  "Estable y sin NaN en 832 partidas. El coste por paso se mantiene: `npm run perf` da 0,31–0,39 ms y la media por paso no empeora frente al árbol anterior.",
+  "La regla de no rebajar umbrales se cumple: solo hay pruebas añadidas y sustituciones justificadas por cambios de mecánica.",
+  "Los objetivos medibles agarrando por el extremo se cumplen: uno solo 0,73–1,26 m en 3 s en 24 direcciones; dos 6,89 m; escalera entre dos en 3,73 s; T-coop 3 y 4 sin caídas; T-route con 2, 3 y 4 humanos 48/48."
+ ]
+}
