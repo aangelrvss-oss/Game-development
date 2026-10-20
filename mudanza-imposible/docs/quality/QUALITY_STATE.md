@@ -336,3 +336,32 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
       2. si un frágil obligatorio roto hace perder (C2-01);
       3. si arrastrar con menos gente es válido (C2-07).
     - **Estado:** no se ha cambiado ninguna mecánica ni código del juego. `/loop` está detenido y no hay despertares programados.
+
+- **Ciclo 2b** (autorizado el 20-10-2026; rama `rebirth/ciclo-2b`, creada desde `2250cfe`, worktree `Game-development-2b`): ver la sección 7 de [`reviews/2026-10-20-revision-ciclo-2.md`](reviews/2026-10-20-revision-ciclo-2.md).
+  - Decisiones de diseño aprobadas por el usuario:
+    - **D1:** entregado = dentro de la zona válida y estable un intervalo breve, aunque siga agarrado; indicador visual de «dentro» y de «registrado»; sin dobles cuentas.
+    - **D2:** romper un obligatorio no hace perder; penalización mínima en la valoración; la rotura debe ser visible.
+    - **D3:** transportar con menos gente es posible, pero con una desventaja clara (velocidad, estabilidad y control); sin escalón artificial en el camión.
+  - **PAUSA TEMPORAL** a petición del usuario: 20-10-2026, 21:27 UTC (23:27 en Madrid), **hasta el miércoles 21-10-2026 a las 23:00 en Madrid**.
+    - **Punto exacto de pausa:** etapa 0 (fiabilidad de `duo-e2e` y `keyboard-e2e`), durante la tanda de aceptación.
+    - **Etapas completadas: ninguna.** La etapa 0 NO está validada.
+    - **Trabajo guardado, SIN VALIDAR:**
+      - `scripts/duo-e2e.cjs`: tira y elige las teclas según el eje real del sofá;
+      - `scripts/keyboard-e2e.cjs`: espera a que el juego esté listo y no repite la pulsación;
+      - `scripts/e2e-piloto.cjs`: piloto de prueba nuevo, compartido;
+      - `scripts/audit/ciclo-2b/etapa-0/`: tanda alternada, aceptación y `soltar-tension.ts`;
+      - **no hay ningún cambio en el código del juego.**
+    - **Decisión de arnés (pendiente de revisión):** las tandas usan un viewport de 320×180 (`E2E_VIEWPORT`) para que cada `duo-e2e` baje de unos 9 a unos 3 minutos. Hay que confirmar que no cambia lo que se comprueba.
+    - **Resultados parciales** (evidencias en [`reviews/ciclo-2b/etapa-0-parcial/`](reviews/ciclo-2b/etapa-0-parcial/)):
+      - `duo-e2e` arreglado, alternado: `657fd30` 7/7 terminadas en verde (la 8.ª se interrumpió por la pausa); `5cab122` 6/7. El fallo es «soltar mientras tira: J2 se tambalea y cae — tambaleo true, caída false», con las teclas S/↑ y una desviación de 19° respecto al eje. Ese caso sigue siendo frágil.
+      - Pruebas sueltas: `duo-e2e` 1/1 en verde; `keyboard-e2e` 1/1 en cada versión.
+      - Mutación sin tirón al soltar (`mutacion-releaseKick.patch`): la prueba la detecta en 1/1 ejecución («tambaleo false, caída false»).
+      - Hacen falta ≥ 19/20, 20/20 y la mutación detectada en ≥ 10/10. **No alcanzado ni completado.**
+    - **Procesos detenidos:** el agente de la etapa 0; las tandas `aceptacion.sh`, `tanda.sh duo` y `tanda.sh teclado`; los servidores `vite preview` de los puertos 4211, 4212 y 4213; y Chromium.
+    - **Pendiente al reanudar:**
+      1. revisar el diff de los tres scripts de prueba y la decisión del viewport;
+      2. investigar el fallo restante de `5cab122` con S/↑ (es probable que la prueba aún no fije bien la orientación o la tensión al soltar; el diagnóstico del ciclo 2 dice que con S+↑ nunca pasaba);
+      3. repetir la tanda completa: 20+20 de `duo-e2e`, 20+20 de `keyboard-e2e` y ≥ 10 con la mutación;
+      4. solo si se cumple, hacer el commit de la etapa 0 validada y pasar a la etapa 1 (piloto, R-C2-01).
+    - Los worktrees temporales de referencia están en `/tmp/claude-0/c2b-e0/wt-{657fd30,5cab122,mut}`. Se pueden volver a crear en cualquier momento con `git worktree add --detach`.
+    - **`/loop` desactivado, sin despertares programados.**

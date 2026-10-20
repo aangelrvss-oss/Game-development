@@ -1,0 +1,17 @@
+== duo 1..20 (657fd30:4211 5cab122:4212) inicio 2026-10-20T20:44:41Z
+   script /home/user/Game-development-2b/mudanza-imposible/scripts/duo-e2e.cjs (d87705de2522), piloto 5d807ba6b670, viewport 320x180, chromium /opt/pw-browsers/chromium
+657fd30-duo-1 exit=0 OK=21 FALLA=0 dur=168s load=4.49
+5cab122-duo-1 exit=0 OK=21 FALLA=0 dur=168s load=4.44
+657fd30-duo-2 exit=0 OK=21 FALLA=0 dur=164s load=4.37
+5cab122-duo-2 exit=0 OK=21 FALLA=0 dur=167s load=4.70
+657fd30-duo-3 exit=0 OK=21 FALLA=0 dur=168s load=4.52
+5cab122-duo-3 exit=0 OK=21 FALLA=0 dur=193s load=4.45
+657fd30-duo-4 exit=0 OK=21 FALLA=0 dur=179s load=4.21
+5cab122-duo-4 exit=0 OK=21 FALLA=0 dur=178s load=4.56
+657fd30-duo-5 exit=0 OK=21 FALLA=0 dur=185s load=4.50
+5cab122-duo-5 exit=0 OK=21 FALLA=0 dur=178s load=4.46
+657fd30-duo-6 exit=0 OK=21 FALLA=0 dur=184s load=4.52
+5cab122-duo-6 exit=1 OK=20 FALLA=1 dur=177s load=4.77
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo true, caída false (antes de soltar: agarran sí/sí, extremos 1/-1; tiran con KeyS / ArrowUp, desvío máximo de las teclas respecto al eje 19°, 0 cambios de tecla; sucesos J2: 13.87 release J2, 13.97 wobble J2, 15.35 stun J2)
+657fd30-duo-7 exit=0 OK=21 FALLA=0 dur=187s load=4.31
+5cab122-duo-7 exit=0 OK=21 FALLA=0 dur=175s load=4.26

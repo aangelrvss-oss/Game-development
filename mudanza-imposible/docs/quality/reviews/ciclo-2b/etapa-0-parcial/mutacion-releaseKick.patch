@@ -1,0 +1,13 @@
+diff --git a/mudanza-imposible/src/sim/carrier.ts b/mudanza-imposible/src/sim/carrier.ts
+index 66c46ca..5a33e43 100644
+--- a/mudanza-imposible/src/sim/carrier.ts
++++ b/mudanza-imposible/src/sim/carrier.ts
+@@ -699,7 +699,7 @@ export class Carrier implements HandOwner {
+     const g = 9.81, h = CARRIER.comHeight, D = this.lean, W = this.leanVel;
+     if (this.heldTension && !this.holding) {
+       // Acaba de soltar: la tensión con la que tiraba (o le tiraban) desaparece de golpe
+-      const k = CARRIER.releaseKick / (mass * h);
++      const k = 0 * CARRIER.releaseKick / (mass * h); // MUTACIÓN etapa 0: sin tirón al soltar
+       W.x -= this.heldTension.x * k; W.z -= this.heldTension.z * k;
+     }
+     this.heldTension = this.holding ? { ...this.forceExp } : null;
