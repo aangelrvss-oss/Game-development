@@ -1,0 +1,172 @@
+{
+ "dimension": "Diversión y claridad de los controles (director de juego y UX), ciclo 2 (5cab122) frente a 657fd30",
+ "score": 4.5,
+ "justification": "Le doy un 4,5/10, lejos del 8,5. El menú, la lista «Cargados N/M» y los avisos con las teclas de cada jugador se entienden, y «La calle» se completa. Pero el ciclo 2 añade tres frustraciones nuevas que la pantalla no anuncia, y la dificultad heredada ante una ejecución imperfecta es alta.\n\n**Navegador** (teclas reales con page.keyboard; script jugar.cjs). Los jugadores van solos al asa; para llevar el objeto usan la intención del piloto, pero con 8 direcciones, 0,2 s de reacción, dudas y errores.\n- «La calle» con 2 jugadores: se gana en 75,0 s. Con el sofá dentro del camión y agarrado no ocurre nada: la lista dice «en camino» y no sale ningún aviso. Al soltarlo aparece en rojo «Acercaos al sofá y agarradlo», lo contrario de lo que hay que hacer.\n- Patio con 2 jugadores: se pierde a los 45,4 s porque se rompe la lámpara, después de que la mesa se volcara 5 veces.\n- Patio con 4 jugadores: las teclas U y Num 0 de J3 y J4 funcionan, pero se pierde a los 5,3 s por la lámpara.\n- Si J1 choca con la lámpara andando, se pierde a los 4,7 s.\n\n**Node** (el mismo cerebro en los dos árboles):\n- Con el piloto puro se gana 20/20, en unos 35 s.\n- Humanizado, con 2 jugadores, se gana 16/20 en el ciclo 2 y 17/20 en la base. Es un problema heredado.\n- Si el equipo nunca suelta el sofá: 0/4 en el ciclo 2 frente a 4/4 en la base. Es nuevo.\n- Patio humanizado: 1/10 con 2 jugadores y 1/10 con 4. Casi todas las derrotas son por la lámpara (nuevo).\n- 4 jugadores en «La calle»: 8/20 frente a 11/20, con 325 caídas frente a 196. Seguramente se debe al piloto (R-C2-01) y no a los jugadores.\n\nLa diversión real, la sensación de control, el sonido y los mandos solo los puede juzgar una persona.",
+ "subscores": [
+  {
+   "aspect": "Se entiende sin manual (menú, agarrar, cuántas personas)",
+   "score": 6,
+   "why": "El menú y el aviso de agarrar con las teclas de cada uno son claros, y el icono con el «2» o el «3» indica cuántas personas hacen falta. En contra: no se dice que hay que soltar dentro del camión, el icono de peso parece un candado y no se marca nada como frágil."
+  },
+  {
+   "aspect": "HUD, «Cargados N/M» y avisos",
+   "score": 4,
+   "why": "La lista se actualiza bien, pero en el momento clave guía mal: «en camino» con el sofá ya dentro, el aviso de agarrar justo al soltar y «¡Que se vuelca!» durante 16,4 s por una mesa ya cargada. Al empezar, la lista tapa el camión del patio."
+  },
+  {
+   "aspect": "Cooperación y momentos interesantes",
+   "score": 5,
+   "why": "Llevar el sofá entre dos funciona. Con 4 jugadores no aparece ningún reto propio: el piano, que necesita 3, es opcional y no da nada, y el 3.º y el 4.º no aportan en «La calle»."
+  },
+  {
+   "aspect": "Frustración y tiempos muertos (cámara, controles, rampa)",
+   "score": 3,
+   "why": "La lámpara hace perder la partida en 2–5 s al chocar con ella o al soltarla andando. Hay atascos de más de 100 s en el empalme de las dos rampas. Quien no suelta el sofá dentro del camión acaba perdiendo. La cámara sigue a la mesa (8 % del tiempo con algún jugador fuera de la pantalla en el patio)."
+  },
+  {
+   "aspect": "Objetos opcionales",
+   "score": 2,
+   "why": "Ni las estrellas ni los resultados los cuentan, y moverlos solo trae riesgo de daño."
+  }
+ ],
+ "claims": [
+  {
+   "claim": "La entrega dentro del camión añade unos 2 s a «La calle»",
+   "source": "QUALITY_STATE §9 / informe-paso2",
+   "verdict": "CONFIRMADO",
+   "evidence": "piloto-puro.ts, con 2 humanos y las semillas 1–20: base, mediana 33,38 s; ciclo 2, 35,72 s (+2,34 s). Con 4: 32,97 y 34,70 s. Registro: /tmp/claude-0/review-c2/director/piloto-puro.txt"
+  },
+  {
+   "claim": "T-hud: «Cargados N/M» con 4 jugadores sin tapar los paneles de jugador",
+   "source": "ciclo-2.md T-hud",
+   "verdict": "PARCIAL",
+   "evidence": "En la captura clave/cuatro-3s.jpg los paneles de J1–J4 no quedan tapados. Pero con la cámara de juego la lista (262 px a la derecha) tapa la rampa y el camión del patio al empezar (observación visual mía)."
+  },
+  {
+   "claim": "El patio no se presenta como uno de los niveles del juego",
+   "source": "ciclo-2.md T-level-3",
+   "verdict": "CONFIRMADO",
+   "evidence": "El menú, con ?nivel=pruebas, dice literalmente: «Patio de pruebas: escena de prueba de los objetos con el camión, no es un nivel del juego…»"
+  },
+  {
+   "claim": "La nevera y el piano, opcionales, no aportan nada",
+   "source": "verificacion-pausa/inventario.json",
+   "verdict": "CONFIRMADO",
+   "evidence": "main.ts:331-337: las estrellas solo cuentan el tiempo y la integridad; los resultados solo cuentan los obligatorios."
+  },
+  {
+   "claim": "El 3.º y el 4.º jugador aportan (T-roles)",
+   "source": "informe-paso3",
+   "verdict": "NO REPRODUCIDO",
+   "evidence": "Solo se cumple con el piloto perfecto. Humanizado, el patio con 4 se gana 1/10 (casi todas las derrotas son por la lámpara), y en el navegador se pierde a los 5,3 s. En «La calle» con 4, 8/20 frente a 11/20 en la base."
+  },
+  {
+   "claim": "R-C2-01 (regresión del piloto) afecta a 4 humanos",
+   "source": "diagnostico-regresiones.md",
+   "verdict": "PARCIAL",
+   "evidence": "Coincide con lo que mido: «La calle» con 4 humanizados da 8/20 y 325 caídas en el ciclo 2, frente a 11/20 y 196 en la base (n-*-cuatro-calle.txt). No lo he aislado: también puede influir el camión."
+  },
+  {
+   "claim": "Gana quien deja el sofá dentro del camión «suelto y quieto»",
+   "source": "index.html:119",
+   "verdict": "PARCIAL",
+   "evidence": "Solo lo dice una nota del menú. Ni el HUD ni ningún aviso lo dicen (hud.ts:179-184 no tiene ningún aviso para soltar)."
+  }
+ ],
+ "defects": [
+  {
+   "severity": "major",
+   "title": "Hay que soltar el sofá dentro del camión para ganar, la pantalla no lo dice y al soltar sale el aviso contrario",
+   "evidence": "Base: equipo que no suelta, 4/4 ganadas (40,5–60,4 s). Ciclo 2: 0/4, perdidas a los 180 s tras 127–134 s sujetándolo dentro, con integridad 100 (n-*-calle2-nosuelta.txt). En el navegador: con el sofá dentro y agarrado, ningún aviso y la lista dice «en camino» (clave/calle2-camion-sin-soltar.jpg); tras soltar, «Acercaos al sofá y agarradlo: J1 con ESPACIO, J2 con INTRO» durante 1,7 s (clave/calle2-camion-tras-soltar.jpg). Código: game.ts:654 (exige !held) y hud.ts:184.",
+   "repro": "cd mudanza-imposible; ROOT=$PWD npx vite-node scripts/audit/review-c2/director/humano.ts calle2 2 4 999 (repetirlo con ROOT apuntando a un worktree de 657fd30). Navegador: NODE_PATH=$(npm root -g) NOVATO_ESPERA=8 node scripts/audit/review-c2/director/jugar.cjs calle2 http://localhost:4191/ 3",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "La lámpara obligatoria hace perder la partida al instante si alguien choca con ella andando o la suelta en marcha, sin ningún aviso de que es frágil",
+   "evidence": "lampara.ts: andando contra ella, «fase=lost lámpara=broken … 0.77 impact dv=3.93» (con solo 5° de inclinación); rozándola, se pierde a 1,48 s. lampara-soltar.ts: soltándola andando, «2.55 itemBroken dv=2.81 lose»; parado, no se rompe. En el navegador, patio-choque: «Se ha roto: Lámpara de pie | Tiempo 0:04.7 … Estado de la carga 0%» (clave/patio-choque-final.jpg). Humanizado: patio con 4, 0/10 sin la fase de novato. El HUD no marca nada como frágil (grep: solo una pegatina en itemView.ts:102).",
+   "repro": "ROOT=$PWD npx vite-node scripts/audit/review-c2/director/lampara.ts; … lampara-soltar.ts; NODE_PATH=$(npm root -g) node scripts/audit/review-c2/director/jugar.cjs patio-choque http://localhost:4191/ 1",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "Atascos largos en el empalme entre la rampa de la terraza y la del camión",
+   "evidence": "Humanizado, con 2 jugadores: en el ciclo 2 hay 2/20 partidas perdidas a los 180 s en la etapa «Rampa», con el sofá en x 22–24 y z −32/−33, al costado de la rampa del camión (z de −32,15 a −28,35); en la base, 0/20. Con empuje directo hacia la rampa y R al volcar, 1/20 (el sofá cae junto a la caja de carga). Solo hay 1,5 m llanos entre las rampas (calle.ts:23, x1 = 22,5; la rampa del camión empieza en x = 24) y el sofá mide más de 2,2 m.",
+   "repro": "TRAZA=1 ROOT=$PWD npx vite-node scripts/audit/review-c2/director/humano.ts calle2 9 1 0; SIMPLE_X=21 … humano.ts calle2 1 20 8",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Los avisos de vuelco y atasco solo miran el objeto principal (en el patio, la mesa), también cuando ya está cargada",
+   "evidence": "Patio con 2, en el navegador: «¡Que se vuelca!» 16,4 s, en buena parte con «Mesa · cargado». hud.ts:179-182 usa game.sofaUp y game.stuckTime, que son del objeto principal. Una silla o una nevera volcadas no dan ningún aviso.",
+   "repro": "NODE_PATH=$(npm root -g) node scripts/audit/review-c2/director/jugar.cjs patio2 http://localhost:4191/ 1 (ver /tmp/claude-0/review-c2/director/patio2-s1.json)",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Cámara y aro en el patio: el camión queda fuera de la pantalla o bajo la lista, y el aro se apaga al cargar la mesa",
+   "evidence": "world.ts:163 apunta al 75 % al objeto principal; levelView.ts:158 apaga el aro cuando la mesa está cerca del objetivo. Patio con 2: 36 de 453 ticks con algún jugador fuera de la pantalla. Al empezar no se ve el camión (observación de las capturas de trabajo).",
+   "repro": "jugar.cjs patio2 (campo fueraDePantalla)",
+   "kind": "visual",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Textos pensados para el sofá en el patio",
+   "evidence": "Resultados del patio: «Probad a cruzar con el semáforo…» (main.ts:330), aunque el patio no tiene semáforo. «Estado de la carga 0%» al romperse la lámpara (game.ts:258). En el menú, «Enderezar el sofá volcado» y «El sofá pesa de verdad» (index.html:112,116). El mejor tiempo se comparte entre niveles (main.ts:319).",
+   "repro": "jugar.cjs patio-choque; leer index.html y main.ts",
+   "kind": "lectura de código",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "La dificultad ante una ejecución imperfecta es heredada: el piloto gana 20/20 y el «humanizado» pierde entre el 15 % y el 35 %",
+   "evidence": "Con 2 jugadores, piloto puro: 20/20 en ambos árboles. Humanizado, sin fases de novato: base 17/20 con mediana de 45,1 s; ciclo 2 16/20 con 49,7 s (14 caídas frente a 5). Con fases de novato: 12/20 frente a 13/20. Las derrotas son sobre todo atropellos en la calzada (carHit de 10 a 20).",
+   "repro": "ROOT=… npx vite-node scripts/audit/review-c2/director/humano.ts calle2 1 20 0 1",
+   "kind": "automatizado",
+   "regression": "anterior al ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Con 4 jugadores, «La calle» humanizada empeora y no ofrece nada propio a J3 y J4",
+   "evidence": "Ciclo 2: 8/20, mediana 84 s y 325 caídas. Base: 11/20, 66 s y 196 caídas (Fisher p≈0,26). Probablemente es R-C2-01, del piloto, y no lo vivirían así jugadores reales.",
+   "repro": "humano.ts cuatro-calle 1 20 0 en los dos árboles",
+   "kind": "automatizado",
+   "regression": "desconocido"
+  }
+ ],
+ "strengths": [
+  "El menú explica los controles de los 4 jugadores y el aviso «Acercaos… J1 con ESPACIO, J2 con INTRO, J3 con U, J4 con NUM 0» se adapta al número de jugadores.",
+  "«Cargados N/M» con iconos, «opcional» y el número de personas es legible, y los paneles de J1–J4 no quedan tapados a 1280×720.",
+  "Con 2 jugadores, «La calle» se completa en el navegador con teclado simulado (75 s, sofá al 100 %), sin errores de consola.",
+  "El camión abierto con rampa se lee bien, y «¡Camión!» y «¡ENTREGADO!» dan un buen cierre.",
+  "J3 y J4 agarran con sus teclas en el navegador (1,68 y 1,48 s)."
+ ],
+ "humanChecks": [
+  "Guion de 15 minutos con 2 parejas que no conozcan el juego:\n- min 0–2: leer el menú sin ayuda y decir en voz alta qué creen que hay que hacer y cuántos hacen falta para el sofá;\n- min 2–6: «La calle» con 2 jugadores, sin instrucciones; anotar si sueltan el sofá dentro del camión sin que nadie se lo diga y cómo reaccionan al aviso rojo al soltarlo;\n- min 6–10: patio con 2 jugadores (?nivel=pruebas); anotar si identifican la lámpara como frágil, si la rompen y si les parece justo perder por ella;\n- min 10–14: patio o «La calle» con 4 en un solo teclado (con portátil sin teclado numérico, J4 con mando); anotar teclas fantasma, quién se aburre y si el piano les apetece;\n- min 14–15: «¿repetiríais?» y momento más divertido y más frustrante.",
+  "Diversión real de llevar el sofá entre dos y si los avisos se leen a tiempo.",
+  "El sonido de carga y de rotura con altavoces.",
+  "Mandos físicos, y J4 con el teclado numérico en un portátil.",
+  "Si el empalme entre las dos rampas frustra a personas reales."
+ ],
+ "files": [
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/director/jugar.cjs",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/director/cerebro.cjs",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/director/humano.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/director/lampara.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/director/lampara-soltar.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/director/piloto-puro.ts",
+  "/tmp/claude-0/review-c2/director/clave/calle2-camion-sin-soltar.jpg",
+  "/tmp/claude-0/review-c2/director/clave/calle2-camion-tras-soltar.jpg",
+  "/tmp/claude-0/review-c2/director/clave/cuatro-3s.jpg",
+  "/tmp/claude-0/review-c2/director/clave/patio-choque-final.jpg",
+  "/tmp/claude-0/review-c2/director/calle2-s3.json",
+  "/tmp/claude-0/review-c2/director/patio2-s1.json",
+  "/tmp/claude-0/review-c2/director/cuatro-s1.json",
+  "/tmp/claude-0/review-c2/director/piloto-puro.txt"
+ ]
+}

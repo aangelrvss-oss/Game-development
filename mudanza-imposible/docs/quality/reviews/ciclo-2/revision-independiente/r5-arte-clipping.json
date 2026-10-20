@@ -1,0 +1,204 @@
+{
+ "dimension": "Calidad visual, animaciones y clipping (rol arte técnico y animación). Ciclo 2 (5cab122, worktree en 04da4c4) frente a 657fd30",
+ "score": 6.5,
+ "justification": "Nota: 6,5/10. No llega al umbral de 8,5.\n\n**Lo que está bien**\n\nLa coherencia entre lo dibujado y la física es el punto fuerte del ciclo, y lo he medido yo jugando, no solo en reposo.\n- **Lectura de código y Node:** la prueba T-view pasa (camión: 8 piezas, 0,00 mm). En partidas con el piloto, en Node:\n  - los objetos dibujados entran como mucho 2,7 cm en el suelo, las paredes o la rampa del camión;\n  - los colliders de los objetos se solapan con piezas fijas como mucho 2,3 cm;\n  - al apilar, ningún objeto se mete en otro (0 cm);\n  - el tronco y la cabeza del muñeco entran en los objetos como mucho 2,6 cm en marcha y 3,7 cm cayendo;\n  - las botas en la rampa y en el suelo del camión flotan como mucho 2,2 cm y se hunden como mucho 3,4 cm.\n- **El sofá ya no sobresale:** el dibujado sobresalía de sus colliders 18,0 cm en 657fd30 y ahora 2,8 cm. En «La calle», el sofá dibujado entraba 10,1 cm en la fachada y ahora entra 1,6 cm.\n- **Sin regresión en «La calle»:** las manos y el cuerpo con el sofá dan las mismas cifras en las dos versiones, en Chromium con 1 a 4 jugadores (`manoplas [-5.5,3.2,1.5,-3.8]` en ambas).\n- **Los objetos se reconocen:** son procedurales, de maqueta, con contorno y la paleta de la dirección artística. Es observación visual mía en las capturas.\n\n**Lo que impide llegar a 8,5**\n\n1. **Cámara (nuevo en el ciclo 2).** Sigue al objeto principal (la mesa) aunque ya esté cargado. Con 4 jugadores en el patio, en el 20,1 % de los fotogramas (63 de 313) algún jugador queda fuera de la imagen.\n2. **Sombreros (heredado).** No hay sombrero distinto por jugador. En gris, J1–J4 son idénticos; solo los distingue la etiqueta. Incumple la dirección artística.\n3. **Manos (heredado, expuesto por los objetos nuevos):**\n   - en la nevera se hunden: el centro de la manopla queda 4,4 cm dentro en el 100 % de los fotogramas;\n   - en la lámpara, las manos agarran la pantalla y no el pie;\n   - al tambalearse, el muñeco suelta las manos en el dibujo, pero en la física sigue agarrando: la caja flota 1,07 s con las manos a hasta 94 cm.\n4. **Romper no se ve (nuevo):** la lámpara rota es idéntica a una lámpara caída. Además, los parches de cinta flotan fuera de la pantalla cónica. No hay animación de frustración ni de celebración en el muñeco.\n5. **Sofá recortado (regresión de aspecto, nuevo en el ciclo 2):**\n   - planta dibujada de 2,62 × 1,32 m a 2,30 × 0,98 m;\n   - cojines del respaldo convertidos en paneles de 4 cm;\n   - sin los cojines decorativos;\n   - cinchas aplastadas que desde arriba ya no se leen.\n\n   Gana coherencia y pierde volumen («cojines inflados», «parecer grandes»).\n\n**Piloto automático (R-C2-01)**\n\nLas capturas de rampa y camión se hicieron con el piloto. Lo que depende de él son el ritmo y las caídas: mi partida con 4 humanos y 2 ayudantes en «La calle» dura 127,93 s, la misma cifra que obtuvo el revisor 1. Esas caídas añaden muestras de manos lejos del objeto, pero el mecanismo del tambaleo es del dibujo y lo vivirían igual jugadores reales.\n\n**Lo que solo puede validar una persona:** sensación, diversión y lectura en movimiento real.",
+ "subscores": [
+  {
+   "aspect": "Clipping y coherencia entre lo dibujado y lo que choca (objetos, camión, apilado, botas y cuerpos)",
+   "score": 8.5,
+   "why": "Resultado automatizado (Node, clipping-node.ts, con 2, 3 y 4 humanos y con 1 humano más 3 despistados):\n- objeto frente a camión: ≤ 2,7 cm;\n- objeto frente a objeto: 0;\n- cuerpo dibujado: ≤ 2,6 cm en marcha;\n- botas: ≤ 3,4 cm.\nT-view: 0,00 mm. Restan los picos al caer (6 cm contra la pared del camión, 7,2 cm contra un cono) y el solape de 6 cm entre muñecos al empezar."
+  },
+  {
+   "aspect": "Legibilidad de los objetos desde la cámara de juego y calidad de los modelos",
+   "score": 7.5,
+   "why": "Observación visual:\n- se reconocen el piano (negro, con teclas), la mesa (tablero con camino), la nevera (blanca, con tiradores e imanes), la silla, la caja (con cinta y «MUDANZA») y la lámpara (pantalla con franja roja y blanca);\n- desde arriba, la lámpara es un disco blanco;\n- el sofá ha perdido volumen y las cinchas ya no se ven;\n- el estado roto no se ve."
+  },
+  {
+   "aspect": "Coherencia con ART_DIRECTION (sombreros por jugador, paleta, maqueta, contornos)",
+   "score": 5,
+   "why": "Cumple la paleta, los contornos, los colores mate y el chaflán (caja 8,3 %, nevera 6 %, piano 7 %).\nIncumple:\n- un sombrero por jugador (dollRig.ts:222: una sola gorra para todos);\n- «Celebración al cargar» y «frustración cómica al romper»: el muñeco no tiene ninguna de las dos animaciones;\n- «cojines inflados» en el sofá nuevo."
+  },
+  {
+   "aspect": "Animaciones (esfuerzo, caída, levantarse, agarrar a distintas alturas)",
+   "score": 6,
+   "why": "Funcionan:\n- caída con estrellas y levantarse en el camión y junto a los objetos, sin clipping relevante;\n- cada objeto se lleva a una altura distinta (base a 13–24 cm del suelo).\nFallan:\n- el molinillo al tambalearse suelta el objeto en el dibujo (hasta 94 cm);\n- las manos se hunden en la nevera;\n- las rayas de esfuerzo salen aunque agarren 3 o 4 personas (heredado, P6);\n- no hay anticipación al agarrar."
+  },
+  {
+   "aspect": "Cámara y encuadre con varios objetos",
+   "score": 5,
+   "why": "Automatizado: en el patio con 4 jugadores, el 20,1 % de los fotogramas deja a algún jugador fuera de la imagen.\nLa cámara (world.ts:154-166) y el corte de lo que tapa (world.ts:188) solo miran a `game.sofaPos`, que es el objeto principal, aunque ya esté cargado."
+  },
+  {
+   "aspect": "Regresiones frente a 657fd30 en esta dimensión",
+   "score": 7,
+   "why": "En «La calle», manos y cuerpo dan cifras idénticas en las dos versiones, y el clipping del sofá mejora (de 10,1 cm a 1,6 cm contra la fachada).\nEmpeora el aspecto del sofá: más pequeño y plano, con las cinchas invisibles desde arriba.\nLo demás es nuevo, por los objetos y niveles nuevos, o heredado."
+  }
+ ],
+ "claims": [
+  {
+   "claim": "El sofá se dibuja desde su ItemDef: antes sobresalía 15–30 cm de sus colliders y ahora todo queda dentro con 3 cm como máximo",
+   "source": "informe-paso3-vista.json (a); sofaView.ts",
+   "verdict": "CONFIRMADO",
+   "evidence": "`npx vite-node scripts/audit/review-c2/arte/sofa-sobresale.ts`:\n«657fd30 (base): sobresale como máximo 18.0 cm; vértices a más de 3 cm: 38.0 %; caja envolvente dibujada -1.31,-0.24,-0.66 → 1.31,0.71,0.66»\n«5cab122 (ciclo 2): sobresale como máximo 2.8 cm; vértices a más de 3 cm: 0.0 %; caja envolvente dibujada -1.15,-0.23,-0.50 → 1.15,0.69,0.48»\nNo distingo el «30 cm» de los cojines de colores. El precio: el sofá dibujado es más pequeño (ver defectos)."
+  },
+  {
+   "claim": "T-view: las 8 piezas dibujadas del camión coinciden con sus colliders (0,00 mm) y ningún vértice de un objeto sale más de 3 cm",
+   "source": "informe-paso3-vista.json; tests/view.test.ts",
+   "verdict": "CONFIRMADO",
+   "evidence": "`npx vitest run tests/view.test.ts`:\n«T-view, camión de «La calle»: 8 piezas, error máximo 0.00 mm»\n«T-view, camión de «Patio de pruebas»: 8 piezas, error máximo 0.00 mm»\n«Tests 2 passed (2)».\nEn juego (clipping-node.ts) el dibujo de los objetos entra en el camión como mucho:\n- «DIBUJO sofa dentro de truckWall max 2.7 cm»;\n- «DIBUJO caja dentro de truckFloor max 2.2 cm»."
+  },
+  {
+   "claim": "Los objetos se reconocen y siguen la dirección artística (paleta, maqueta de juguete)",
+   "source": "ciclo-2.md T-view; informe-paso3-vista.json",
+   "verdict": "PARCIAL",
+   "evidence": "Observación visual (work/mosaico-reposo.jpg, patio-juego-reposo.jpg): los seis objetos se reconocen de cerca y desde la cámara de juego, con contorno, colores de la paleta y la franja de frágil en la lámpara.\nPero:\n- el sofá ya no tiene «cojines inflados»;\n- el estado roto no se dibuja;\n- los jugadores no tienen sombrero propio (incumple la dirección artística)."
+  },
+  {
+   "claim": "No hay sombreros distintos por jugador",
+   "source": "verificacion-pausa / QUALITY_STATE §9",
+   "verdict": "CONFIRMADO",
+   "evidence": "Lectura de código: dollRig.ts:222, «Gorra roja ladeada», una sola gorra; solo cambia el color (dollView.ts:11-12); src/view/doll no cambia entre 657fd30 y 5cab122.\nVisual: clave/4-J1-J4-en-gris-y-lampara-rota.jpg. En gris, J1–J4 tienen la misma silueta y solo los distingue la etiqueta."
+  },
+  {
+   "claim": "Las señales de esfuerzo están saturadas (rayas aunque se lleve bien entre varios)",
+   "source": "segunda-ronda-diseno-arte.json (P6); seis-problemas-ciclo-1.json",
+   "verdict": "CONFIRMADO",
+   "evidence": "Observación visual: mosaico-agarres1.jpg (mesa con 4) y mosaico-agarres2.jpg (nevera con 4, piano con 3) muestran las rayas sobre las cabezas con todas las asas ocupadas.\nEs heredado: no cambia en el ciclo 2."
+  },
+  {
+   "claim": "Las caídas duran ≤ 1,3 s en el suelo, con estrellas, y se levantan solos",
+   "source": "ART_DIRECTION.md (Animación)",
+   "verdict": "CONFIRMADO",
+   "evidence": "- Lectura de código: CARRIER.fallTime 1.3 (carrier.ts:119).\n- Visual: caidos2-camion-cerca.jpg y caidos2-camion-levantandose.jpg (estrellas y luego en pie), dentro del camión.\n- Automatizado: caidos-rota.cjs, peor solape del cuerpo al caer de 6 cm contra pieza fija (J1, fotograma 6), y ≤ 0,7 cm de pie."
+  },
+  {
+   "claim": "Regresión del piloto R-C2-01: con 4 humanos y 2 ayudantes en «La calle», la entrega pasa a 58 s de mediana y hasta 127,93 s",
+   "source": "r1-e2e-regresiones.json / diagnostico-regresiones.md",
+   "verdict": "CONFIRMADO",
+   "evidence": "Mi ejecución, `npx vite-node scripts/audit/review-c2/arte/clipping-node.ts -- calle 4 6 atentos 140`, da «fase won t=127.93 caídas=16 integridad=89», la misma cifra máxima que el revisor 1.\nEn esa partida también suben las muestras de manos lejos del sofá («MANO sofa hueco … max 193.4 cm, >6cm 1.7 %») por el tambaleo."
+  },
+  {
+   "claim": "Capturas del implementador: patio con 4 jugadores (J3 y J4 suben la mesa por la rampa, J2 dentro con la lámpara) y el sofá dentro de la caja de carga",
+   "source": "informe-paso3-vista.json (c); capturas/",
+   "verdict": "PARCIAL",
+   "evidence": "Observación visual: patio-4j-de-camino.png y calle-sofa-en-el-camion.png muestran lo que dicen.\nEl informe no menciona que en patio-4j-cargando.png J3 sale cortado en el borde izquierdo (solo se ve su aro rosa) y J1 queda en la esquina: es el defecto de encuadre."
+  }
+ ],
+ "defects": [
+  {
+   "severity": "major",
+   "title": "La cámara sigue al objeto principal aunque ya esté cargado: con varios objetos, los jugadores se salen de la imagen",
+   "evidence": "Automatizado (Chromium, nav-camion.txt):\n«ENCUADRE patio 4h: fotogramas con algún humano fuera de la imagen 63/313 (20.1 %)»\n«ENCUADRE t=15.1 fuera: J2»\nLectura de código:\n- world.ts:155, `const s = game.sofaPos`, objetivo al 75 % sobre el objeto principal (la mesa, `main: 0` en patio.ts);\n- world.ts:188, el corte de lo que tapa solo mira `game.sofaPos` y a los humanos, no los objetos que lleva cada equipo.\nVisual: clave/1-encuadre-patio-4j-J2-fuera.jpg. La mesa ya está cargada en el camión, J2 queda fuera de la imagen y J1 en el borde.\nSe ve también en la captura del implementador patio-4j-cargando.png (J3 cortado).",
+   "repro": "cd /home/user/Game-development-rc2/mudanza-imposible && npm run build && npx vite preview --port 4192 --strictPort &\nNODE_PATH=$(npm root -g) node scripts/audit/review-c2/arte/arte-navegador.cjs http://localhost:4192/ /tmp/claude-0/review-c2/arte/work encuadre",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "No hay sombrero por jugador: J1–J4 solo se distinguen por color y etiqueta (incumple ART_DIRECTION)",
+   "evidence": "Lectura de código: dollRig.ts:222, una sola «Gorra roja ladeada» para todos; dollView.ts:11-12 solo cambia colores.\nVisual: clave/4-J1-J4-en-gris-y-lampara-rota.jpg (filtro gris en el canvas). Los cuatro muñecos tienen la misma silueta.\nNo hay diff en src/view/doll entre 657fd30 y 5cab122.",
+   "repro": "NODE_PATH=$(npm root -g) node scripts/audit/review-c2/arte/arte-navegador.cjs http://localhost:4192/ /tmp/claude-0/review-c2/arte/work patio  → work/patio-juego-reposo-gris.jpg",
+   "kind": "visual",
+   "regression": "anterior al ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Romper no se ve: la lámpara rota es igual que caída, los parches de cinta flotan fuera de la pantalla cónica y no hay frustración en el muñeco",
+   "evidence": "Automatizado: caidos-rota.cjs, «LAMPARA tras caer: {\"state\":\"broken\",\"integrity\":0,…,\"phase\":\"lost\"}».\nVisual: lampara-rota-cerca.jpg y zoom-lampara-rota.jpg. La lámpara está tumbada e intacta; se ven dos placas grises que asoman por la boca de la pantalla.\nLectura de código:\n- itemView.ts:201-212: los parches son cajas de min(0,32, 0,6·ancho) = 0,204 m en big.top + 0,01, desplazadas hasta ±0,05 m, sobre un cono cuya tapa mide 0,102 m de radio;\n- el estado roto solo hace visibles esos parches (sync, :221-222);\n- main.ts:264 solo da sonido y aviso.\nLa dirección artística pide «frustración cómica (cabezazo, brazos al cielo) al romper algo».",
+   "repro": "NODE_PATH=$(npm root -g) node scripts/audit/review-c2/arte/caidos-rota.cjs http://localhost:4192/ /tmp/claude-0/review-c2/arte/work",
+   "kind": "visual",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Manos hundidas en la nevera y agarrando la pantalla de la lámpara en vez de su asa en el pie",
+   "evidence": "Automatizado (Chromium, nav-agarres.txt; hueco = distancia del centro de la manopla a la superficie menos el radio de la palma, unos 8 cm; negativo = metida):\n- «AGARRE nevera n=2: … manoplas hueco cm [-12.4,-12.4,-12.4,-12.4]»;\n- «AGARRE nevera n=4: … [-12.3,…,-12.3]» (centro 4,4 cm dentro, en todas las manos);\n- «AGARRE lampara n=1: … manoplas hueco cm [-11.4,-11.4]».\nNode, patio con 3 humanos: «MANO lampara centro dentro max 5.1 cm | >3cm 71.2 %».\nLectura de código: dollRig.ts:487 pone la mano en el asa + 0,14 m de lado + 0,05 m arriba, y :505 la adelanta 0,06 m a lo largo del antebrazo, hacia dentro del objeto.\nEl asa de la lámpara (items.ts, p.y 0,32) queda 10 cm bajo la pantalla (0,42), así que las palmas caen sobre la pantalla.\nVisual: clave/3-manos-nevera-y-lampara.jpg.",
+   "repro": "NODE_PATH=$(npm root -g) node scripts/audit/review-c2/arte/arte-navegador.cjs http://localhost:4192/ /tmp/claude-0/review-c2/arte/work agarres",
+   "kind": "automatizado",
+   "regression": "anterior al ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Al tambalearse llevando un objeto ligero, los brazos hacen el molinillo y el objeto flota delante sin manos hasta 1 s",
+   "evidence": "Node, patio con 4 humanos (DETALLE=1 clipping-node.ts):\n- 66 muestras «mano lejos: J1 caja hueco … estado=losingBalance» entre t=15.67 y t=16.73;\n- máximo 93,8 cm («MANO caja hueco … max 93.8 cm | >6cm 3.5 %»).\nEn «La calle» con 4 humanos y 2 ayudantes: «MANO sofa hueco … max 193.4 cm».\nLectura de código: dollRig.ts:485-492. Con `stumbling` la mano deja el asa aunque `c.heldBody` siga agarrando. El mecanismo es heredado, pero con la caja (una sola persona) se ve el objeto suspendido solo.",
+   "repro": "cd /home/user/Game-development-rc2/mudanza-imposible && DETALLE=1 npx vite-node scripts/audit/review-c2/arte/clipping-node.ts -- pruebas 4 4 atentos 80 | grep 'mano lejos'",
+   "kind": "automatizado",
+   "regression": "anterior al ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "El sofá recortado a sus colliders pierde volumen y lectura: más pequeño, cojines planos y cinchas invisibles desde arriba",
+   "evidence": "Automatizado (sofa-sobresale.ts), caja envolvente dibujada:\n- base: -1.31…1.31 × -0.66…0.66 (2,62 × 1,32 m);\n- ciclo 2: -1.15…1.15 × -0.50…0.48 (2,30 × 0,98 m).\nLectura de código (sofaView.ts):\n- respaldo de paneles de 0,04 m (:104);\n- desaparecen los dos cojines decorativos;\n- cinchas con `loop.scale.set(1, 0.2, 1)` (:118).\nVisual: clave/2-sofa-657fd30-izq-vs-c2-der.jpg, base a la izquierda y ciclo 2 a la derecha. De cerca el nuevo se ve plano y desde arriba las asas no se leen.\nEs un intercambio que exigía la especificación (lo dibujado coincide con los colliders); ganarle volumen exigiría ampliar la forma del ItemDef.",
+   "repro": "cd /home/user/Game-development-rc2 && git worktree add --detach /tmp/claude-0/review-c2/arte/base 657fd30 && ln -s /home/user/Game-development/mudanza-imposible/node_modules /tmp/claude-0/review-c2/arte/base/mudanza-imposible/node_modules && cd mudanza-imposible && npx vite-node scripts/audit/review-c2/arte/sofa-sobresale.ts",
+   "kind": "visual",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "El rebote de los objetos (squash) escala desde el origen y no desde la base: hunde o levanta el objeto unos cm al golpearse",
+   "evidence": "Lectura de código:\n- itemView.ts:216-219 aplica `inner.scale` (y de 0,88 a 1,12) sobre el origen local;\n- en la nevera el origen está 0,43 m sobre la base, así que la base baja o sube unos 5 cm durante el rebote;\n- SofaView sí lo compensa (sofaView.ts:182, `inner.position.y = seatHalf * sq`).\nNo lo he medido en pantalla porque es transitorio.",
+   "repro": "Leer src/view/itemView.ts:213-223 frente a src/view/sofaView.ts:179-183",
+   "kind": "lectura de código",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Varios «¡CARGADO!» a la vez se superponen, y el marcador amarillo de destino atraviesa los objetos cargados",
+   "evidence": "Visual:\n- camion-apilado-cerca.jpg: tres rótulos «¡CARGADO!» encimados (escena preparada a mano);\n- con el piloto también se cargan dos a la vez: «caja@30.8 caja@30.8» en el patio con 4;\n- zoom-caidos-j1.jpg: la pirámide amarilla de destino atraviesa la nevera ya cargada.\nLectura de código: main.ts:271, `view.fx.text(e.pos, '¡CARGADO!' …)`, sin apartar los rótulos.",
+   "repro": "NODE_PATH=$(npm root -g) node scripts/audit/review-c2/arte/arte-navegador.cjs http://localhost:4192/ /tmp/claude-0/review-c2/arte/work camion",
+   "kind": "visual",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Solapes puntuales de más de 3 cm del cuerpo dibujado: entre muñecos al empezar, al caer contra conos y contra la pared del camión",
+   "evidence": "Node:\n- «CUERPO libre vs muñeco max 6.0 cm | >3cm 26.7 %» (patio con 4, t=2.80);\n- «CUERPO caido-lying vs prop max 7.4 cm» (1 humano y 3 despistados, t=44.5);\n- «CUERPO caido-falling vs objeto max 3.7 cm» (patio con 4).\nChromium (caidos-rota.cjs): «{\"j\":1,\"down\":\"falling\",\"cm\":6,\"what\":\"fijo\",\"k\":6}», al caer contra la pared del camión.",
+   "repro": "npx vite-node scripts/audit/review-c2/arte/clipping-node.ts -- pruebas 4 4 atentos 80; npx vite-node scripts/audit/review-c2/arte/clipping-node.ts -- pruebas 1 4 despistados 200",
+   "kind": "automatizado",
+   "regression": "desconocido"
+  }
+ ],
+ "strengths": [
+  "Los objetos se dibujan pegados a su física y no atraviesan el escenario:\n- objeto frente al camión ≤ 2,7 cm en partidas reales;\n- apilado sin solapes («APILADO: objeto-objeto []; objeto-fijo []»);\n- camión dibujado a 0,00 mm de sus colliders.",
+  "El sofá dibujado pasa de sobresalir 18,0 cm de sus colliders a 2,8 cm. Contra la fachada, en «La calle», de 10,1 cm a 1,6 cm (Node, base frente a ciclo 2).",
+  "En «La calle» no hay regresión de manos ni de cuerpo: con 1, 2, 3 y 4 jugadores, las manoplas dan valores idénticos en 657fd30 y en el ciclo 2. Las botas en la rampa nueva del camión quedan a ≤ 2,2 cm.",
+  "Los seis objetos procedurales se reconocen desde la cámara de juego, con contorno, paleta cálida, franja de frágil en la lámpara y detalles legibles (teclas, imanes, camino de mesa).",
+  "Cada objeto se lleva a una altura propia (base a 13–24 cm del suelo en el aire) con las mismas manos y sin código por objeto. Caer y levantarse dentro del camión funciona sin clipping relevante."
+ ],
+ "humanChecks": [
+  "Jugar a 4 en el patio con mando: comprobar si quedarse fuera de la imagen (20 % de los fotogramas con el piloto) molesta de verdad cuando cada equipo lleva un objeto distinto.",
+  "Distinguir a J1–J4 sin mirar el color, con personas daltónicas o en una pantalla pequeña: sin sombreros, ¿basta la etiqueta J#?",
+  "Decidir si el sofá nuevo, más plano, pequeño y con las cinchas invisibles desde arriba, es aceptable, o si hay que dar volumen a su forma en el ItemDef.",
+  "Valorar si el molinillo que suelta la caja en el aire al tambalearse se lee como gracioso o como error.",
+  "Valorar si llevar la lámpara por la pantalla y las manos hundidas en la nevera se notan a la distancia de juego.",
+  "Romper la lámpara jugando: ¿se entiende que está rota sin leer el aviso? No hay animación de frustración.",
+  "Valorar si las rayas de esfuerzo con 3 o 4 personas en el piano o la nevera ayudan o confunden.",
+  "Sonido de carga y de rotura, y sensación de control: no lo he evaluado."
+ ],
+ "files": [
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/arte/clipping-node.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/arte/clipping-node-base.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/arte/arte-navegador.cjs",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/arte/caidos-rota.cjs",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/arte/ayudantes.cjs",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/arte/sofa-sobresale.ts",
+  "/tmp/claude-0/review-c2/arte/clave/1-encuadre-patio-4j-J2-fuera.jpg",
+  "/tmp/claude-0/review-c2/arte/clave/2-sofa-657fd30-izq-vs-c2-der.jpg",
+  "/tmp/claude-0/review-c2/arte/clave/3-manos-nevera-y-lampara.jpg",
+  "/tmp/claude-0/review-c2/arte/clave/4-J1-J4-en-gris-y-lampara-rota.jpg",
+  "/tmp/claude-0/review-c2/arte/clip-patio-2h.txt",
+  "/tmp/claude-0/review-c2/arte/clip-patio-3h.txt",
+  "/tmp/claude-0/review-c2/arte/clip-patio-4h.txt",
+  "/tmp/claude-0/review-c2/arte/clip-patio-1h3c-desp.txt",
+  "/tmp/claude-0/review-c2/arte/clip-calle-2h.txt",
+  "/tmp/claude-0/review-c2/arte/clip-calle-4h.txt",
+  "/tmp/claude-0/review-c2/arte/clip-calle-4h2c.txt",
+  "/tmp/claude-0/review-c2/arte/base-clip-calle-2h.txt",
+  "/tmp/claude-0/review-c2/arte/base-clip-calle-4h.txt",
+  "/tmp/claude-0/review-c2/arte/nav-agarres.txt",
+  "/tmp/claude-0/review-c2/arte/nav-camion.txt",
+  "/tmp/claude-0/review-c2/arte/nav-calle.txt",
+  "/tmp/claude-0/review-c2/arte/nav-base.txt",
+  "/tmp/claude-0/review-c2/arte/work/"
+ ]
+}

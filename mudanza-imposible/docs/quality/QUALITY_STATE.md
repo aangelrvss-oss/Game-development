@@ -96,7 +96,8 @@ Matices de la verificación sobre los críticos:
 |---|---|---|
 | 0 | Diagnóstico: auditoría protegida, línea base, dirección artística, checkpoint, estado persistente | **Cerrado** el 19-10-2026, ~21:05 UTC |
 | 1 | **Núcleo fiable**: entradas sin pérdidas (incluidos mandos y 4 jugadores); mano blanda con fuerza limitada y física única; alzado automático; cápsula a la anchura del muñeco y caída física sin `visOff`; pruebas de partida completa con 2, 3 y 4 jugadores. Especificación: [`cycles/ciclo-1.md`](cycles/ciclo-1.md) | **Implementado, revisado y corregido** (`7b67f61`: tsc OK, Vitest 71/71, `e2e:duo` 21/21, `e2e:teclado` OK). Crítico cerrado. Falta la segunda ronda de revisión (verificación de la corrección), que abre el ciclo 2. Un mayor (3.º y 4.º jugador sin papel) pasa al ciclo 2. |
-| 2 | Sistema de objetos (`ItemDef`) con objetos de varias manos y entrega en el camión con progreso; nivel como datos (`LevelDef`) con el recorrido actual como nivel de referencia; papel real para el 3.º y el 4.º jugador. Especificación: [`cycles/ciclo-2.md`](cycles/ciclo-2.md) | **Implementado e integrado, PENDIENTE DE REVISIÓN INDEPENDIENTE**: commit de integración `5cab122` (20-10-2026). Revisión independiente en curso. Sin corrección. **No es satisfactorio todavía**: hay mayores abiertos (sección 9). |
+| 2 | Sistema de objetos (`ItemDef`) con objetos de varias manos y entrega en el camión con progreso; nivel como datos (`LevelDef`) con el recorrido actual como nivel de referencia; papel real para el 3.º y el 4.º jugador. Especificación: [`cycles/ciclo-2.md`](cycles/ciclo-2.md) | **Integrado (`5cab122`) y revisado de forma independiente: NO SATISFACTORIO** (notas 4,5–6,5; global 5/10; 0 P0 y 5 P1). Se mantiene integrado como base provisional, sin revertir. Informe: [`reviews/2026-10-20-revision-ciclo-2.md`](reviews/2026-10-20-revision-ciclo-2.md). |
+| 2b | **Corrección del ciclo 2, propuesta y NO empezada.** Paso 0: pruebas de navegador fiables. Paso 1: entrega comprensible. Paso 2: fragilidad justa. Paso 3: piloto (R-C2-01). Paso 4: ayudantes con varios objetos. Paso 5: cámara y avisos. Paso 6: cooperación necesaria y señales. Las métricas de aceptación y las condiciones de parada están en el informe (sección 7). Los pasos 1, 2 y 6 necesitan antes una decisión humana. | Pendiente de autorización |
 | 3 | Nivel 1 completo («Una casa imposible»), con aprendizaje integrado | Pendiente |
 | 4 | Personajes y assets con Blender (muebles, camión) siguiendo la dirección artística | Pendiente |
 | 5 | Niveles 2–4 (escaleras, calle, almacén) | Pendiente |
@@ -126,7 +127,7 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
   - Cada iteración ejecuta o integra un único ciclo y programa la siguiente con `ScheduleWakeup`, como latido de respaldo de 30 minutos.
   - La señal principal es el aviso de fin del flujo de agentes del ciclo.
 - **Estado:** reactivado el 19-10-2026 a las ~21:00 UTC, después de cerrar y proteger el ciclo 0.
-- **Ciclo actual:** 2, integrado como `5cab122` y PENDIENTE DE REVISIÓN INDEPENDIENTE. No se empieza el ciclo 3 sin decisión humana.
+- **Ciclo actual:** 2, integrado (`5cab122`), revisado y NO satisfactorio. El siguiente es el 2b (corrección), pendiente de autorización y de las decisiones de diseño de la sección 7. **No se empieza ni el 2b ni el 3 sin autorización explícita.**
 - **DETENIDO el 20-10-2026 a las ~08:15 UTC por petición del usuario (revisión humana).**
   - `ScheduleWakeup` se paró y canceló el despertar pendiente; no queda ninguno programado.
   - Se esperó a que el agente del paso 3 hiciera su commit (`23b8c66`, árbol limpio, sin bloqueos de Git) y después se detuvo el flujo `wf_a0c2d6f7-d64`. En ese momento solo corrían dos revisores de solo lectura.
@@ -296,3 +297,42 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
        - Hay además un coste propio del diseño de `ec1d620`: las caídas en el camión pasan de 9 a 32.
        - **Alcance:** afecta a la demo, a la parte B de `duo-e2e` y a todas las mediciones que usan el piloto. A los jugadores reales solo les afecta el coste de la rampa y la caja de carga.
     - **No se ha corregido nada.**
+  - **Revisión independiente completa** (flujo `wf_5062ee7a-d85`; 7 agentes, ninguno con errores). Informe fechado: [`reviews/2026-10-20-revision-ciclo-2.md`](reviews/2026-10-20-revision-ciclo-2.md). Informes literales, capturas clave y evidencias en [`reviews/ciclo-2/revision-independiente/`](reviews/ciclo-2/revision-independiente/). Scripts en `scripts/audit/review-c2/`.
+    - **Notas:**
+      - e2e y regresiones: 5;
+      - física y sabotaje: 6;
+      - IA y modos de 1 a 4: 4,5;
+      - diversión y controles: 4,5;
+      - arte y clipping: 6,5;
+      - rendimiento y contenido: 5,5 (rendimiento unos 8 y contenido unos 3);
+      - árbitro de contraste: 5 global.
+    - **Ninguna dimensión llega a 8,5. Ronda NO satisfactoria.**
+    - **P1 abiertos, que bloquean la siguiente iteración:**
+      - C2-01: lámpara obligatoria rota de un golpe, derrota inmediata;
+      - C2-02: hay que soltar dentro del camión, no se dice y el aviso dice lo contrario;
+      - C2-04: patio con 4h y ayudantes, derrota determinista;
+      - R-C2-01: regresión del piloto (`autopilot.ts:533` y `:328`);
+      - C2-05: `e2e:duo` y `e2e:teclado` no sirven como criterio de aceptación (fragilidad de las pruebas, ~50 % en las dos versiones).
+    - **P2 abiertos:**
+      - C2-03: retener;
+      - C2-06: ayudantes con varios objetos;
+      - C2-07: cargar a rastras con menos gente;
+      - C2-08: cámara;
+      - C2-09: cobertura de pruebas;
+      - C2-10: el 4.º jugador;
+      - C2-13: objetos opcionales sin uso;
+      - H-01: señales de esfuerzo;
+      - H-02: tira y afloja (evidencia contradictoria);
+      - H-03: transporte individual con el sofá.
+    - **Discrepancias abiertas:**
+      - el 6/6 inicial de la base;
+      - la lámpara a 3,12 m/s;
+      - la mesa a solas (13,7 frente a 25–28 s);
+      - el tira y afloja;
+      - la separación numérica residual.
+    - **Decisión propuesta:** no revertir; ciclo de corrección 2b antes del 3, empezando por el paso 0 (pruebas de navegador fiables, sin tocar mecánicas).
+    - **Decisiones humanas necesarias:**
+      1. la regla de entrega (C2-02 y C2-03);
+      2. si un frágil obligatorio roto hace perder (C2-01);
+      3. si arrastrar con menos gente es válido (C2-07).
+    - **Estado:** no se ha cambiado ninguna mecánica ni código del juego. `/loop` está detenido y no hay despertares programados.

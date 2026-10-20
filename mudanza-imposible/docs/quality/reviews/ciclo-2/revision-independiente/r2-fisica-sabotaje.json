@@ -1,0 +1,207 @@
+{
+ "dimension": "Física cooperativa y sabotaje de un jugador (física y diseño de sistemas), ciclo 2 (5cab122) frente a 657fd30",
+ "score": 6,
+ "justification": "Todo lo he medido en Node con scripts propios. Están en /home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/fisica/ y los registros, en /tmp/claude-0/review-c2/fisica/. Los escenarios del sofá en «La calle» los he ejecutado con el mismo guion contra 5cab122 y contra 657fd30, en un worktree temporal que ya he borrado.\n\nhand.ts y la física de carrier.ts no cambian entre las dos versiones (el diff solo añade maxHands y comentarios). Por eso las regresiones de mi dimensión no vienen de la mano ni de las piernas, sino de las reglas nuevas (entrega dentro del camión, «nadie lo agarra», objetos frágiles) y de los objetos nuevos.\n\nLO QUE ESTÁ BIEN (automatizado):\n- Estabilidad muy buena:\n  - en reposo, |w| ≤ 8e-4 rad/s;\n  - los 7 objetos juntos en el camión quedan quietos y cargados;\n  - apretados contra la pared, como mucho 1,8 cm de penetración;\n  - nada atraviesa paredes ni suelo a 11 m/s;\n  - nada se encaja bajo la rampa.\n- Con minCarriers−1 ningún objeto despega, agarrando por cualquier punto: 0 de 252.\n- Tirar en contra es inútil: quien tira pierde el agarre en 0,38–0,55 s.\n- Soltar de golpe en la escalera o en las rampas retrasa lo mismo que en 657fd30.\n\nLO QUE IMPIDE EL 8,5:\n1. NUEVO: quien agarra un obligatorio sin tocar el mando impide ganar, y nadie se lo puede quitar (ni 3 contra 1). En «La calle» se pierde por tiempo; en 657fd30 se ganaba a 33,4 s.\n2. Correr a la velocidad normal contra la lámpara obligatoria la rompe: se pierde la partida a los 1,97 s.\n3. «Hace falta N» solo vale para levantar, no para entregar:\n   - el piano lo cargan 2 personas (26–27 s);\n   - la mesa, 1 persona (25 s);\n   - la nevera, 1 persona (36 s);\n   - el sofá, en cambio, no sube la rampa con 1 (el rozamiento decide la clase).\n4. Agarrar un objeto cargado lo descarga en el acto, y uno solo saca los ligeros en 1–1,6 s.\n5. Un saboteador activo en la rampa o en la abertura frena 60 s a dos con la mesa (controlador guiado). Esto lo tiene que confirmar una persona.\n\nDiversión, sensación y mandos: no se pueden juzgar con estas pruebas.",
+ "subscores": [
+  {
+   "aspect": "Estabilidad numérica y colisiones (6–130 kg)",
+   "score": 8.5,
+   "why": "Reposo sin vibración (|v| ≤ 2e-4 m/s, |w| ≤ 8e-4 rad/s). 7 objetos apilados en el camión, cargados y estables. Sin túneles a 11 m/s. Penetraciones transitorias de hasta 19 cm (lanzado al techo) y 37 cm (nevera cayendo 3 m) en un paso."
+  },
+  {
+   "aspect": "Clases de peso: levantar",
+   "score": 9,
+   "why": "0 de 252 combinaciones despegan con minCarriers−1 (12 direcciones + asas; para el piano, pares de 8 direcciones + pares de asas). Se cumple desde los datos."
+  },
+  {
+   "aspect": "Clases de peso: entregar («trampa»)",
+   "score": 4.5,
+   "why": "Piano cargado por 2 personas (26,5–27,4 s frente a 9,2–12,4 con 3–4). Mesa por 1 (25,2–28,5 s frente a 11,1–13,4). Nevera por 1 (36,0 s frente a 12,1). En llano, 2 empujan el piano a 1,48 m/s y 1 la mesa a 1,62 m/s."
+  },
+  {
+   "aspect": "Sabotaje físico (tirar, empujar, soltar)",
+   "score": 7.5,
+   "why": "Tirar en contra no sirve (se suelta en 0,4–0,55 s). Tirar de lado desvía 6–8 m sin soltarse. Una embestida contra el porteador hace soltar el sofá o el piano. Soltar en rampas: sin deslizamiento, mismo retraso que en 657fd30."
+  },
+  {
+   "aspect": "Sabotaje de reglas (retener, descargar, lámpara)",
+   "score": 3.5,
+   "why": "Retener bloquea la victoria sin contrajuego. La lámpara se rompe corriendo y se pierde al instante. Descargar es instantáneo."
+  },
+  {
+   "aspect": "Regresiones frente a 657fd30",
+   "score": 6,
+   "why": "Sin regresión de física: mano y piernas iguales, mismos retrasos al soltar, mismas tasas tras un tirón de lado (10/15 frente a 11/15) o una embestida (1/15 frente a 2/15). Regresión de diseño: retener ahora bloquea la victoria. Mejora: el sofá ya no se entrega con una sola persona."
+  }
+ ],
+ "claims": [
+  {
+   "claim": "Con minCarriers−1 el objeto no despega del suelo (como mucho lo arrastra)",
+   "source": "informe-paso1-objetos.json, T-item-2",
+   "verdict": "CONFIRMADO",
+   "evidence": "necesidad.ts (necesidad.log), agarrando por cualquier punto, despega en 0:\n- Mesa: 48 pruebas.\n- Nevera: 48 pruebas.\n- Sofá: 54 pruebas.\n- Piano con 2: 102 pruebas.\nLa base sostenida máxima es −0,00 m en los cuatro."
+  },
+  {
+   "claim": "El piano, entre dos, se arrastra a 0,9 m/s; mesa, nevera y sofá, uno solo, a 0,4–0,65 m/s; llevarlos entre los necesarios es 3–6 veces más rápido",
+   "source": "informe-paso1-objetos.json, risks",
+   "verdict": "REFUTADO",
+   "evidence": "necesidad.log, mayor avance en 4 s:\n- piano con 2: 1,48 m/s («puntos 0°+180° empuja», 5,91 m);\n- mesa con 1: 1,62 m/s («punto 270° empuja»);\n- sofá con 1: 1,03 m/s;\n- nevera con 1: 0,67 m/s.\nLlevada por dos, la mesa avanza 15,11 m en 6 s (2,5 m/s): la diferencia es de 1,5×, no de 3–6×. En el recorrido completo hasta cargar (trampa.log) es de 2,2–3×."
+  },
+  {
+   "claim": "El piano necesita 3 personas; mesa y nevera, 2",
+   "source": "ciclo-2.md, T-item-2",
+   "verdict": "PARCIAL",
+   "evidence": "Para levantarlo, sí. Para entregarlo, no (trampa.log):\n- «Patio, piano, 2 persona(s), tirando: … CARGADO a los 27.35 s»;\n- «Patio, mesa, 1 persona(s), tirando: … CARGADO a los 25.23 s»;\n- «Patio, nevera, 1 persona(s), tirando: … CARGADO a los 35.97 s».\nCaptura 2-piano-cargado-por-2.jpg: «¡ENTREGADO!», con el HUD en «Piano · 3 · cargado» y solo J1 y J2."
+  },
+  {
+   "claim": "La lámpara se rompe si cae o la arrolla un porteador corriendo, y no si se lleva andando y se deja con cuidado",
+   "source": "informe-paso1-objetos.json, T-item-3",
+   "verdict": "CONFIRMADO",
+   "evidence": "patio.log:\n- empujada a 1,56 y 3,12 m/s: «pending, integridad 100»;\n- a 5,20 m/s (la velocidad normal sin carga): «broken, integridad 0»;\n- un jugador que va hacia ella desde la salida: «fase lost a los 1.97 s de juego, motivo broken».\nNo he repetido la prueba de dejarla con cuidado."
+  },
+  {
+   "claim": "T-deliver: un objeto cuenta como cargado si nadie lo agarra; si se saca, deja de contar",
+   "source": "ciclo-2.md / informe-paso2",
+   "verdict": "CONFIRMADO",
+   "evidence": "descarga.log: al agarrarlo, «pasa a carried con 1 itemUnloaded en ese mismo paso». Se saca de la caja de carga:\n- caja: 0,97 s;\n- silla: 1,30 s;\n- lámpara: 1,55 s;\n- nevera: 3,17 s;\n- mesa: 9,03 s;\n- piano, con 2: 3,13 s.\nEfecto colateral, retener: ver los defectos."
+  },
+  {
+   "claim": "T-truck: caben al menos 4 objetos a la vez, todos cargados",
+   "source": "informe-paso2-niveles.json",
+   "verdict": "CONFIRMADO",
+   "evidence": "estabilidad.log, los 7 objetos dentro del camión: «|v| máx 3.8e-4 m/s, |w| máx 7.8e-4 rad/s, penetración máx 0.13 cm; cargados 7/7», con integridad 100 en todos."
+  },
+  {
+   "claim": "Partida de referencia: con 2 humanos, de 33,38 a 35,62 s, sin caídas",
+   "source": "informe-paso2-niveles.json",
+   "verdict": "CONFIRMADO",
+   "evidence": "calle-c2.log: «base2: won a 35.72 s, integridad 100 … caídas 0/0». calle-base.log (657fd30): «won a 33.38 s». La diferencia (+2,3 s) es la rampa del camión."
+  },
+  {
+   "claim": "Heredado del ciclo 1: uno solo arrastra el sofá agarrando por otros puntos (respaldo, 3,12 m en 3 s)",
+   "source": "ciclo-1/segunda-ronda-fisica-qa.json",
+   "verdict": "CONFIRMADO",
+   "evidence": "necesidad.log: sofá con 1, «punto 270° tira: avanza 4.10 m en 4 s». Sigue igual, pero en el ciclo 2 el sofá no sube solo la rampa del camión (ver «Fortalezas»)."
+  },
+  {
+   "claim": "R-C2-01: el piloto empeora con 4 humanos y 2 ayudantes (regresión de autopilot.ts)",
+   "source": "diagnostico-regresiones.md",
+   "verdict": "NO VERIFICADO",
+   "evidence": "Queda fuera de mi dimensión. Mis escenarios del piloto en «La calle» usan 2 pilotos con un PilotCrew compartido y sin PilotPlan: se construyen igual en las dos versiones y R-C2-01 no les afecta."
+  }
+ ],
+ "defects": [
+  {
+   "severity": "major",
+   "title": "Retener: un solo jugador que agarra un objeto obligatorio, sin tocar el mando, hace imposible ganar. Nadie se lo puede quitar.",
+   "evidence": "game.ts:654: `it.loadTime = this.phase === 'playing' && it.inHold && !held && still ? …`. En 657fd30 (game.ts:397-399) bastaba con que el sofá estuviera en la zona y fuera a menos de 1,5 m/s, aunque alguien lo agarrara.\n\ncalle-c2.log: «agarra-y-retiene: lost a 180.00 s … retiene 145.62 s». calle-base.log: «agarra-y-retiene: won a 33.43 s».\n\nretener.log: «NO lo suelta» en 19 de 20 combinaciones de 1 a 3 jugadores que tiran o sacuden 10 s con caja, mesa, sofá o piano. Solo se suelta la caja sacudida por 1 (1,38 s).\n\npatio.log: «retiene | … fase playing tras 30 s; cargados 4/5; el saboteador SIGUE agarrando».\n\nCaptura 4-retiene-la-caja.jpg: HUD «Cargados 4/5 · Caja · en camino», con J1 agarrando la caja dentro del camión.",
+   "repro": "cd mudanza-imposible\nnpx vite-node scripts/audit/review-c2/fisica/retener.ts\nONLY=retiene npx vite-node scripts/audit/review-c2/fisica/patio-sabotaje.ts\nSRC=src ONLY=retiene npx vite-node scripts/audit/review-c2/fisica/calle-sabotaje.ts\n(y lo mismo con SRC=<worktree de 657fd30>/mudanza-imposible/src)",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "La lámpara obligatoria se rompe al chocar a la velocidad normal de andar sin carga (5,2 m/s): un jugador pierde la partida del patio en 2 s, a propósito o sin querer",
+   "evidence": "items.ts:171: `fragility: { impactDv: 2.45, damage: 400 }`. carrier.ts: walkSpeed 5.2.\n\npatio.log:\n- con el mando a 1 (≈5,20 m/s): «broken, integridad 0»;\n- a 0,6 (3,12 m/s): «pending, integridad 100»;\n- «patio, un jugador corre a la lámpara desde la salida: fase lost a los 1.97 s de juego, motivo broken»;\n- «la caja llevada contra la lámpara: lámpara broken (0), fase lost».\n\nAdemás, dejarla caer 0,3 m al recolocar los objetos ya la rompía (primera ejecución de capturas.cjs: «t 0,47, lost, broken»).\n\nCaptura 3-lampara-arrollada.jpg: a 0:02.1, «¡Se ha roto: Lámpara de pie!» y la lámpara tachada en el HUD.",
+   "repro": "ONLY=lampara npx vite-node scripts/audit/review-c2/fisica/patio-sabotaje.ts",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "«Hacen falta N personas» solo vale para levantar: con menos gente se lleva a rastras y se CARGA el piano (con 2), la mesa (con 1) y la nevera (con 1). La clase depende del rozamiento: el sofá, de 66 kg, no sube solo la rampa; la mesa, de 65 kg, sí.",
+   "evidence": "trampa.log, piano:\n- 2 personas: «CARGADO a los 27.35 s» y «26.47 s»;\n- 3 personas: 12,42 y 9,73 s;\n- 4 personas: 9,17 y 9,47 s.\n\ntrampa.log, mesa y nevera:\n- mesa con 1: 25,23 y 28,45 s, frente a 11,08 y 13,38 s con 2;\n- nevera con 1: 35,97 s, frente a 12,10 s con 2.\n\nSofá con 1 desde el llano entre rampas: «NO cargado … 90.00 s».\n\nRozamiento: sofá 1,0 y mesa 0,6 (items.ts).\n\nLa prueba T-item-2 (tests/items.test.ts:224-227) solo exige `less.maxLow < 0.05` y `less.d < ok.d`.\n\nCapturas 1 y 2: 2 personas suben el piano por la rampa y lo cargan; el HUD dice «Piano · 3».",
+   "repro": "npx vite-node scripts/audit/review-c2/fisica/trampa.ts\nnpx vite-node scripts/audit/review-c2/fisica/necesidad.ts",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Descargar es instantáneo: con solo agarrar un objeto cargado deja de contar, y uno solo saca los ligeros en 1–1,6 s",
+   "evidence": "game.ts:644-648 (en estado `loaded`, si alguien lo agarra pasa a `carried` y se emite `itemUnloaded`).\n\ndescarga.log: «Caja … pasa a carried con 1 itemUnloaded en ese mismo paso; fuera de la caja de carga a los 0.97 s». Silla: 1,30 s. Lámpara: 1,55 s. Nevera: 3,17 s. Mesa: 9,03 s. Piano con 1: no sale; con 2: 3,13 s.\n\nEl contrajuego es volver a cargarlo (winHold de 1 s más el viaje). Parece caos cómico, pero se suma al defecto de retener.",
+   "repro": "ONLY=descarga npx vite-node scripts/audit/review-c2/fisica/patio-sabotaje.ts",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Bloqueo activo en la rampa o en la abertura del camión: un saboteador que se pone delante y empuja frena 60 s a dos personas con la mesa. Uno quieto se puede rodear.",
+   "evidence": "bloqueo.log:\n- «sin saboteador: mesa loaded (suelta a 10.37 s)»;\n- «pasivo en la rampa, el equipo va por z = +0,6 (lo rodea): loaded (10.00 s)»;\n- «activo en la rampa: carried (no llegan a soltarla en 60 s)»;\n- «activo en la abertura: carried (… 60 s)».\n\nLectura de código (carrier.ts, `control`): quien toca un objeto movible empuja como mucho HAND.maxH (300 N), pero una persona contra otra persona empuja con accel·masa (2240 N). La mecánica viene de antes (carrier.ts no cambia); el estrechamiento del camión es nuevo. En la puerta de «La calle», con pilotos, el efecto es pequeño en las dos versiones: +1,38 s (ciclo 2) y +1,39 s (657fd30).\n\nMi controlador es ingenuo y mi contrajuego automático («apartarlo entre dos») no funcionó. Hay que validarlo con personas.",
+   "repro": "npx vite-node scripts/audit/review-c2/fisica/bloqueo.ts",
+   "kind": "automatizado",
+   "regression": "anterior al ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Tirar de lado desvía el objeto 6–8 m en 6 s sin soltarse nunca; con el piano, tirar en contra AYUDA al equipo",
+   "evidence": "tira.log:\n- «Nevera, 2 + saboteador lado: avance 8.58 m, desvío 8.41 m; sueltas 0/0/0»;\n- «Sofá … lado: desvío 6.22 m»;\n- «Piano, 3 + saboteador contra: avance 11.31 m» frente a 10,68 m sin saboteador (su mano también sostiene);\n- «Piano … lado: caídas 0/1/0/1, equipo agarrando al final 2/3».\n\nMano sin cambios: viene de antes. En «La calle», el tirón de lado da las mismas tasas en las dos versiones: 10/15 ganadas en el ciclo 2 y 11/15 en 657fd30 (calle-batch-*.log).",
+   "repro": "ONLY=tira npx vite-node scripts/audit/review-c2/fisica/patio-sabotaje.ts\nBATCH=1 SRC=src npx vite-node scripts/audit/review-c2/fisica/calle-sabotaje.ts",
+   "kind": "automatizado",
+   "regression": "anterior al ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Tras un empujón o un tirón, el piloto se salta puntos de paso y se queda 170 s contra la fachada. Es fragilidad del piloto, no de la física: lo mismo en las dos versiones.",
+   "evidence": "autopilot.ts:231: `if (++this.wiggles >= 3 && this.wp < last) { this.advance(g); … }`. En la traza de tira-lado-patio (ciclo 2), el sofá se queda en (5.2, −12.1) entre la jardinera (x 3,7) y el café (x 6,8) mientras wp pasa de 3 a 11.\n\nTasas iguales en las dos versiones (calle-batch-*.log):\n- tirón de lado: 10/15 (ciclo 2) frente a 11/15 (657fd30);\n- embestida: 1/15 frente a 2/15.\nEn las embestidas, los coches destruyen el sofá en la calzada.\n\nUna persona jugando se recuperaría.",
+   "repro": "TRACE=1 ONLY=tira-lado SRC=src npx vite-node scripts/audit/review-c2/fisica/calle-sabotaje.ts",
+   "kind": "automatizado",
+   "regression": "anterior al ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Penetraciones transitorias grandes en choques muy rápidos (≥ 7,7 m/s): hasta 19 cm contra el techo y 37 cm al caer la nevera 3 m. Nunca atraviesa.",
+   "evidence": "estabilidad.log:\n- «Nevera: techo … pen. máx 19.04 cm»;\n- «Caída de 3 m … Nevera: pen. máx 37.00 cm; dentro»;\n- todos los lanzamientos acaban «dentro».\n\nEn juego se alcanzan 9,66 m/s (657fd30) y 11,00 m/s (ciclo 2) tras atropellos (calle-*.log). Como mucho, un fotograma de solape visible.",
+   "repro": "npx vite-node scripts/audit/review-c2/fisica/estabilidad.ts",
+   "kind": "automatizado",
+   "regression": "desconocido"
+  }
+ ],
+ "strengths": [
+  "Estabilidad en reposo y apilado excelente: |v| ≤ 2e-4 m/s y |w| ≤ 8e-4 rad/s para los 7 objetos en el suelo y en el camión. Los 7 objetos juntos en la caja de carga quedan cargados con integridad 100 (estabilidad.log).",
+  "Sin túneles: los lanzamientos a 11 m/s contra la cabina, las paredes, el techo y el suelo acaban siempre dentro, y desde fuera rebotan. 4 porteadores aprietan contra la pared con 1,8 cm de penetración como máximo, y una persona atrapada entre el piano y la pared no sale despedida (|v| 1,11 m/s). Nada se encaja bajo la rampa (bajo-rampa.log).",
+  "Levantar exige de verdad minCarriers personas, por cualquier punto y en cualquier dirección: 0 de 252 combinaciones despegan (necesidad.log).",
+  "Tirar en contra no sirve como sabotaje: el saboteador pierde el agarre en 0,38–0,55 s y el equipo apenas lo nota (mesa: 15,11 frente a 14,85 m en 6 s). Es igual en 657fd30.",
+  "Soltar de golpe en la rampa del camión no hace deslizarse el objeto (rozamiento 0,9: retrocede 0,00 m). En la escalera y en la rampa de la terraza retrasa lo mismo que en 657fd30: +2,51 frente a +2,55 s y +4,75 frente a +4,54 s.",
+  "Mejora frente a 657fd30: una persona sola ya no entrega el sofá al final. En 657fd30 ganaba en 2,2 s desde el llano; ahora no sube la rampa (solo-final.log)."
+ ],
+ "humanChecks": [
+  "Jugar con 3–4 personas en el patio, con una de ellas en el papel de «gamberro»: ¿retener, descargar y romper la lámpara se viven como caos cómico o como bloqueo frustrante? Retener no tiene contrajuego físico medible.",
+  "Comprobar si un equipo de personas reales puede apartar a quien bloquea la rampa o la abertura del camión (mi contrajuego automático no lo consiguió) y si al hacerlo se pierde la sensación de control.",
+  "Valorar si cargar el piano entre 2, o la mesa y la nevera con 1, «se siente» como trampa o como esfuerzo legítimo, y si el aviso «Pesa mucho» (solo sale cuando arrastra una persona sola) hace falta también con el piano entre 2.",
+  "Con mandos físicos, comprobar lo fácil que es chocar sin querer con la lámpara a la velocidad normal y si la lectura de su fragilidad (franja roja y blanca) basta para evitarlo.",
+  "Fuera de mi dimensión, pero visto en las capturas: la cámara sigue solo al objeto principal (world.ts:126/155). En el patio, quien lleva otro objeto puede quedar fuera de plano. Para las capturas 1 y 2 tuve que apuntar la cámara al piano desde la página (g.sofa = piano.body)."
+ ],
+ "files": [
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/fisica/comun.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/fisica/necesidad.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/fisica/trampa.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/fisica/calle-sabotaje.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/fisica/patio-sabotaje.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/fisica/bloqueo.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/fisica/retener.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/fisica/estabilidad.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/fisica/bajo-rampa.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/fisica/solo-final.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/fisica/piano-traza.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/fisica/capturas.cjs",
+  "/tmp/claude-0/review-c2/fisica/necesidad.log",
+  "/tmp/claude-0/review-c2/fisica/trampa.log",
+  "/tmp/claude-0/review-c2/fisica/calle-c2.log",
+  "/tmp/claude-0/review-c2/fisica/calle-base.log",
+  "/tmp/claude-0/review-c2/fisica/calle-batch-c2.log",
+  "/tmp/claude-0/review-c2/fisica/calle-batch-base.log",
+  "/tmp/claude-0/review-c2/fisica/tira.log",
+  "/tmp/claude-0/review-c2/fisica/patio.log",
+  "/tmp/claude-0/review-c2/fisica/patio2.log",
+  "/tmp/claude-0/review-c2/fisica/descarga.log",
+  "/tmp/claude-0/review-c2/fisica/bloqueo.log",
+  "/tmp/claude-0/review-c2/fisica/retener.log",
+  "/tmp/claude-0/review-c2/fisica/estabilidad.log",
+  "/tmp/claude-0/review-c2/fisica/bajo-rampa.log",
+  "/tmp/claude-0/review-c2/fisica/solo-final.log",
+  "/tmp/claude-0/review-c2/fisica/clave/1-piano-2-personas-rampa.jpg",
+  "/tmp/claude-0/review-c2/fisica/clave/2-piano-cargado-por-2.jpg",
+  "/tmp/claude-0/review-c2/fisica/clave/3-lampara-arrollada.jpg",
+  "/tmp/claude-0/review-c2/fisica/clave/4-retiene-la-caja.jpg"
+ ]
+}

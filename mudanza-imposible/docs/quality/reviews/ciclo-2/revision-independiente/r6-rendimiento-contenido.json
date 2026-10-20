@@ -1,0 +1,266 @@
+{
+ "dimension": "Rendimiento y calidad real del contenido (producto y QA de rendimiento), ciclo 2 (5cab122) frente a 657fd30",
+ "score": 5.5,
+ "justification": "RENDIMIENTO, unos 8/10, sin regresiones medibles.\n- Física y piloto: en Node, Game.step con 4 jugadores y 6 porteadores cuesta de media 0,25–0,34 ms por paso en «La calle» (p95 de 0,46 a 0,66) frente a 0,34–0,50 ms en 657fd30 (p95 de 0,57 a 0,99). En el patio, 0,29–0,34 ms (p95 de 0,47 a 0,57). El piloto suma de 0,02 a 0,06 ms. Las diferencias caben en el ruido, con 3 semillas por caso.\n- `npm run perf` y `npm run perf:patio`, 3 veces cada uno: mismas cifras en los dos árboles, y la relación patio/calle va de 1,01 a 1,22.\n- Navegador, con render por software y 4+6 porteadores a 1280×720: el fotograma se va en un 97–98 % en rasterizar. La física es el 0,2 % (0,5–0,7 ms) y el envío del dibujo desde JS el 2 % (5,3–6,1 ms). En «La calle», c2 tarda lo mismo que la base: 369/393/414 ms frente a 382/389/428 ms, con 388 frente a 392 llamadas de dibujo.\n- Bundle: +35 kB (2.940,64 kB; 1.030,74 kB con gzip). Arranque igual: mediana de 785 ms frente a 782 ms.\n- Memoria:\n  - con dispose, los cuerpos de Rapier se liberan (RSS estable en 214 MB tras 15 partidas; el control sin dispose crece unos 16 MB por partida);\n  - las geometrías y los programas son estables;\n  - hay una fuga heredada de texturas de GPU: la sombra de cada muñeco, unos 4 × 64×64 por reinicio. En el patio crece de forma lineal, de 21 a 57 texturas en 10 partidas.\n- No he podido validar una GPU real. Con unas 400 llamadas de dibujo sin agrupar, el coste en equipos modestos es un riesgo, no una regresión.\n\nCONTENIDO, unos 3,5/10: a nivel de prototipo técnico, lejos de una calidad comercial.\n- Niveles: de los 4 niveles del plan, no hay ninguno. Hay una sola escena jugable («La calle», el recorrido de siempre) y una escena de prueba que solo se abre por URL.\n- Objetos: hay 7. El sofá solo aparece en «La calle»; en el patio se usan 5. La nevera y el piano no sirven para nada: no dan estrellas, puntos ni victoria, y ninguna de las 51 partidas los cargó.\n- Arte: procedural. No existe ningún asset de Blender (.glb ni .blend); solo hay un setup.sh.\n- Audio: efectos sintetizados, sin música.\n- Récord: uno solo para todos los niveles.\n- Textos del patio: hablan del sofá y del semáforo.\n- HUD:\n  - «Estado de la carga 0 %» con un solo objeto roto;\n  - la cámara sigue solo a la mesa, así que J4 queda tapado o fuera de la pantalla;\n  - aparecen dos filas «Caja» que no se distinguen.\n- README contradictorio: dice «29 de 29 pruebas» (hay 112), da 0,10–0,14 ms por paso frente a los 0,27–0,45 ms de su propia sección del ciclo 2, y dice que no existen «más muebles».\n- Robustez del patio con ayudantes: 6 derrotas de 51. Con 4 humanos y 2 ayudantes atentos se pierde siempre: a los 134,42 s la mesa entra en el camión y la lámpara (obligatoria) se rompe dentro. Con la corrección experimental del piloto (R-C2-01) se pierden 2 de 3, así que no es solo cosa del piloto.\n\nNota global: 5,5. Está por debajo del umbral de 8,5 por el contenido, no por el rendimiento.",
+ "subscores": [
+  {
+   "aspect": "Coste de simulación (Game.step y piloto), con 4 jugadores y 6 porteadores en los dos niveles",
+   "score": 9,
+   "why": "Entre 0,25 y 0,34 ms por paso de media y p99 de 0,6 a 1,3 ms, frente a un presupuesto de 16,7 ms. Sin regresión frente a 657fd30 (0,34–0,50 ms). Los picos de 10–25 ms solo aparecen en el primer paso (calentamiento del JIT)."
+  },
+  {
+   "aspect": "Coste de dibujo en el navegador",
+   "score": 7,
+   "why": "El envío del dibujo cuesta 5,3–6,1 ms de JS por fotograma, con 345–412 llamadas de dibujo y 76–115 mil triángulos, igual que en la base. Con render por software, el 97 % del fotograma es rasterizado. No he podido medir una GPU real, y no hay instancias ni mallas fusionadas."
+  },
+  {
+   "aspect": "Memoria al reiniciar",
+   "score": 7.5,
+   "why": "Los cuerpos de Rapier, las geometrías y los programas se liberan. La textura de la sombra de cada muñeco no se libera: es una fuga heredada de unos 64 KB por reinicio, y en el patio se ve crecer de forma lineal (+4 texturas por partida)."
+  },
+  {
+   "aspect": "Bundle y primer arranque",
+   "score": 8,
+   "why": "2,94 MB (1,03 MB con gzip) en un solo fragmento: +35 kB frente a la base. El menú está listo en 0,6–1,0 s en local. Medí sin red real: con 4G hay que sumar la descarga de 1 MB."
+  },
+  {
+   "aspect": "Contenido frente al plan (niveles, objetos, arte, audio)",
+   "score": 3,
+   "why": "0 de 4 niveles. El patio es una escena de prueba que solo se abre por URL. 2 de los 7 objetos son decorativos y opcionales, sin recompensa. No hay ni un asset real (Blender sin usar), ni música, ni selector de nivel."
+  },
+  {
+   "aspect": "Coherencia de textos, HUD y resultados con varios objetos",
+   "score": 5,
+   "why": "La lista «Cargados N/M» funciona y tiene estados. En el patio fallan varias cosas: los textos de resultados y del menú hablan del sofá y del semáforo; aparece «Estado de la carga 0 %» con un solo objeto roto; la cámara solo sigue a la mesa; hay dos filas «Caja» iguales; el récord es el mismo para todos los niveles."
+  },
+  {
+   "aspect": "Robustez del patio con ayudantes (contenido jugable)",
+   "score": 4,
+   "why": "45 de 51 partidas ganadas. Con 4 humanos y 2 ayudantes atentos se pierde 3 de 3 por la lámpara rota dentro del camión; con 2 humanos y despistados, 3 de 6. Con la corrección experimental de R-C2-01 sigue perdiéndose 2 de 3."
+  },
+  {
+   "aspect": "README y documentación de rendimiento",
+   "score": 4,
+   "why": "Se contradice: 0,10–0,14 ms (línea 557) frente a 0,273–0,446 ms (línea 279); «29 de 29 pruebas» (línea 469); «No existe todavía: más muebles» (líneas 758–761)."
+  }
+ ],
+ "claims": [
+  {
+   "claim": "npm run perf («La calle» con ayudantes): 0,273, 0,316 y 0,446 ms por paso con 2, 4 y 6 porteadores",
+   "source": "informe-paso3-vista.json (measurements) y README.md:279",
+   "verdict": "PARCIAL",
+   "evidence": "Mis 3 ejecuciones, en /tmp/claude-0/review-c2/rendimiento/perf-c2.log: 2 → 0,232/0,223/0,258; 4 → 0,237/0,238/0,235; 6 → 0,304/0,393/0,338 ms. Es el mismo orden de magnitud, algo más bajo; la variación entre ejecuciones llega al 30 %."
+  },
+  {
+   "claim": "perf:patio: patio / calle = 1,19 (2 jugadores) y 1,07 (4 jugadores), por debajo de la referencia de 2",
+   "source": "informe-paso3-vista.json y README.md:279",
+   "verdict": "CONFIRMADO",
+   "evidence": "perf-patio-c2.log, 3 ejecuciones: con 2 jugadores, 1,01, 1,09 y 1,01; con 4, 1,14, 1,22 y 1,13. Pero la métrica es débil (scripts/perf-patio.ts:18-27): el patio tiene 25–29 cuerpos y «La calle» 73–77; solo se miden 40 s, con carriers = humans, y no entran ni el caso de 4+6 ni el coste por objeto."
+  },
+  {
+   "claim": "Física (npm run perf): 0,10–0,14 ms por paso con 2–6 porteadores",
+   "source": "README.md:557 (y 0,1–0,16 en README.md:395)",
+   "verdict": "REFUTADO",
+   "evidence": "Hoy salen de 0,22 a 0,39 ms por paso (perf-c2.log), y la base 657fd30 da de 0,22 a 0,38 (perf-base.log). El propio README da 0,273–0,446 en la línea 279."
+  },
+  {
+   "claim": "npm run build correcta; el JS ocupa 2.940,64 kB (1.030,74 kB con gzip)",
+   "source": "QUALITY_STATE.md §9, Pruebas antes de integrar",
+   "verdict": "CONFIRMADO",
+   "evidence": "build-c2.log: «dist/assets/index-nU-kwtRH.js 2,940.64 kB │ gzip: 1,030.74 kB». La base da 2.905,99 kB (1.018,01 con gzip): +35 kB."
+  },
+  {
+   "claim": "En el paso 1, perf sin regresión: HEAD 0,227/0,233/0,297 frente a nuevo 0,211/0,258/0,285",
+   "source": "informe-paso1-objetos.json",
+   "verdict": "CONFIRMADO",
+   "evidence": "coste-paso.ts con Game.step aislado, 4 humanos y 6 porteadores, 3 semillas: c2 entre 0,251 y 0,340 ms de media, frente a 0,339–0,499 en 657fd30. Con 2 y 2, c2 da 0,16–0,23 y la base 0,23–0,41. No hay regresión: las diferencias caben en el ruido."
+  },
+  {
+   "claim": "Ni los FPS ni el coste de dibujo cambian (229 frente a 233 llamadas de dibujo)",
+   "source": "r1-e2e-regresiones.json (revisor 1)",
+   "verdict": "CONFIRMADO",
+   "evidence": "En otra escena (4 jugadores y 6 porteadores, «La calle», nav-*-calle.json): fotograma de 368,9 ms frente a 381,5 en reposo, 392,6 frente a 389,3 en t=9 s y 413,9 frente a 427,7 en t=22 s; 388 frente a 392 llamadas y 107.945 frente a 109.781 triángulos."
+  },
+  {
+   "claim": "Blender solo se ha usado en una prueba de instalación; no hay ningún asset .glb ni .blend",
+   "source": "QUALITY_STATE.md §9 (verificación de solo lectura)",
+   "verdict": "CONFIRMADO",
+   "evidence": "`find . -path ./node_modules -prune -o \\( -name '*.glb' -o -name '*.gltf' -o -name '*.blend' -o -name '*.fbx' -o -name '*.obj' \\) -print` no devuelve nada. assets-src/ solo contiene blender/setup.sh."
+  },
+  {
+   "claim": "El mejor tiempo se comparte entre niveles",
+   "source": "QUALITY_STATE.md §9",
+   "verdict": "CONFIRMADO",
+   "evidence": "src/main.ts:319-321 usa una sola clave, localStorage 'mudanza.best', sin el id del nivel."
+  },
+  {
+   "claim": "La nevera y el piano, opcionales, no aportan nada a la partida",
+   "source": "QUALITY_STATE.md §9",
+   "verdict": "CONFIRMADO",
+   "evidence": "game.ts:610 da la victoria solo con los obligatorios. main.ts:332 calcula las estrellas solo con el tiempo y la integridad. El menú dice «lo opcional (nevera, piano) no hace falta» (captura patio-menu.png). En 51 partidas de matriz-patio-c2.jsonl, como máximo se cargaron 5 objetos."
+  },
+  {
+   "claim": "Patio con ayudantes: de 5/10 partidas ganadas a 10/10",
+   "source": "informe-paso3-vista.json",
+   "verdict": "PARCIAL",
+   "evidence": "Las configuraciones de su tabla se reproducen (2 humanos y 4 ayudantes atentos: won 61,62 s; 1 humano y 4 despistados, semilla 1: won 169,33 s). Pero fuera de la tabla, con 4 humanos y 2 ayudantes atentos, se pierde 3 de 3 («lost broken 134.42», lámpara) y con 2 humanos y despistados se pierde 3 de 6. En total, 45 de 51."
+  },
+  {
+   "claim": "R-C2-01: con 4 humanos y 2 ayudantes, el piloto empeora mucho «La calle»",
+   "source": "diagnostico-regresiones.md",
+   "verdict": "CONFIRMADO",
+   "evidence": "coste-c2.jsonl, «La calle» con 4+6: 130,95, 39,45 y 39,77 s, frente a 35,53, 36,88 y 41,65 s en la base (coste-base.jsonl). Con la corrección experimental del diagnóstico (diff-exp-ambos.patch), el patio con 4+6 pasa de 3 de 3 perdidas a 1 ganada, 1 perdida por rotura y 1 por tiempo."
+  },
+  {
+   "claim": "Capturas sin errores de página ni de consola",
+   "source": "informe-paso3-vista.json",
+   "verdict": "CONFIRMADO",
+   "evidence": "nav-c2-pruebas.json, nav-c2-calle.json y captura-derrota.txt: \"errores\": [] en todas mis sesiones de Chromium."
+  }
+ ],
+ "defects": [
+  {
+   "severity": "major",
+   "title": "El «Patio de pruebas» con ayudantes se pierde a menudo por la lámpara obligatoria; con 4 humanos y 2 ayudantes atentos, siempre",
+   "evidence": "matriz-patio-c2.jsonl: 45 de 51 ganadas. Perdidas: atentos 4h/6c, semillas 1–3, 'broken' a 134,42 s; despistados 2h/4c, semilla 3, a 33,5 s; despistados 2h/6c, semillas 2 y 3, a 27,3 y 31,23 s. Siempre se rompe la lámpara. derrota-patio-4h6c.log: «133.25 itemLoaded mesa» → «134.42 itemBroken lampara (9.10, 1.17, 1.56)» → «lose broken»: la mesa entra en el camión y tira la lámpara ya cargada. Sin ayudantes (4h/4c) se gana en 30,85 s. Con la corrección experimental de R-C2-01 (diff-exp-ambos.patch, en un worktree temporal): semilla 1 won 59,48; semilla 2 lost broken 84,53; semilla 3 lost time 240 (derrota-patio-exp-ambos.log).",
+   "repro": "cd /home/user/Game-development-rc2/mudanza-imposible && npx vite-node scripts/audit/review-c2/rendimiento/matriz-patio.ts | grep '^{'  ;  npx vite-node scripts/audit/review-c2/rendimiento/derrota-patio.ts -- 4 6 atentos 1",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "Contenido muy por debajo del plan: 0 de 4 niveles, 1 escena jugable, objetos sin uso real, ningún asset, sin música",
+   "evidence": "src/levels/index.ts:10-13 solo registra 'calle' y 'pruebas' (PATIO.test = true, patio.ts:86). En index.html no hay selector de nivel: solo se elige con ?nivel=. El sofá solo aparece en «La calle» (calle.ts:238), y en el patio la nevera y el piano son opcionales y no dan recompensa (game.ts:610, main.ts:332). No existe ningún .glb ni .blend (find vacío; assets-src/blender/setup.sh es lo único). El audio son 20 efectos sintetizados (sfx.ts:40-67), sin música.",
+   "repro": "find /home/user/Game-development-rc2/mudanza-imposible -path '*/node_modules' -prune -o \\( -name '*.glb' -o -name '*.blend' -o -name '*.ogg' -o -name '*.mp3' \\) -print ; grep -n \"calle:\\|pruebas:\" src/levels/index.ts ; grep -n nivel index.html",
+   "kind": "lectura de código",
+   "regression": "anterior al ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Los textos del patio hablan del sofá y del semáforo, que no existen en esa escena",
+   "evidence": "Captura c2-patio-derrota-lampara.jpg: título «Se ha roto: Lámpara de pie» y subtítulo «Demasiados golpes. Probad a cruzar con el semáforo y a no dejarlo caer.» (main.ts:330; el patio no tiene tráfico, patio.ts:105). El menú del patio dice «Enderezar el sofá volcado» y «El sofá pesa de verdad…» (docs/quality/reviews/ciclo-2/capturas/patio-menu.png).",
+   "repro": "NODE_PATH=$(npm root -g) node scripts/audit/review-c2/rendimiento/captura-derrota-patio.cjs http://localhost:4194/ /tmp/x.jpg   (con vite preview en el puerto 4194)",
+   "kind": "visual",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "«Estado de la carga 0 %» con un solo objeto roto de siete: la integridad es 100 menos la suma de los daños",
+   "evidence": "game.ts:258-260 `return Math.max(0, 100 - this.damageTotal)`. En la captura c2-patio-derrota-lampara.jpg, el HUD y los resultados marcan 0 % aunque 6 objetos siguen intactos. Romper un opcional frágil quita la estrella del 70 % aunque la partida siga.",
+   "repro": "Igual que el anterior; mirar la casilla «Estado de la carga» de la captura",
+   "kind": "visual",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Con varios objetos, la cámara solo sigue al objeto principal (la mesa): con 4 jugadores repartidos, J4 queda tapado o fuera de la pantalla",
+   "evidence": "world.ts:153-170: updateCamera usa game.sofaPos (el objeto main). patio.ts:100 fija `main: 0` (la mesa). En la captura c2-patio-4j6p-t22.jpg (t = 23,5 s), J4 queda debajo de los paneles de jugador, en el borde inferior, y la nevera queda cortada a la izquierda.",
+   "repro": "NODE_PATH=$(npm root -g) node scripts/audit/review-c2/rendimiento/mide-navegador.cjs http://localhost:4194/ c2 pruebas /tmp/x.json /tmp/x.jpg",
+   "kind": "visual",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "El récord es el mismo para todos los niveles",
+   "evidence": "main.ts:319-321: localStorage 'mudanza.best' sin el id del nivel. Un tiempo del patio (unos 30 s) pisaría el de «La calle».",
+   "repro": "grep -n \"mudanza.best\" src/main.ts",
+   "kind": "lectura de código",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "El README está desfasado y se contradice sobre rendimiento, pruebas y contenido",
+   "evidence": "README.md:557 da «0,10–0,14 ms por paso» y la línea 395 «0,1–0,16 ms», frente a «0,273, 0,316 y 0,446 ms» en la línea 279 y los 0,22–0,39 que he medido. La línea 469 dice «29 de 29 pruebas pasan» (hay 112). Las líneas 758-761 dicen «No existe todavía: Más niveles o muebles», con 7 objetos ya en el catálogo. La línea 559 dice «Menú listo en 1,9–2,8 s» y yo he medido 0,6–1,0 s.",
+   "repro": "grep -n \"0,10–0,14\\|29 de 29\\|Más niveles o muebles\\|0,273\" README.md",
+   "kind": "lectura de código",
+   "regression": "empeora en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Fuga de texturas de GPU al reiniciar: la textura de la sombra de cada muñeco no se libera",
+   "evidence": "dollRig.ts:279 crea un CanvasTexture de 64×64 por muñeco. DollView.dispose (dollView.ts:243-256) libera el material, pero no su map. sombra-muneco.txt: «liberadas: [false,false,false,false]» en c2 (los dos niveles) y en 657fd30. mem-c2-pruebas.jsonl: renderer.info.memory.textures crece 21→25→29…→57 en 10 partidas, +4 por partida exacto (unos 64 KB). fuga-texturas-pruebas.json: «storage 64x64 … {1:4, 2:4, 3:4, 4:4}» vivas. Las geometrías (366) y los programas (9) son estables.",
+   "repro": "NODE_PATH=$(npm root -g) node scripts/audit/review-c2/rendimiento/mem-reinicios.cjs http://localhost:4194/ pruebas 10 ; con `npx vite --port 4196`: node scripts/audit/review-c2/rendimiento/sombra-muneco.cjs http://localhost:4196/ pruebas",
+   "kind": "automatizado",
+   "regression": "anterior al ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "La métrica T-perf (patio/calle ≤ 2) no mide lo que pretende",
+   "evidence": "scripts/perf-patio.ts:18-27: compara el patio (25–29 cuerpos, 37–41 colliders) con «La calle» (73–77 cuerpos, 76–80 colliders), con carriers = humans, solo 40 s y sin 4+6. No aísla el coste por objeto: un mundo más pequeño con 7 objetos sale igual de barato. scripts/perf.ts además incluye el piloto en el tiempo por paso.",
+   "repro": "Leer scripts/perf-patio.ts; npm run perf:patio imprime los cuerpos y colliders de cada mundo",
+   "kind": "lectura de código",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Unas 400 llamadas de dibujo y unos 6 ms de JS por fotograma solo para enviar el dibujo, sin agrupar ni instanciar",
+   "evidence": "nav-c2-pruebas.json: 347–404 llamadas, 76–82 mil triángulos y render_js_med de 5,5–5,8 ms en una escena pequeña. nav-c2-calle.json: 345–407 llamadas, 90–115 mil triángulos, 5,3–6,1 ms. Igual en la base (385–412 llamadas). En un portátil modesto o un móvil puede comerse una parte grande de los 16,7 ms; está sin medir en una GPU real.",
+   "repro": "NODE_PATH=$(npm root -g) node scripts/audit/review-c2/rendimiento/mide-navegador.cjs http://localhost:4194/ c2 pruebas /tmp/x.json",
+   "kind": "automatizado",
+   "regression": "anterior al ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "La lista del HUD muestra dos filas «Caja» que no se distinguen",
+   "evidence": "Captura c2-patio-4j6p-t22.jpg: «Caja · en camino» aparece dos veces, sin número ni color propio. No se sabe cuál lleva cada jugador.",
+   "repro": "Ver /tmp/claude-0/review-c2/rendimiento/clave/c2-patio-4j6p-t22.jpg",
+   "kind": "visual",
+   "regression": "nuevo en ciclo 2"
+  }
+ ],
+ "strengths": [
+  "No hay regresión de rendimiento en ninguna medida: coste por paso, reparto del fotograma, llamadas de dibujo, triángulos, bundle (+35 kB) y arranque (785 frente a 782 ms).",
+  "La física cuesta muy poco: 0,25–0,34 ms por paso con 4+6 en los dos niveles (0,5–0,7 ms en el navegador, el 0,2 % del fotograma). El piloto suma 0,02–0,1 ms.",
+  "Game.dispose libera de verdad el mundo de Rapier: el RSS se queda en 214 MB en 15 partidas, y el control sin dispose crece unos 16 MB por partida. Las geometrías y los programas de Three.js son estables al reiniciar.",
+  "La lista «Cargados N/M» del HUD tiene estados claros (pendiente, en camino, cargado, roto e icono de manos) y no tapa los paneles a 1280×720.",
+  "Los objetos procedurales se reconocen en las capturas (mesa, cajas, nevera, piano y lámpara), y no hay errores de página ni de consola en ninguna sesión.",
+  "Sin ayudantes, el patio se gana siempre: 2 humanos en 45,85 s, 3 en 31,87 s y 4 en 30,85 s."
+ ],
+ "humanChecks": [
+  "FPS reales en una GPU de verdad (portátil con gráfica integrada y un móvil), con 4 jugadores en «La calle» y en el patio: aquí todo es render por software y solo valen las proporciones.",
+  "Si perder toda la partida porque la mesa tira la lámpara ya cargada dentro del camión (o porque un ayudante despistado la tumba) se vive como un caos divertido o como algo injusto.",
+  "Si con 4 jugadores en el patio la cámara, que solo sigue a la mesa, deja ver a todos; si quien lleva la caja se pierde de la pantalla.",
+  "Si la lista de 7 objetos del HUD se lee de un vistazo jugando (las dos «Caja» iguales, los iconos de manos) y si el aviso y el sonido de carga se notan.",
+  "Si los objetos opcionales (nevera y piano) despiertan algún interés sin recompensa, o si sobran.",
+  "El sonido de carga y de rotura con altavoces reales, y si se echa en falta la música.",
+  "Con mandos físicos, si el reparto entre objetos se coordina de forma natural (no se ha probado con personas)."
+ ],
+ "files": [
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/rendimiento/coste-paso.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/rendimiento/derrota-patio.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/rendimiento/matriz-patio.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/rendimiento/wasm-reinicios.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/rendimiento/mide-navegador.cjs",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/rendimiento/mem-reinicios.cjs",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/rendimiento/fuga-texturas.cjs",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/rendimiento/sombra-muneco.cjs",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/rendimiento/arranque.cjs",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/rendimiento/captura-derrota-patio.cjs",
+  "/tmp/claude-0/review-c2/rendimiento/clave/c2-patio-4j6p-t22.jpg",
+  "/tmp/claude-0/review-c2/rendimiento/clave/c2-calle-4j6p-t22.jpg",
+  "/tmp/claude-0/review-c2/rendimiento/clave/base-calle-4j6p-t22.jpg",
+  "/tmp/claude-0/review-c2/rendimiento/clave/c2-patio-derrota-lampara.jpg",
+  "/tmp/claude-0/review-c2/rendimiento/perf-c2.log",
+  "/tmp/claude-0/review-c2/rendimiento/perf-base.log",
+  "/tmp/claude-0/review-c2/rendimiento/perf-patio-c2.log",
+  "/tmp/claude-0/review-c2/rendimiento/coste-c2.jsonl",
+  "/tmp/claude-0/review-c2/rendimiento/coste-base.jsonl",
+  "/tmp/claude-0/review-c2/rendimiento/matriz-patio-c2.jsonl",
+  "/tmp/claude-0/review-c2/rendimiento/derrota-patio-4h6c.log",
+  "/tmp/claude-0/review-c2/rendimiento/derrota-patio-exp-ambos.log",
+  "/tmp/claude-0/review-c2/rendimiento/nav-c2-pruebas.json",
+  "/tmp/claude-0/review-c2/rendimiento/nav-c2-calle.json",
+  "/tmp/claude-0/review-c2/rendimiento/nav-base-calle.json",
+  "/tmp/claude-0/review-c2/rendimiento/mem-c2-pruebas.jsonl",
+  "/tmp/claude-0/review-c2/rendimiento/mem-c2-calle.jsonl",
+  "/tmp/claude-0/review-c2/rendimiento/mem-base-calle.jsonl",
+  "/tmp/claude-0/review-c2/rendimiento/fuga-texturas-pruebas.json",
+  "/tmp/claude-0/review-c2/rendimiento/fuga-texturas-calle.txt",
+  "/tmp/claude-0/review-c2/rendimiento/sombra-muneco.txt",
+  "/tmp/claude-0/review-c2/rendimiento/wasm-reinicios-pruebas.jsonl",
+  "/tmp/claude-0/review-c2/rendimiento/arranque.txt",
+  "/tmp/claude-0/review-c2/rendimiento/build-c2.log",
+  "/tmp/claude-0/review-c2/rendimiento/build-base.log",
+  "/tmp/claude-0/review-c2/rendimiento/captura-derrota.txt"
+ ]
+}

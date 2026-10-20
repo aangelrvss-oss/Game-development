@@ -1,0 +1,254 @@
+{
+ "dimension": "contraste",
+ "score": 5,
+ "justification": "Nota global del ciclo 2 (5cab122 frente a 657fd30): 5/10. Ninguna dimensión llega a 8,5, así que el ciclo 2 NO es satisfactorio.\n\nQué hay detrás de la nota:\n- Lo que funciona está bien medido. Las pruebas en Node son estables (tsc limpio y Vitest 112/112 deterministas). La física de mano y piernas no cambia. Lo dibujado coincide con los colliders (T-view 0,00 mm). «La calle» se gana con 1–4 humanos.\n- Las funciones nuevas del ciclo tienen defectos mayores reproducibles. Los he confirmado yo con scripts propios en Node:\n  - la lámpara obligatoria se rompe en un solo golpe con dv ≥ 2,70 m/s: andar contra ella con el mando al 80 % (4,16 m/s) hace perder la partida, y al 60 % le deja 14 de integridad;\n  - un objeto agarrado dentro del camión no cuenta nunca. Quien lo retiene bloquea la victoria (20 s: «cargados 4/5»), y al soltar se gana a los 1,30 s;\n  - el patio con 4 humanos y ayudantes atentos se pierde de forma determinista: 4h/6c 0/6 y 4h/5c 1/6, todas las derrotas en el mismo instante (134,42 s o 135,97 s) y siempre por la lámpara rota.\n\nDiscrepancias principales entre revisores. Las he resuelto con datos, no por votación:\n1. El revisor 1 llama «regresión» a la inestabilidad de duo-e2e (2/8 frente a 6/6). Con más muestras no se sostiene:\n   - navegador agregado: 11/16 frente a 7/18, p = 0,10;\n   - emulador del diagnóstico: 175/400 frente a 183/400;\n   - con las teclas S+↑ falla siempre, en las dos versiones: 0/139 y 1/141.\n\n   Es fragilidad de la prueba, presente en las dos versiones. Aun así invalida el criterio T-level-2.\n2. La «mediana 58,05» de R-C2-01 es la mediana superior de 8 valores. La convencional es 47,45. La distribución es bimodal: 4 semillas tardan unos 36 s y 4 entre 58 y 128 s. Además, en la misma tabla del revisor de IA, 4h+1 atentos MEJORA en el ciclo 2 (mediana de 72,70 a 41,94 s). Nadie lo comentó. El piloto con 4 humanos y ayudantes ya era frágil en la base.\n3. «Retener» y «hay que soltar» cumplen la especificación T-deliver («nadie lo agarra»). No son un fallo de implementación, sino una decisión de diseño con consecuencias que nadie anticipó: no hay contrajuego ni ninguna indicación en el HUD.\n4. El «NO REPRODUCIDO» de T-roles del director mide otra cosa (un piloto humanizado). El criterio literal se cumple, pero el 4.º jugador no aporta: M5 da 30,62 s y el código real, 30,85 s.\n\nFaltan, como evidencia, el informe del revisor de rendimiento (no me llegó; solo he leído sus registros) y el final del informe de arte (truncado).",
+ "subscores": [
+  {
+   "aspect": "Estabilidad E2E y regresiones (QA)",
+   "score": 5,
+   "why": "Mantengo el 5, pero con otra causa:\n- la inestabilidad de duo-e2e y keyboard-e2e es fragilidad de las pruebas, presente también en 657fd30 (diagnóstico 5/10 frente a 5/10; mi Fisher del agregado, p = 0,10), no una regresión;\n- el gate falla en torno al 50 % en las dos versiones;\n- ninguna prueba vigila a humanos con ayudantes, que el objeto esté quieto (M2) ni al 4.º jugador (M5);\n- en el patio, las semillas no exploran nada: mi matriz da el mismo instante en las 6 semillas."
+  },
+  {
+   "aspect": "Física cooperativa y sabotaje",
+   "score": 5.5,
+   "why": "La física base es sólida y sin regresión (mano y piernas iguales, estabilidad y sin túneles). Pero las reglas nuevas abren sabotajes sin respuesta (lo he reproducido):\n- retener bloquea ganar;\n- la lámpara se rompe al primer golpe;\n- piano, mesa y nevera se cargan con menos gente de la necesaria (evidencia del revisor de física leída, no repetida).\nBajo medio punto la nota del revisor (6): su «a 3,12 m/s la lámpara no sufre» no se sostiene; en mi prueba le deja 14 de integridad."
+  },
+  {
+   "aspect": "IA de ayudantes y modos de 1 a 4",
+   "score": 4,
+   "why": "Confirmo la derrota determinista del patio con 4h y ayudantes atentos: 0/6 con 6 porteadores y 1/6 con 5. Según el informe de IA, los ayudantes pasan aparcados el 78–81 % del tiempo jugando solo, y además hay un interbloqueo en el asa lateral (no lo he reproducido). En «La calle» funciona, pero R-C2-01 es bimodal y 4h+1 ya era malo en la base (72,70 s)."
+  },
+  {
+   "aspect": "Diversión y claridad",
+   "score": 4.5,
+   "why": "De acuerdo con el director:\n- la condición de victoria nueva (soltar) no se comunica, y el aviso en ese momento dice lo contrario (hud.ts:184, confirmado leyendo el código);\n- la lámpara castiga con la derrota inmediata;\n- los opcionales no dan nada (main.ts:331-337).\nLa diversión real no está medida: solo pilotos."
+  },
+  {
+   "aspect": "Arte, animación y clipping",
+   "score": 6.5,
+   "why": "Coherente con sus evidencias: clipping de 2–3 cm como máximo y T-view a 0,00 mm. En contra:\n- cámara anclada al objeto principal (world.ts:155, comprobado);\n- sin sombrero por jugador (dollRig.ts:222, heredado);\n- un objeto roto no se ve distinto;\n- el sofá ha perdido volumen.\nLo bajaría de grave a menor el sombrero (no está en la especificación del ciclo 2), pero eso no cambia la nota."
+  },
+  {
+   "aspect": "Rendimiento y contenido (informe no recibido)",
+   "score": 7,
+   "why": "Provisional: solo he leído sus registros.\n- perf: 0,22–0,39 ms por paso en las dos versiones;\n- menú visible a unos 780 ms en las dos;\n- fuga-texturas: 37 texturas vivas, sin conclusión que yo pueda verificar.\nEn contenido (verificación de solo lectura): ninguno de los 4 niveles del plan existe, no hay selector de nivel y el récord se comparte entre niveles. No se puede puntuar con rigor sin su informe."
+  }
+ ],
+ "claims": [
+  {
+   "claim": "duo-e2e es una regresión del ciclo 2: 2/8 en 5cab122 frente a 6/6 en 657fd30 (p≈0,009)",
+   "source": "Revisor 1 (r1-e2e-regresiones.json)",
+   "verdict": "REFUTADO",
+   "evidence": "Resultado automatizado (datos ya existentes, recalculados por mí con scripts/audit/review-c2/contraste/duo-tasas.py):\n- emulador del diagnóstico, 400 escenarios por versión: «657fd30 … KeyS+ArrowUp [139, 0], KeyA+ArrowRight [261, 175] total OK 175/400»; «23b8c66 … KeyS+ArrowUp [141, 1], KeyA+ArrowRight [258, 181] … total OK 183/400»;\n- navegador agregado (6/6 + 5/10 frente a 2/8 + 5/10): «Fisher bilateral p = 0.1».\nCon S+↑ falla siempre en las dos versiones: es el diseño de la prueba (duo-e2e.cjs:203-218), no el juego.\nEl 6/6 de la base del revisor 1 queda sin explicar: su worktree ya no existe. Lo dejo abierto como posible artefacto de entorno."
+  },
+  {
+   "claim": "El fallo de duo-e2e se debe al giro del sofá al soltar, que varía con los FPS",
+   "source": "QUALITY_STATE.md §9 (Pruebas antes de integrar)",
+   "verdict": "REFUTADO",
+   "evidence": "Lo refutan el revisor 1 (5,13 frente a 5,33 fotogramas por segundo, iguales) y el diagnóstico (mediana de 193,9 frente a 195,4 ms por fotograma).\nLa dependencia real está en qué fotograma cae cada pulsación y en qué teclas elige la prueba. El filo de π/4 que propuso el revisor 1 tampoco basta: el diagnóstico mide giros de 0,35 a 1,79 rad antes de tirar."
+  },
+  {
+   "claim": "T-level-2: e2e:duo y e2e:teclado siguen pasando",
+   "source": "cycles/ciclo-2.md / informe-paso3-vista.json",
+   "verdict": "REFUTADO",
+   "evidence": "Como criterio de aceptación no se cumple: «soltar» pasa en torno al 45–50 % en las DOS versiones (175/400 y 183/400). keyboard-e2e falla de forma intermitente por la doble pulsación de Espacio (keyboard-e2e.cjs:41-50); el diagnóstico grabó la secuencia `190:g0 195:r0`, idéntica en 657fd30. No es una regresión, pero el gate no sirve."
+  },
+  {
+   "claim": "R-C2-01: con 4 humanos y 2 ayudantes en «La calle», la mediana pasa de 33,87 a 58,05 s",
+   "source": "Revisor 1, diagnóstico y arte",
+   "verdict": "PARCIAL",
+   "evidence": "Automatizado (registros releídos): tiempos de c2 4h/6c = [35.27, 36.43, 36.75, 36.85, 58.05, 62.43, 65.65, 127.93] (regresion-c2.txt).\n- 58,05 es la mediana SUPERIOR; la convencional es 47,45 (la del revisor de IA). En la base: 33,87 frente a 33,20.\n- La distribución es bimodal: la mitad de las semillas solo cuesta unos 3 s más (la rampa).\n- No lo dijo nadie: en la misma tabla, 4h/5c atentos MEJORA, de una mediana de 72,70 s y peor caso de 105,65 en la base a 41,94 y 49,15 en el ciclo 2 (resumen-base-calle.txt frente a resumen-c2-calle.txt).\nEl mecanismo (autopilot.ts:533 y :328) lo confirma el experimento del diagnóstico. Solo afecta al piloto: la demo y las herramientas de medida."
+  },
+  {
+   "claim": "La lámpara obligatoria se rompe al chocar a la velocidad normal de andar (5,2 m/s) y se pierde la partida",
+   "source": "Revisor de física; director",
+   "verdict": "CONFIRMADO",
+   "evidence": "Automatizado (contraste-node.ts PARTE=lampara):\n- «mando 0.6: v máx 3.12 m/s → lámpara pending, integridad 14.00 … golpes dv [2.66]»;\n- «mando 0.8: 4.16 m/s → broken … fase lost (broken) … dv [3.17]»;\n- «mando 1: 5.20 m/s → broken … dv [4.00]».\nLectura de código: items.ts:180 `fragility: { impactDv: 2.45, damage: 400 }`, así que un golpe con dv ≥ 2,70 la deja a 0.\nDiscrepancia con física: su «a 3,12 m/s, integridad 100» no se reproduce (en mi prueba, 14)."
+  },
+  {
+   "claim": "Soltar la lámpara andando la rompe; parado, no",
+   "source": "Director (lampara-soltar.ts)",
+   "verdict": "PARCIAL",
+   "evidence": "El guion del director, repetido por mí: «andar 1,5 s y soltar andando: fase=lost … 2.55 impact dv=2.81». Mi variante, que sigue andando tras soltar en campo abierto: «soltarla en marcha: lámpara pending, integridad 100».\nEstá en el filo del umbral (2,81 frente a 2,70): a veces se rompe y a veces no, según cómo cae. T-item-3 («dejarla con cuidado») se cumple al pie de la letra."
+  },
+  {
+   "claim": "Retener: quien agarra un obligatorio dentro del camión impide ganar; en 657fd30 se ganaba igual",
+   "source": "Revisor de física; director («equipo que no suelta» 0/4 frente a 4/4)",
+   "verdict": "CONFIRMADO",
+   "evidence": "Automatizado (contraste-node.ts PARTE=retener): «J1 agarra true, 20 s sin tocar el mando: fase playing, cargados 4/5, caja carried (inHold true)»; al soltar, «gana: sí, 1.30 s después de soltar».\nLectura de código: game.ts:654 exige `!held`; 657fd30 game.ts:397-399 solo miraba la zona y una velocidad < 1,5 m/s.\nMatiz que no recoge ningún revisor: es lo que pide la especificación T-deliver («nadie lo agarra»). El defecto es de diseño y de comunicación, no de implementación."
+  },
+  {
+   "claim": "Patio con 4 humanos y ayudantes atentos: 0/8 con 2 ayudantes y 2/8 con 1; se pierde porque se rompe la lámpara",
+   "source": "Revisor de IA",
+   "verdict": "CONFIRMADO",
+   "evidence": "Automatizado, script propio (contraste-node.ts PARTE=patio, semillas 1–6):\n- «4h/4c: won@30.85 ×6»;\n- «4h/5c: lost/broken@135.97 en s1–s4 y s6; s5 won@61.17»;\n- «4h/6c: lost/broken@134.42 ×6 (rotos lampara)».\nSale idéntico en todas las semillas. El revisor de rendimiento lo reproduce con el parche del diagnóstico (exp-ambos): s1 gana, s2 pierde por la lámpara y s3 por tiempo. NO se debe solo a R-C2-01."
+  },
+  {
+   "claim": "El patio con ayudantes pasa de 5/10 a 10/10 partidas ganadas",
+   "source": "informe-paso3-vista.json",
+   "verdict": "REFUTADO",
+   "evidence": "Solo vale para las 10 configuraciones elegidas por el implementador.\n- Revisor 1: 23/24, con una derrota por tiempo en 1h/6c despistados, semilla 5.\n- Revisor de IA: 40 de 334 partidas perdidas con ayudantes.\n- Mi matriz con 4h: 1 de 12 ganadas con 5 o 6 porteadores."
+  },
+  {
+   "claim": "T-roles: el 3.º y el 4.º jugador aportan",
+   "source": "informe-paso3-vista.json; director dice «NO REPRODUCIDO»",
+   "verdict": "PARCIAL",
+   "evidence": "El criterio literal (4 frente a 2 ≥ 25 %, 3 < 2) se cumple: 45,85 / 31,68 / 30,85 s (revisor 1 y revisor de IA). Pero:\n- 4 frente a 3 solo gana un 2,6 %;\n- con el 4.º inactivo (mutación M5) se tarda 30,62 s;\n- con la salida «esquinas», 4 frente a 2 solo gana un 16,1 % (revisor de IA).\nEl «NO REPRODUCIDO» del director usa un piloto humanizado y otra métrica, y no refuta el criterio."
+  },
+  {
+   "claim": "El piano, entre dos, va a 0,9 m/s; llevarlos entre los necesarios es 3–6 veces más rápido",
+   "source": "informe-paso1-objetos.json",
+   "verdict": "REFUTADO",
+   "evidence": "Evidencia del revisor de física, leída y no repetida (trampa.log):\n- «Patio, piano, 2 persona(s), tirando: … CARGADO a los 27.35 s», frente a 9,17–12,42 s con 3–4;\n- en llano, 1,48 m/s con 2.\nLa verificación de solo lectura ya decía que la mesa la carga uno solo. Hay una cifra que no cuadra: 13,7 s (verificación) frente a 25,2–28,5 s (física). Lo atribuyo a métodos distintos, sin verificar; las dos coinciden en que se puede."
+  },
+  {
+   "claim": "P3 (transporte individual) EMPEORADO, frente a «mejora: el sofá ya no lo entrega uno solo»",
+   "source": "verificacion-pausa frente al revisor de física",
+   "verdict": "PARCIAL",
+   "evidence": "Las dos cosas son ciertas y no se contradicen: el sofá (rozamiento 1,0) ya no sube solo la rampa (solo-final.log), pero la mesa (rozamiento 0,6) y la nevera sí. El balance de la dimensión es negativo porque los objetos nuevos se pueden hacer trampa."
+  },
+  {
+   "claim": "Las caídas en la zona del camión pasan de 9 a 61",
+   "source": "Revisor 1; diagnóstico",
+   "verdict": "CONFIRMADO",
+   "evidence": "Los registros cuadran: el diagnóstico desglosa 9 → 32 (ec1d620, coste de la rampa y la caja de carga) → 61 (23b8c66, piloto). Lo de ec1d620 lo vivirían también jugadores reales; lo de 23b8c66, solo el piloto."
+  },
+  {
+   "claim": "Durante la entrega, el HUD no dice que hay que soltar y, al soltar, muestra el aviso de agarrar",
+   "source": "Director",
+   "verdict": "CONFIRMADO",
+   "evidence": "Lectura de código: hud.ts:179-184. La cadena de avisos no tiene ninguno para «soltad dentro del camión», y el último, `hints.grab`, sale siempre que ningún humano agarra. La captura del director (calle2-camion-tras-soltar.jpg) va en ese sentido; no he vuelto a abrir el navegador."
+  }
+ ],
+ "defects": [
+  {
+   "severity": "major",
+   "title": "[C2-01][P1] La lámpara de pie obligatoria se rompe de un solo golpe (dv ≥ 2,70 m/s) y hace perder la partida al instante",
+   "evidence": "Automatizado (contraste-node.ts, PARTE=lampara): andando contra ella sin carga, con el mando al 0,8 (4,16 m/s) → «broken … fase lost (broken) … dv [3.17]»; al 0,6 (3,12 m/s) → integridad 14.\nLectura de código: items.ts:180 `impactDv: 2.45, damage: 400`, es decir, 100 puntos con dv = 2,70.\nCorroboran:\n- física (patio.log: «lost a los 1.97 s»);\n- director (soltar en marcha: dv 2,81 → rota);\n- IA y rendimiento (derrotas del patio con ayudantes).\nImpacto en el jugador: se pierde en 2–5 s por un roce casual o, con ayudantes, por un tambaleo ajeno. Es la causa de casi todas las derrotas medidas en el patio.\nConfianza: alta.\nDependencias: subir impactDv o repartir el daño en varios golpes debe mantener T-item-3 (que se rompa al caer desde la altura de carga); hacerla opcional cambia T-deliver y T-roles. Va ligado a C2-04.",
+   "repro": "cd /home/user/Game-development-rc2/mudanza-imposible && ROOT=$PWD PARTE=lampara npx vite-node scripts/audit/review-c2/contraste/contraste-node.ts (salida en /tmp/claude-0/review-c2/contraste/lampara-retener.txt)",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "[C2-02][P1] La entrega exige soltar el objeto dentro del camión, la pantalla no lo dice y, al soltar, aparece el aviso contrario («Acercaos… agarradlo»)",
+   "evidence": "Lectura de código: game.ts:654 (`!held`) y hud.ts:179-184 (no hay aviso para soltar; `hints.grab` sale cuando ningún humano agarra).\nAutomatizado:\n- director: «equipo que nunca suelta» 0/4 en el ciclo 2 frente a 4/4 en 657fd30;\n- mi prueba: sin soltar, «cargados 4/5» durante 20 s; al soltar se gana a los 1,30 s.\nImpacto en el jugador: un grupo que no lee la nota del menú (index.html:119) puede sujetar el sofá dentro del camión hasta perder por tiempo.\nConfianza: alta en el mecanismo; media en cuánto confunde a personas reales (hace falta prueba humana).\nDependencias: es la regla de T-deliver tal como está escrita. Cambiarla (por ejemplo, contar como cargado lo que está dentro aunque lo agarren) cierra a la vez C2-03, pero cambia T-deliver y las pruebas de entrega. Un aviso en el HUD solo cierra este defecto.",
+   "repro": "ROOT=$PWD PARTE=retener npx vite-node scripts/audit/review-c2/contraste/contraste-node.ts; director: ROOT=$PWD npx vite-node scripts/audit/review-c2/director/humano.ts calle2 2 4 999",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "[C2-03][P2] Retener sin contrajuego: un solo jugador que agarra un objeto obligatorio sin tocar el mando impide ganar, y los demás no pueden quitárselo",
+   "evidence": "Automatizado: mi prueba en el patio, «caja carried (inHold true)» y «cargados 4/5» durante 20 s. Revisor de física: retener.log, «NO lo suelta» en 19 de 20 combinaciones con 1–3 que tiran o sacuden, y en «La calle» «agarra-y-retiene: lost a 180.00 s», frente a «won a 33.43 s» en 657fd30.\nImpacto en el jugador: en partidas con «gamberro», el sabotaje se convierte en un bloqueo total en lugar de caos cómico.\nConfianza: alta en el mecanismo; baja en cuánto molesta a personas reales.\nDependencias: misma causa que C2-02 (game.ts:654). Requiere una decisión de diseño (por ejemplo, permitir arrebatar el objeto o soltarlo con tirones), que afecta a la mano blanda (hand.ts), común a todo.",
+   "repro": "npx vite-node scripts/audit/review-c2/fisica/retener.ts; ROOT=$PWD PARTE=retener npx vite-node scripts/audit/review-c2/contraste/contraste-node.ts",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "[C2-04][P1] Patio con 4 humanos y ayudantes atentos: derrota determinista (4h/6c 0/6 y 4h/5c 1/6), porque un ayudante que suelta la mesa en el camión se tambalea y rompe la lámpara ya cargada",
+   "evidence": "Automatizado, script propio (contraste-node.ts PARTE=patio): «4h/4c: won@30.85 ×6»; «4h/5c: lost/broken@135.97 ×5, s5 won@61.17»; «4h/6c: lost/broken@134.42 ×6».\nLa traza del revisor de IA muestra el mecanismo: «133.50 release A4 → 133.65 wobble A4 → 135.97 impact lampara3 … lose broken». Con el parche del diagnóstico para R-C2-01, sigue perdiendo (rendimiento: exp-ambos, s2 rota y s3 por tiempo; IA: 4h+1 151,7 s).\nImpacto en el jugador: con 4 personas y ayudantes en el patio, los ayudantes pueden destruir lo ya cargado.\nConfianza: alta como resultado del piloto; media para personas reales (el tambaleo y la suelta del ayudante, bots.ts:160-171 y carrier.ts:698-701, no dependen del piloto).\nDependencias: C2-01 (lámpara) y R-C2-01. Hay que corregir antes C2-01 para saber cuánto queda.",
+   "repro": "cd /home/user/Game-development-rc2/mudanza-imposible && ROOT=$PWD PARTE=patio H=4 C=4,5,6 SEEDS=1-6 STYLES=atentos npx vite-node scripts/audit/review-c2/contraste/contraste-node.ts (/tmp/claude-0/review-c2/contraste/patio-4h.txt)",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "[R-C2-01][P1] Regresión del piloto automático (autopilot.ts:533 tryTime y :328 mayEnter): con 4h y 2 ayudantes en «La calle», cola de hasta 127,93 s",
+   "evidence": "Automatizado (registros del revisor 1 releídos): tiempos de c2 4h/6c = 35,27 / 36,43 / 36,75 / 36,85 / 58,05 / 62,43 / 65,65 / 127,93 s, frente a una mediana de 33,20 en la base. Distribución bimodal: la mediana convencional es 47,45, no 58,05. El experimento del diagnóstico confirma la causa (exp-trytime: mediana 35,93; caídas en el camión de 23 a 9).\nMatiz nuevo: 4h/5c atentos MEJORA (72,70 → 41,94 s), así que el piloto con 4 humanos y ayudantes ya era frágil en 657fd30.\nImpacto en el jugador: indirecto. Afecta a la demo y a la herramienta con la que se miden T-route, T-roles y help-batch, no a quien juega con mando.\nConfianza: alta en el mecanismo; media en su peso global.\nDependencias: volver a la línea de 657fd30 empeora T-roles con 2 (45,85 → 59,55 s, diagnóstico) y el patio con ayudantes (exp-patio del revisor de IA: 2h/2 atentos 6/8, 4h+1 151,7 s). Hay que arreglarlo con un criterio de falta de progreso, no revirtiendo.",
+   "repro": "ROOT=$PWD npx vite-node /home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/qa/regresion.ts calle (en los dos árboles); CFG=4,6,atentos ROOT=$PWD npx vite-node scripts/audit/review-c2/diagnostico/caidas.ts",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "[C2-05][P1] e2e:duo y e2e:teclado no sirven como gate: «soltar» falla en torno al 50 % y el agarre con Espacio se duplica, en las DOS versiones (fragilidad de las pruebas, no regresión)",
+   "evidence": "Automatizado (duo-tasas.py sobre los datos del diagnóstico):\n- 657fd30 175/400 y 23b8c66 183/400;\n- KeyS+ArrowUp 0/139 y 1/141, es decir, falla siempre;\n- navegador agregado, p = 0,10.\nkeyboard-e2e: doble pulsación con esperas de reloj de 150 ms (keyboard-e2e.cjs:41-50); en 657fd30 se reproduce la misma secuencia de entradas.\nImpacto en el jugador: ninguno directo. Bloquea la aceptación de T-level-2 y la vigilancia de regresiones en el navegador.\nConfianza: alta.\nDependencias: solo los scripts (duo-e2e.cjs:115-234 y keyboard-e2e.cjs:41-50). Si se arreglan sin fijar la orientación, la prueba puede perder su capacidad de detectar fallos del tambaleo.",
+   "repro": "python3 -I /home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/contraste/duo-tasas.py /home/user/Game-development/mudanza-imposible/docs/quality/reviews/ciclo-2/revision-independiente/diagnostico-evidencias",
+   "kind": "automatizado",
+   "regression": "anterior al ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "[C2-06][P2] Ayudantes con varios objetos en el patio: interbloqueo en el asa lateral al pie de la rampa y utilidad casi nula jugando solo (aparcados el 78–81 % del tiempo)",
+   "evidence": "Del revisor de IA, no reproducido por mí:\n- «norte|1|1|atentos|0/2 … time@240(0/5)», con la mesa parada en (1,4; −1,3) de t = 20 a 240 s;\n- 1h + 1–5 atentos: 63,80 / 62,37 / 62,85 / 63,08 / 63,60 s;\n- aparcados 0,79–0,81.\nLectura de código: bots.ts:199 solo da por bloqueado al ayudante si el objeto se mueve a más de 0,6 m/s; game.ts:217 da tier −1 a los objetos de una persona.\nImpacto en el jugador: jugando solo con ayudantes en el patio, «compañía» que no ayuda; con otras salidas, partidas que no terminan.\nConfianza: media (solo un revisor, mecanismo trazado).\nDependencias: M4b (el nivel 3 del reparto parece código muerto) y T-roles; tocar game.ts:217 cambia la regla «no quitar al jugador lo que lleva solo».",
+   "repro": "SF=$PWD/scripts/audit/review-c2/ia/salidas.ts; ROOT=$PWD MODE=patio H=1 C=2 SEED=1 SPAWNS=norte SPAWNS_FILE=$SF PASO=10 npx vite-node scripts/audit/review-c2/ia/traza.ts",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "[C2-07][P2] Las clases de peso solo valen para levantar: el piano se carga con 2, y la mesa y la nevera con 1, a rastras",
+   "evidence": "Del revisor de física (trampa.log), leído:\n- «piano, 2 persona(s) … CARGADO a los 27.35 s» (con 3–4, 9–12 s);\n- mesa con 1, 25,23 s; nevera con 1, 35,97 s.\nLa verificación de solo lectura ya lo vio con la mesa (13,7 s). La cifra difiere y la discrepancia queda abierta.\nLectura de código: tests/items.test.ts:224-227 solo exige `maxLow < 0.05`.\nImpacto en el jugador: la cooperación obligatoria se puede saltar, y el 3.º y el 4.º jugador pierden su papel.\nConfianza: alta.\nDependencias: cumple T-item-2 al pie de la letra, así que corregirlo cambia la especificación. Un umbral de rozamiento o de pendiente por masa afecta a la regla de «una sola física» y a T-roles.",
+   "repro": "npx vite-node scripts/audit/review-c2/fisica/trampa.ts",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "[C2-08][P2] La cámara (y el recorte de lo que tapa) sigue al objeto principal aunque ya esté cargado: con 4 jugadores en el patio, el 20 % de los fotogramas deja a alguien fuera de la imagen",
+   "evidence": "Lectura de código (comprobada): world.ts:155 `const s = game.sofaPos`, con el objetivo al 75 % sobre el objeto principal.\nAutomatizado (arte, Chromium): «fotogramas con algún humano fuera de la imagen 63/313 (20.1 %)». Director: 36 de 453 ticks con 2 jugadores.\nImpacto en el jugador: con varios objetos, un jugador pierde de vista a su muñeco o al objeto que lleva.\nConfianza: alta.\nDependencias: el HUD también usa sofaUp y stuckTime del principal (hud.ts:179-182); conviene corregirlos juntos. Puede afectar a las capturas de T-hud.",
+   "repro": "NODE_PATH=$(npm root -g) node scripts/audit/review-c2/arte/arte-navegador.cjs http://localhost:4192/ /tmp/claude-0/review-c2/arte/work encuadre",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "[C2-09][P2] Las pruebas no vigilan las combinaciones que fallan: humanos con ayudantes, objeto quieto (M2), reparto (M6), el 4.º jugador (M5), y las semillas del patio no exploran nada",
+   "evidence": "Del revisor 1 (mutaciones): M2 «112 passed … NO DETECTADA»; M6 112/112; M5 con el 4.º inactivo, 30,62 s, pasa T-roles.\nMío: en el patio, las 6 semillas de 4h/5c y 4h/6c terminan en el mismo instante (135,97 y 134,42 s).\nImpacto en el jugador: indirecto. C2-04 y R-C2-01 pasaron la integración en verde.\nConfianza: alta.\nDependencias: necesita varias salidas (como hizo el revisor de IA) y un caso con humanos y ayudantes; dependerá de cómo se corrijan R-C2-01 y C2-01.",
+   "repro": "python3 -I scripts/audit/review-c2/qa/mutar.py M2-entrega-sin-quieto M6-reparto-lejanos M5-cuarto-parado; ROOT=$PWD PARTE=patio H=4 C=5,6 npx vite-node scripts/audit/review-c2/contraste/contraste-node.ts",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "[C2-10][P2] El 4.º jugador sigue sin aportar (objetivo del ciclo): 4 frente a 3 mejora un 2,6 % en el patio y nada en «La calle»",
+   "evidence": "Medianas de T-roles: 45,85 / 31,68 / 30,85 s (revisor 1 y revisor de IA). Con el 4.º inactivo (M5), 30,62 s. Con 5 salidas del revisor de IA, en 3 de 5 se tarda más con 4 que con 3. En «La calle», 35,72 / 35,82 / 34,70 s.\nImpacto en el jugador: el 4.º jugador espera o estorba.\nConfianza: alta (con el piloto); con personas, sin medir.\nDependencias: C2-07 (si la clase de peso no obliga, el 4.º no hace falta); el piano es opcional y no da nada (main.ts:331-337).",
+   "repro": "npx vitest run tests/roles.test.ts; python3 -I scripts/audit/review-c2/qa/mutar.py M5-cuarto-parado",
+   "kind": "automatizado",
+   "regression": "anterior al ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "[C2-11][P3] Coste de diseño de la rampa y la caja de carga (ec1d620): caídas en el camión de 9 a 32 y unos 2–4 s más, y posibles atascos en el empalme de las dos rampas",
+   "evidence": "Diagnóstico: caídas en la zona del camión 9 → 32 (ec1d620), antes de la regresión del piloto. Director, con piloto humanizado: 2/20 derrotas en la etapa «Rampa» frente a 0/20 (p ≈ 0,49, no significativo); solo hay 1,5 m llanos entre las rampas (calle.ts:23).\nImpacto en el jugador: posible frustración al final del recorrido.\nConfianza: baja, sin personas.\nDependencias: levels/truck.ts y calle.ts; afecta a T-view (0,00 mm) y a T-deliver.",
+   "repro": "TRAZA=1 ROOT=$PWD npx vite-node scripts/audit/review-c2/director/humano.ts calle2 9 1 0",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "[C2-12][P3] Sin sombrero por jugador (ART_DIRECTION): en gris o con daltonismo, J1–J4 solo se distinguen por la etiqueta",
+   "evidence": "Lectura de código: dollRig.ts:222, una sola «Gorra roja ladeada» (comprobado); no hay cambios en src/view/doll. El revisor de arte lo da por mayor. Lo bajo a menor: no forma parte de la especificación del ciclo 2 y es heredado.\nImpacto: legibilidad con 4 jugadores.\nConfianza: alta.\nDependencias: ninguna con la física.",
+   "repro": "grep -n Gorra src/view/doll/dollRig.ts",
+   "kind": "lectura de código",
+   "regression": "anterior al ciclo 2"
+  }
+ ],
+ "strengths": [
+  "La física base no ha regresado: hand.ts y las piernas de carrier.ts no cambian (física). La reproducción cruzada del diagnóstico muestra que las diferencias numéricas vienen del orden de los colliders en Rapier (ec1d620) y no inclinan los resultados.",
+  "Coherencia entre dibujo y física verificada por tres vías: la prueba T-view (0,00 mm), la medición en juego del revisor de arte (≤ 2,7 cm) y la lectura de código del revisor 1 (las esquinas salen de matrixWorld).",
+  "Vitest 112/112 determinista y barajado; las 71 pruebas antiguas conservan nombre y umbrales.",
+  "«La calle» sigue ganándose con 1–4 humanos y con ayudantes; las derrotas con despistados (7/360 frente a 5/360) son heredadas.",
+  "Los revisores aportaron mecanismos trazados (archivo:línea) y experimentos de una línea, no solo síntomas. Eso permitió separar regresión de código, fragilidad de prueba y diseño."
+ ],
+ "humanChecks": [
+  "P1. Patio de pruebas con 2 parejas que no conozcan el juego (?nivel=pruebas): ¿identifican la lámpara como frágil? ¿Cuántas veces la rompen sin querer en 5 minutos y les parece justo perder por ello (C2-01)?",
+  "P1. «La calle» con 2 jugadores, sin instrucciones: ¿sueltan el sofá dentro del camión por sí solos? Anotar su reacción al aviso rojo «Acercaos… agarradlo» justo al soltar (C2-02).",
+  "P1. Patio con 4 personas y 1–2 ayudantes: ¿los ayudantes tumban objetos ya cargados al soltar la mesa? ¿Se entiende por qué se pierde (C2-04)? Esto separa lo que es del piloto de lo que viviría un jugador.",
+  "P2. Una persona en el papel de «gamberro» que retiene un objeto dentro del camión o bloquea la rampa: ¿los demás lo viven como caos cómico o como bloqueo? ¿Encuentran algún contrajuego (C2-03)?",
+  "P2. Con 4 personas: ¿el 4.º jugador tiene algo que hacer? ¿Les apetece llevar el piano entre 3, o lo arrastran entre 2 (C2-07, C2-10)?",
+  "P2. Jugando solo con 3–5 ayudantes en el patio: ¿se siente acompañado o solo (los ayudantes pasan el 80 % del tiempo aparcados)?",
+  "P3. Empalme entre la rampa de la terraza y la del camión en «La calle»: ¿atascos con personas reales (C2-11)?",
+  "P3. Encuadre con 4 jugadores en el patio: ¿alguien pierde de vista a su muñeco (C2-08)?",
+  "P4. Sonido de carga y de rotura con altavoces, y mandos físicos con 3–4 jugadores: nadie lo ha probado."
+ ],
+ "files": [
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/contraste/contraste-node.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/contraste/duo-tasas.py",
+  "/tmp/claude-0/review-c2/contraste/lampara-retener.txt",
+  "/tmp/claude-0/review-c2/contraste/patio-4h.txt",
+  "/tmp/claude-0/review-c2/contraste/duo-tasas.txt"
+ ]
+}
