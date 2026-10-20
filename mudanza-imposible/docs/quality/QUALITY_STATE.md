@@ -96,7 +96,7 @@ Matices de la verificación sobre los críticos:
 |---|---|---|
 | 0 | Diagnóstico: auditoría protegida, línea base, dirección artística, checkpoint, estado persistente | **Cerrado** el 19-10-2026, ~21:05 UTC |
 | 1 | **Núcleo fiable**: entradas sin pérdidas (incluidos mandos y 4 jugadores); mano blanda con fuerza limitada y física única; alzado automático; cápsula a la anchura del muñeco y caída física sin `visOff`; pruebas de partida completa con 2, 3 y 4 jugadores. Especificación: [`cycles/ciclo-1.md`](cycles/ciclo-1.md) | **Implementado, revisado y corregido** (`7b67f61`: tsc OK, Vitest 71/71, `e2e:duo` 21/21, `e2e:teclado` OK). Crítico cerrado. Falta la segunda ronda de revisión (verificación de la corrección), que abre el ciclo 2. Un mayor (3.º y 4.º jugador sin papel) pasa al ciclo 2. |
-| 2 | Sistema de objetos (`ItemDef`) con objetos de varias manos y entrega en el camión con progreso; nivel como datos (`LevelDef`) con el recorrido actual como nivel de referencia; papel real para el 3.º y el 4.º jugador. Especificación: [`cycles/ciclo-2.md`](cycles/ciclo-2.md) | **En pausa por revisión humana** (20-10-2026, ~09:10 UTC). Los 3 pasos de implementación están hechos (`a84984f`, `ec1d620`, `23b8c66`, rama local `rebirth/ciclo-2`), pero **sin revisión independiente ni corrección**. |
+| 2 | Sistema de objetos (`ItemDef`) con objetos de varias manos y entrega en el camión con progreso; nivel como datos (`LevelDef`) con el recorrido actual como nivel de referencia; papel real para el 3.º y el 4.º jugador. Especificación: [`cycles/ciclo-2.md`](cycles/ciclo-2.md) | **Implementado e integrado, PENDIENTE DE REVISIÓN INDEPENDIENTE**: commit de integración `5cab122` (20-10-2026). Revisión independiente en curso. Sin corrección. **No es satisfactorio todavía**: hay mayores abiertos (sección 9). |
 | 3 | Nivel 1 completo («Una casa imposible»), con aprendizaje integrado | Pendiente |
 | 4 | Personajes y assets con Blender (muebles, camión) siguiendo la dirección artística | Pendiente |
 | 5 | Niveles 2–4 (escaleras, calle, almacén) | Pendiente |
@@ -126,7 +126,7 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
   - Cada iteración ejecuta o integra un único ciclo y programa la siguiente con `ScheduleWakeup`, como latido de respaldo de 30 minutos.
   - La señal principal es el aviso de fin del flujo de agentes del ciclo.
 - **Estado:** reactivado el 19-10-2026 a las ~21:00 UTC, después de cerrar y proteger el ciclo 0.
-- **Ciclo actual:** 2, en pausa.
+- **Ciclo actual:** 2, integrado como `5cab122` y PENDIENTE DE REVISIÓN INDEPENDIENTE. No se empieza el ciclo 3 sin decisión humana.
 - **DETENIDO el 20-10-2026 a las ~08:15 UTC por petición del usuario (revisión humana).**
   - `ScheduleWakeup` se paró y canceló el despertar pendiente; no queda ninguno programado.
   - Se esperó a que el agente del paso 3 hiciera su commit (`23b8c66`, árbol limpio, sin bloqueos de Git) y después se detuvo el flujo `wf_a0c2d6f7-d64`. En ese momento solo corrían dos revisores de solo lectura.
@@ -203,7 +203,7 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
       - contactos sueltos de hasta 4,4 cm (la línea base daba 6,1 cm);
       - teletransportes sin comprobar el sitio;
       - coste por paso duplicado.
-- **Ciclo 2** (20-10-2026, en curso): ver [`cycles/ciclo-2.md`](cycles/ciclo-2.md).
+- **Ciclo 2** (20-10-2026; implementado, integrado y PENDIENTE DE REVISIÓN INDEPENDIENTE): ver [`cycles/ciclo-2.md`](cycles/ciclo-2.md) y su guion de agentes [`cycles/ciclo-2.workflow.js`](cycles/ciclo-2.workflow.js).
   - Flujo de agentes `wf_a0c2d6f7-d64` lanzado sobre `5505243`, en este orden:
     1. segunda ronda de revisión del ciclo 1 (2 revisores, worktree `Game-development-r1b`); si encuentra un crítico, el flujo se detiene;
     2. implementación en 3 pasos (worktree `Game-development-c2`, rama local `rebirth/ciclo-2`);
@@ -235,3 +235,42 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
         - la etiqueta J# salta;
         - levantarse dura 0,85 s en el dibujo y 0,6 s en la física.
     - **Esta ronda no es satisfactoria (6,5 < 8,5).** Los 6 mayores pasan al agente de corrección del ciclo 2, junto con los de su propia revisión.
+  - **Implementación** (informes literales en [`reviews/ciclo-2/`](reviews/ciclo-2/)):
+    - `a84984f`: catálogo `ItemDef` con 7 objetos y una sola física. **Hallazgo:** el sofá pesa 66,46 kg y no 90, porque Rapier pesa la caja redondeada por su caja interior. Es así desde antes del proyecto.
+    - `ec1d620`: `LevelDef` («La calle» y «Patio de pruebas»), camión con caja de carga y rampa, entrega con progreso y lista «Cargados N/M». La entrega dentro del camión añade unos 2 s a «La calle».
+    - `23b8c66`: objetos dibujados de forma procedural, ayudantes y piloto por equipos. T-roles: medianas 45,85, 31,68 y 30,85 s con 2, 3 y 4 humanos.
+    - `80b4d53`: evidencias. Son las 8 capturas a 1280×720 de [`reviews/ciclo-2/capturas/`](reviews/ciclo-2/capturas/) y el guion del flujo.
+  - **Pausa por revisión humana** (~08:15–10:50 UTC): el flujo se detuvo antes de su revisión y su corrección, que no llegaron a ejecutarse.
+  - **Verificación de solo lectura** sobre `c52a81c` frente a `23b8c66`, en [`reviews/verificacion-pausa/`](reviews/verificacion-pausa/):
+    - **Pruebas en Node:** tsc limpio; Vitest 71/71 frente a 112/112, también barajado; las 71 pruebas anteriores siguen con el mismo nombre; **ningún umbral rebajado** (solo adaptaciones de API); build correcta.
+    - **Coste del ciclo 2 en «La calle»:** la entrega es 2–6 s más lenta y las caídas de porteadores pasan de 24 a 48 en 30 partidas (28 en la zona del camión).
+    - **Los seis mayores del ciclo 1:**
+      - **P1** regresión con ayudantes: **EMPEORADO**, 11/512 perdidas frente a 7/512. Hay derrotas nuevas con atentos: el sofá se queda atascado al pie de la rampa del camión.
+      - **P2** `e2e:duo` inestable: **ABIERTO**. La reproducción en Node da lo mismo en las dos versiones, 62/85.
+      - **P3** transporte individual explotable: **EMPEORADO**. El sofá sigue igual (3,12 m en 3 s), y la mesa la mueve uno solo 4,88 m en 3 s y la mete en el camión del patio en 13,7 s; la nevera, en 23,6 s.
+      - **P4** tira y afloja: **ABIERTO**. No cambia: en 2 contra 1 no salta «¡Se escapa!» y la regla de tiempo nunca actúa.
+      - **P5** utilidad del 3.º y el 4.º jugador: **PARCIAL**. En el patio, el 3.º acorta un 30,9 %, pero el 4.º solo un 2,6 % más (en 2 de 3 salidas tarda más que con 3). En «La calle» no aportan.
+      - **P6** señales de esfuerzo: **ABIERTO**. No cambian, y con la caja salen «rayas» el 100 % del tiempo llevándola bien.
+    - **Contenido:**
+      - **Niveles:** de los 4 niveles del plan no existe ninguno. «La calle» es el recorrido mezclado de siempre y el patio es una escena de prueba. El nivel solo se elige por URL; el menú no tiene selector.
+      - **Objetos:** la nevera y el piano, opcionales, no aportan nada a la partida.
+      - **Récord:** el mejor tiempo se comparte entre niveles.
+      - **README:** está desfasado.
+      - **Sombreros:** no hay sombreros distintos por jugador.
+      - **Blender:** solo se ha usado en una prueba de instalación (un cubo en `/tmp`). No se ha creado ningún asset `.glb` ni `.blend`.
+  - **Pruebas antes de integrar**, sobre `23b8c66`:
+    - `npx tsc --noEmit -p .`: exit 0.
+    - `npx vitest run --maxWorkers=1`: «Test Files 7 passed (7) · Tests 112 passed (112)».
+    - `npm run build`: correcta; el JS ocupa 2.940,64 kB (1.030,74 kB con gzip).
+    - `keyboard-e2e`: «TODO OK», a 10,6 FPS con render por software.
+    - `duo-e2e`: **1 de 2 en verde.** La otra ejecución dio «FALLA soltar mientras tira: J2 se tambalea y cae — tambaleo true, caída false». Es P2, abierto desde `f8efb59` e idéntico en `c52a81c`: el resultado depende del giro que tenga el sofá al soltar, que en el navegador varía con los FPS. No se ha tocado ni la prueba ni el umbral.
+  - **Integración:**
+    - Merge `--no-ff` `5cab122`, «CICLO 2 — PENDIENTE DE REVISIÓN INDEPENDIENTE».
+    - Primer padre: `b7c54df`, sobre la referencia revisada `657fd30`. Segundo padre: `80b4d53`.
+    - El código es idéntico a `23b8c66`: el diff sin documentación ni auditoría sale vacío.
+    - Sobre el árbol integrado: tsc OK y Vitest 112/112.
+    - Para comparar: `git diff 657fd30 5cab122`. Para deshacer: `git revert -m 1 5cab122`.
+  - **Siguiente paso:**
+    1. Revisión independiente del ciclo 2 con revisores que no lo implementaron (diversión y controles, física cooperativa y sabotaje, IA y modos de 1 a 4, estabilidad e2e y regresiones, arte y clipping, rendimiento y contenido).
+    2. Después, prueba humana.
+    - No se corrige nada ni se empieza el ciclo 3 sin decisión humana.
