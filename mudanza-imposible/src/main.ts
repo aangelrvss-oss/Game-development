@@ -5,12 +5,15 @@ import type { BotStyle } from './sim/bots';
 import type { GameEvent, PlayerInput } from './sim/types';
 import { WorldView } from './view/world';
 import { InputManager } from './input/input';
+import { FixedStep, planPads, playerControls, type PadEvent } from './input/inputCore';
 import { Sfx, renderTrack, type SfxName } from './audio/sfx';
 import { NO_INPUT } from './sim/types';
 import { Hud } from './ui/hud';
 import { carrierName } from './view/doll/dollView';
 
 const DT = 1 / 60;
+/** Paso fijo de 1/60 s, como mucho 5 pasos por fotograma. */
+const stepper = new FixedStep(DT, 5);
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const params = new URLSearchParams(location.search);
@@ -41,41 +44,66 @@ let game: Game | null = null;
 let autopilot: Autopilot | null = null;
 let paused = false;
 let screen: 'menu' | 'play' | 'results' = 'menu';
-let acc = 0;
 let last = performance.now();
 let simTime = 0;
 let pendingResults: { g: Game; at: number } | null = null;
+/** Cuándo apareció la pantalla de resultados (reloj real): un A machacado al ganar no la salta. */
+let resultsShownAt = 0;
 const fpsSamples: number[] = [];
 const toastCooldown = new Map<string, number>();
 let testPilots: { game: Game | null; list: Autopilot[] } = { game: null, list: [] };
 
-// --- Menú ---
-function seg(id: string, values: (number | string)[], get: () => number | string, set: (v: number | string) => void, label = (v: number | string) => String(v)) {
-  const el = $(id);
-  const draw = () => {
+// --- Menú (ratón, teclado o mando: arriba/abajo elige la opción, izquierda/derecha la cambia) ---
+type Opt = number | string;
+interface MenuRow { id: string; values: Opt[]; get: () => Opt; set: (v: Opt) => void; label?: (v: Opt) => string; enabled?: (v: Opt) => boolean }
+const rows: MenuRow[] = [
+  { id: 'opt-humans', values: [1, 2, 3, 4], get: () => opts.humans, set: (v) => { opts.humans = v as number; if (opts.carriers < opts.humans) opts.carriers = opts.humans; } },
+  { id: 'opt-carriers', values: [2, 3, 4, 5, 6], get: () => opts.carriers, set: (v) => (opts.carriers = v as number), enabled: (v) => (v as number) >= opts.humans },
+  { id: 'opt-style', values: ['atentos', 'despistados'], get: () => opts.botStyle, set: (v) => (opts.botStyle = v as BotStyle), label: (v) => (v === 'atentos' ? 'Atentos' : 'Despistados') },
+];
+/** Opción elegida con el mando o las flechas (-1: aún no se ha usado; no se resalta ninguna). */
+let menuFocus = -1;
+function drawAll() {
+  rows.forEach((r, i) => {
+    const el = $(r.id);
     el.innerHTML = '';
-    for (const v of values) {
+    for (const v of r.values) {
       const b = document.createElement('button');
-      b.textContent = label(v);
-      b.className = get() === v ? 'on' : '';
-      if (id === 'opt-carriers' && typeof v === 'number' && v < opts.humans) b.disabled = true;
-      b.onclick = () => { set(v); drawAll(); };
+      b.textContent = r.label ? r.label(v) : String(v);
+      b.className = r.get() === v ? 'on' : '';
+      if (r.enabled && !r.enabled(v)) b.disabled = true;
+      b.onclick = () => { r.set(v); drawAll(); };
       el.appendChild(b);
     }
-  };
-  return draw;
+    el.parentElement?.classList.toggle('focus', i === menuFocus);
+  });
+  drawPadsNote();
 }
-const draws = [
-  seg('opt-humans', [1, 2, 3, 4], () => opts.humans, (v) => { opts.humans = v as number; if (opts.carriers < opts.humans) opts.carriers = opts.humans; }),
-  seg('opt-carriers', [2, 3, 4, 5, 6], () => opts.carriers, (v) => (opts.carriers = v as number)),
-  seg('opt-style', ['atentos', 'despistados'], () => opts.botStyle, (v) => (opts.botStyle = v as BotStyle), (v) => (v === 'atentos' ? 'Atentos' : 'Despistados')),
-];
-function drawAll() { draws.forEach((d) => d()); }
+function menuNav(dx: number, dy: number) {
+  if (dy) menuFocus = Math.max(0, Math.min(rows.length - 1, (menuFocus < 0 ? 0 : menuFocus) + dy));
+  else if (dx) {
+    if (menuFocus < 0) menuFocus = 0;
+    const r = rows[menuFocus];
+    const ok = r.values.filter((v) => !r.enabled || r.enabled(v));
+    const at = ok.indexOf(r.get());
+    const next = ok[Math.max(0, Math.min(ok.length - 1, at + dx))];
+    if (next !== undefined) r.set(next);
+  }
+  drawAll();
+}
+/** Qué mando llevará a qué jugador con la opción elegida (el mismo reparto que hará `start`). */
+function drawPadsNote() {
+  const pads = input.connectedPads();
+  if (!pads.length) {
+    $('pads-note').textContent = 'Mandos: conéctalos y pulsa un botón para que el navegador los detecte. Con mando, A o Start empieza y la cruceta cambia las opciones.';
+    return;
+  }
+  const plan = planPads(opts.humans, pads);
+  const who = pads.map((i) => `mando ${i + 1} → ${plan.has(i) ? `J${plan.get(i)! + 1}` : 'sin jugador'}`).join(', ');
+  $('pads-note').textContent = `Mandos: ${who}. Los demás jugadores van con el teclado. A o Start: empezar · cruceta: opciones · X: demo.`
+    + (input.hasNonStandardPad() ? ' Algún mando no tiene la distribución estándar: sus botones pueden no coincidir.' : '');
+}
 drawAll();
-setInterval(() => {
-  const n = input.pads().length;
-  $('pads-note').textContent = n ? `Mandos detectados: ${n}. El mando 1 es de J1, el 2 de J2…` : 'Conecta mandos y pulsa un botón para que el navegador los detecte (J3 y J4 solo con mando).';
-}, 1000);
 
 $('btn-start').onclick = () => start(false);
 $('btn-demo').onclick = () => start(true);
@@ -88,7 +116,9 @@ $('btn-menu-p').onclick = () => toMenu();
 input.onGlobal = (code) => {
   sfx.unlock();
   if (code === 'KeyM') { const m = sfx.toggleMute(); hud.toast(m ? 'Sonido apagado' : 'Sonido encendido'); }
-  if (screen === 'menu' && code === 'Enter') start(false);
+  const arrow = ({ ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] } as Record<string, number[]>)[code];
+  if (screen === 'menu' && arrow) menuNav(arrow[0], arrow[1]);
+  else if (screen === 'menu' && code === 'Enter') start(false);
   else if (screen === 'results' && (code === 'Enter' || code === 'KeyR')) start(!!autopilot);
   else if (screen === 'results' && code === 'Escape') toMenu();
   else if (screen === 'play' && code === 'Escape') setPaused(!paused);
@@ -108,6 +138,42 @@ function setPaused(p: boolean) {
   if (screen !== 'play') return;
   paused = p;
   show('pause', p);
+  // Lo pulsado durante la pausa (o justo antes) no se aplica al volver
+  input.clearPresses();
+  stepper.reset();
+}
+
+/** Acciones de los mandos, de cualquier mando y en cualquier pantalla (también los que no llevan a nadie). */
+function padAction(e: PadEvent) {
+  sfx.unlock();
+  if (e.action === 'connect' || e.action === 'disconnect') {
+    drawPadsNote();
+    if (screen === 'play' && game) {
+      hud.setControls(game, controlsOf(game));
+      const who = e.player !== null ? `J${e.player + 1}` : 'sin jugador';
+      hud.toast(e.action === 'connect' ? `Mando ${e.pad + 1} conectado: ${who}` : `Mando ${e.pad + 1} desconectado (${who})`, e.action === 'connect' ? 'good' : 'bad');
+    }
+    return;
+  }
+  if (screen === 'menu') {
+    if (e.action === 'confirm' || e.action === 'start') start(false);
+    else if (e.action === 'alt') start(true);
+    else if (e.action === 'up' || e.action === 'down') menuNav(0, e.action === 'up' ? -1 : 1);
+    else if (e.action === 'left' || e.action === 'right') menuNav(e.action === 'left' ? -1 : 1, 0);
+  } else if (screen === 'results') {
+    if (performance.now() - resultsShownAt < 800) return;
+    if (e.action === 'confirm' || e.action === 'start') start(!!autopilot);
+    else if (e.action === 'back') toMenu();
+  } else if (screen === 'play') {
+    if (e.action === 'start') setPaused(!paused);
+    else if (paused && (e.action === 'confirm' || e.action === 'back')) setPaused(false);
+  }
+}
+
+/** Controles de cada jugador humano según su dispositivo (teclado o mando asignado). */
+function controlsOf(g: Game) {
+  const helpers = g.carriers.some((c) => c.human === null);
+  return [0, 1, 2, 3].map((p) => playerControls(p, input.padOfPlayer(p), helpers));
 }
 
 function start(auto: boolean, fromGesture = true) {
@@ -117,12 +183,16 @@ function start(auto: boolean, fromGesture = true) {
   game = new Game(RAPIER, { humans, carriers: Math.max(opts.carriers, humans), botStyle: opts.botStyle, seed: Math.floor(Math.random() * 1e9) });
   autopilot = auto ? new Autopilot(0) : null;
   view.attach(game);
-  hud.setup(game, auto ? ['Piloto automático'] : ['WASD · agarrar Espacio · alzar Mayús izq. · girar Q/E', 'Flechas · agarrar Intro · alzar Mayús dcha. · girar , .', 'Mando 3', 'Mando 4']);
+  // Mandos repartidos para este número de jugadores; lo pulsado en el menú (Intro, A…) no cuenta en la partida
+  input.setPlayers(humans);
+  input.clearPresses();
+  const controls = controlsOf(game);
+  hud.setup(game, auto ? [{ ...controls[0], line: 'Piloto automático' }] : controls);
   hud.show(true);
   show('menu', false); show('results', false); show('pause', false);
   screen = 'play';
   paused = false;
-  acc = 0;
+  stepper.reset();
   simTime = 0;
   if (auto) hud.toast('Demo: el jugador 1 lo lleva el piloto automático', 'info');
 }
@@ -221,6 +291,7 @@ function results(g: Game) {
     ...(best !== null ? [['Mejor tiempo', `${best.toFixed(1)} s`, 'en este navegador']] : []),
   ].map(([a, b, c]) => `<div><small>${a}</small>${b}<small>${c}</small></div>`).join('');
   show('results', true);
+  resultsShownAt = performance.now();
 }
 
 // --- Bucle ---
@@ -232,33 +303,27 @@ function frame(now: number) {
   fpsSamples.push(dtReal);
   if (!capture) view.adapt(dtReal);
   if (fpsSamples.length > 120) fpsSamples.shift();
+  // Todos los mandos, en cada fotograma y en cualquier pantalla: así el Start de cualquiera pausa una sola vez
+  for (const e of input.poll()) padAction(e);
   if (game && screen !== 'menu') {
-    if (input.padStart()) { if (screen === 'play') setPaused(!paused); else if (screen === 'results') start(!!autopilot); }
     const g = game;
     if (!paused) {
       const humans = g.carriers.filter((c) => c.human !== null).length;
-      let inputs: PlayerInput[] = input.read(Math.max(1, humans));
-      acc += dtReal;
-      let steps = 0;
-      while (acc >= DT && steps < 5) {
+      // Las pulsaciones (agarrar, enderezar) esperan en `input` hasta el primer paso que se ejecute: a más de
+      // 60 Hz hay fotogramas sin ningún paso, y antes se perdían
+      const steps = stepper.frame(dtReal);
+      for (let i = 0; i < steps; i++) {
+        let inputs: PlayerInput[] = input.step(Math.max(1, humans));
         if (autopilot) inputs = [autopilot.input(g, DT)];
         g.step(DT, inputs);
         simTime += DT;
         for (const e of g.out) handle(e, g);
-        // Los flancos (agarrar, enderezar) solo cuentan en el primer paso del fotograma
-        inputs = inputs.map((i) => ({ ...i, grab: false, right: false }));
-        acc -= DT;
-        steps++;
       }
-      if (steps === 5) acc = 0;
       if (g.light.ped === 'green' && cooled('pedtick', 0.5) && g.sofaPos.z < 7 && g.sofaPos.z > -12) sfx.play('pedTick');
-    } else {
-      input.read(1);
     }
     hud.update(g);
     view.render(g, now / 1000, paused ? 0 : dtReal);
   } else {
-    input.read(1);
     // De fondo en el menú: la escena quieta
     if (!game) { game = new Game(RAPIER, { humans: 0, carriers: opts.carriers, botStyle: 'atentos' }); view.attach(game); }
     view.render(game, now / 1000, dtReal);
@@ -281,15 +346,15 @@ if (opts.auto) start(true, false);
     const fn = script ? (new Function('g', script) as (g: Game) => PlayerInput[]) : null;
     for (let f = 0; f < frames; f++) {
       const humans = g.carriers.filter((c) => c.human !== null).length;
-      let inputs: PlayerInput[] = fn ? fn(g) : input.read(Math.max(1, humans));
       const steps = Math.round(60 / fps);
       for (let i = 0; i < steps && screen === 'play'; i++) {
-        if (autopilot) inputs = [autopilot.input(g, DT)];
-        else if (fn && i > 0) inputs = (fn(g) ?? []).map((x) => ({ ...x, grab: false, right: false }));
+        // Con guion, sus pulsaciones cuentan en el primer paso del fotograma; con teclado, las consume el primer paso
+        const inputs: PlayerInput[] = autopilot ? [autopilot.input(g, DT)]
+          : fn ? (fn(g) ?? []).map((x) => (i > 0 ? { ...x, grab: false, right: false } : x))
+          : input.step(Math.max(1, humans));
         g.step(DT, inputs.length ? inputs : [NO_INPUT]);
         simTime += DT;
         for (const e of g.out) handle(e, g);
-        inputs = inputs.map((x) => ({ ...x, grab: false, right: false }));
       }
       if (pendingResults && simTime >= pendingResults.at) { const r = pendingResults; pendingResults = null; results(r.g); }
       if (g.light.ped === 'green' && cooled('pedtick', 0.5) && g.sofaPos.z < 7 && g.sofaPos.z > -12) sfx.play('pedTick');
@@ -299,11 +364,11 @@ if (opts.auto) start(true, false);
   },
   get simTime() { return simTime; },
   /**
-   * Pruebas y grabación: el piloto automático lleva a todos los jugadores humanos (uno por jugador).
-   * Uso: `advance(n, fps, 'return window.__mudanza.autoInputs(g)')`.
+   * Pruebas y grabación: el piloto automático lleva a todos los jugadores humanos (uno por jugador, con la ruta
+   * compartida). Uso: `advance(n, fps, 'return window.__mudanza.autoInputs(g)')`.
    */
   autoInputs(g: Game): PlayerInput[] {
-    if (testPilots.game !== g) testPilots = { game: g, list: g.carriers.filter((c) => c.human !== null).map((c) => new Autopilot(c.id)) };
+    if (testPilots.game !== g) testPilots = { game: g, list: Autopilot.team(g) };
     return testPilots.list.map((a) => a.input(g, DT));
   },
   sound: (from: number, to: number) => renderTrack(soundLog.filter((e) => e.t >= from && e.t < to).map((e) => ({ ...e, t: e.t - from })), to - from),

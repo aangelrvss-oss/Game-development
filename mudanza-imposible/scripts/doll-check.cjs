@@ -46,21 +46,22 @@ const noRoute = process.argv[4] === 'sin-ruta';
   if (!onlyRoute) {
   for (const i of [0, 1]) for (const [k, a] of [['frente', 0], ['tres-cuartos', 0.8], ['lado', Math.PI / 2], ['espalda', Math.PI]]) { await close(i, a); await shot(`0${i + 1}-J${i + 1}-${k}`); }
   // Agarran y llevan el sofá hacia arriba (teclas del juego simuladas por script de entrada)
-  const I = (o) => JSON.stringify(o);
-  await adv(1, `return [${I({ mx: 0, mz: 0, grab: true, lift: false, turn: 0, right: false })}, ${I({ mx: 0, mz: 0, grab: true, lift: false, turn: 0, right: false })}]`);
+  // Sin `lift`: al agarrar, la mano sube sola a la altura de carga
+  const I = (o) => JSON.stringify({ mx: 0, mz: 0, grab: false, turn: 0, right: false, ...o });
+  await adv(1, `return [${I({ grab: true })}, ${I({ grab: true })}]`);
   let worst = 0;
   for (let k = 0; k < 45; k++) {
-    await adv(1, `return [${I({ mx: 0, mz: -1, grab: false, lift: false, turn: 0, right: false })}, ${I({ mx: 0, mz: -1, grab: false, lift: false, turn: 0, right: false })}]`);
+    await adv(1, `return [${I({ mz: -1 })}, ${I({ mz: -1 })}]`);
     const f = await feet(); worst = Math.min(worst, ...f.filter((x) => x !== null));
     if (k === 30) await shot('10-llevan-juego');
   }
   await close(0, 1.2, 3.2, 1.4); await shot('11-llevan-cerca');
   // Cada uno hacia su lado y J2 suelta tirando: cae
-  await adv(42, `return [${I({ mx: 1, mz: 0, grab: false, lift: false, turn: 0, right: false })}, ${I({ mx: -1, mz: 0, grab: false, lift: false, turn: 0, right: false })}]`);
-  await adv(1, `return [${I({ mx: 1, mz: 0, grab: false, lift: false, turn: 0, right: false })}, ${I({ mx: -1, mz: 0, grab: true, lift: false, turn: 0, right: false })}]`);
+  await adv(42, `return [${I({ mx: 1 })}, ${I({ mx: -1 })}]`);
+  await adv(1, `return [${I({ mx: 1 })}, ${I({ mx: -1, grab: true })}]`);
   const states = [];
   for (let k = 0; k < 60; k++) {
-    await adv(1, `return [${I({ mx: 0, mz: 0, grab: false, lift: false, turn: 0, right: false })}, ${I({ mx: -1, mz: 0, grab: false, lift: false, turn: 0, right: false })}]`);
+    await adv(1, `return [${I({})}, ${I({ mx: -1 })}]`);
     const st = await p.evaluate(() => { const c = window.__mudanza.game.carriers[1]; return { w: c.wobbling, s: +c.stunned.toFixed(2) }; });
     states.push(st);
     if (k === 8 || k === 20 || k === 34 || k === 50) { await shot(`2${String(k).padStart(2, '0')}-J2-caida-juego`); await close(1, 0.6, 2.6, 2.4); await shot(`2${String(k).padStart(2, '0')}-J2-caida-cerca`); }

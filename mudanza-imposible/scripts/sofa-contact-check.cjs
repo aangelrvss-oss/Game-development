@@ -4,7 +4,8 @@
 // - la cápsula física de cada jugador (la que choca), y
 // - el cuerpo DIBUJADO del muñeco: tronco y cabeza como esferas (las manos y antebrazos no cuentan: tocar
 //   el mueble con ellas es agarrarlo).
-// Escenarios: empujar el lateral sin agarrar, agarrar y girar a los dos lados, alzar y llevar girando,
+// Escenarios: empujar el lateral sin agarrar, agarrar y girar a los dos lados, llevar girando (la mano sube sola a la
+// altura de carga: no hay tecla de alzar),
 // soltar y volver contra el sofá, soltar tirando (caída), caer contra el sofá (el mismo derribo que un coche)
 // y, con `ruta`, el recorrido completo con el piloto automático. Guarda primeros planos de cada escenario.
 const { chromium } = require('playwright');
@@ -23,7 +24,7 @@ const withRoute = process.argv[4] === 'ruta';
   await p.goto(`${url}?capture=1`);
   await p.waitForFunction(() => window.__mudanza);
   await p.evaluate(() => window.__mudanza.start(false, false));
-  const I = (o) => JSON.stringify({ mx: 0, mz: 0, grab: false, lift: false, turn: 0, right: false, ...o });
+  const I = (o) => JSON.stringify({ mx: 0, mz: 0, grab: false, turn: 0, right: false, ...o });
   const adv = (n, a = {}, b2 = {}) => p.evaluate(([n, s]) => window.__mudanza.advance(n, 30, s), [n, `return [${I(a)}, ${I(b2)}]`]);
   const shot = (name) => p.screenshot({ path: path.join(out, `${name}.png`) });
   /** Primer plano: cámara a `d` m del punto medio entre el jugador i y el sofá, girada `a`. */
@@ -92,10 +93,10 @@ const withRoute = process.argv[4] === 'ruta';
   await adv(1, { grab: true }, { grab: true });
   await scenario('2-giro-a', 50, { mz: -1 }, { mz: 1 }, { shotAt: 45, angle: 1.0 });
   await scenario('2-giro-b', 70, { mz: 1 }, { mz: -1 }, { shotAt: 65, angle: -1.0 });
-  // 3. Alzan y lo llevan girando
-  await scenario('3-alzan-llevan', 60, (k) => ({ mz: -1, mx: Math.sin(k / 8), lift: true }), (k) => ({ mz: -1, mx: -Math.sin(k / 8), lift: true }), { shotAt: 50, angle: 1.4 });
+  // 3. Lo llevan girando (en alto: al agarrar, la mano sube sola a la altura de carga; antes se alzaba con Mayús)
+  await scenario('3-llevan-girando', 60, (k) => ({ mz: -1, mx: Math.sin(k / 8) }), (k) => ({ mz: -1, mx: -Math.sin(k / 8) }), { shotAt: 50, angle: 1.4 });
   // 4. J1 empuja hacia el sofá mientras lo sujeta y J2 empuja de lado
-  await scenario('4-empuja-agarrado', 45, { mx: -1, lift: true }, { mz: 1 }, { shotAt: 40, angle: 1.1 });
+  await scenario('4-empuja-agarrado', 45, { mx: -1 }, { mz: 1 }, { shotAt: 40, angle: 1.1 });
   // 5. Sueltan y J1 se mete contra el extremo
   await adv(1, { grab: true }, { grab: true });
   await scenario('5-suelta-y-empuja', 45, () => ({}), {}, {});

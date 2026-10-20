@@ -1,6 +1,6 @@
 # La Mudanza Imposible · vertical slice físico
 
-Demo jugable en el navegador **para dos personas en el mismo teclado**. Entre los dos hay que llevar un sofá desde una casa hasta un camión de mudanzas. Por el camino hay una calle con tráfico, una puerta estrecha, una escalera con giro de 90° y una rampa de chapa sin barandilla. El sofá pesa: uno solo lo arrastra por un extremo a menos de la mitad de velocidad y no puede subirlo por la escalera. Si uno suelta mientras tira, se tambalea y puede acabar en el suelo.
+Demo jugable en el navegador **para 1 a 4 personas, en el mismo teclado o con mandos** (por defecto, dos en un teclado). Entre los dos hay que llevar un sofá desde una casa hasta un camión de mudanzas. Por el camino hay una calle con tráfico, una puerta estrecha, una escalera con giro de 90° y una rampa de chapa sin barandilla. El sofá pesa: uno solo lo arrastra por un extremo a menos de la mitad de velocidad y no puede subirlo por la escalera. Si uno suelta mientras tira, se tambalea y puede acabar en el suelo.
 
 Todo lo que ocurre sale de la simulación física (Rapier). No hay animaciones prefabricadas que muevan el sofá.
 
@@ -22,10 +22,10 @@ npm ci               # instala las versiones exactas del package-lock
 npm run dev          # abre http://localhost:5173
 ```
 
-1. En el menú ya están elegidos **2 jugadores y 2 porteadores** (sin ayudantes). Pulsa **Intro** o «¡A mover!».
-2. **J1** (muñeco de peto y gorra rojos, aro amarillo): **WASD** para moverse, **Espacio** para agarrar o soltar y **Mayús izquierda** para alzar.
-3. **J2** (muñeco de peto y gorra turquesa, aro azul claro): **flechas** para moverse, **Intro** para agarrar o soltar y **Mayús derecha** para alzar.
-4. Cada uno se pone en un extremo del sofá, lo agarran y lo llevan hacia arriba de la pantalla. El aro amarillo en el suelo marca el siguiente objetivo. **En la escalera hay que alzarlo** (mantener Mayús); la pantalla lo recuerda al llegar.
+1. En el menú ya están elegidos **2 jugadores y 2 porteadores** (sin ayudantes). Pulsa **Intro**, «¡A mover!» o **A**/**Start** en un mando. Las flechas o la cruceta del mando cambian las opciones.
+2. **J1** (muñeco de peto y gorra rojos, aro amarillo): **WASD** para moverse y **Espacio** para agarrar o soltar.
+3. **J2** (muñeco de peto y gorra turquesa, aro azul claro): **flechas** para moverse e **Intro** para agarrar o soltar. **J3** usa **IJKL** y **U**; **J4**, el teclado numérico (**8 4 5 6** y **0**). Con mandos, el teclado lleva a los primeros jugadores y los mandos, a los últimos.
+4. Cada uno se pone en un extremo del sofá, lo agarran y lo llevan hacia arriba de la pantalla. El aro amarillo en el suelo marca el siguiente objetivo. **No hay tecla de alzar:** al agarrar, las manos suben el sofá solas. Uno solo apenas lo arrastra por un extremo; entre dos va en el aire y sube la escalera.
 5. **Objetivo:** dejar el sofá en la zona verde junto al camión en menos de 3 minutos sin destrozarlo. **Retroceso** reinicia en cualquier momento; en la pantalla final, **Intro** vuelve a empezar.
 
 Para ver una partida completa sin tocar nada, usa «Ver demo automática» o abre `http://localhost:5173/?auto=1` (1 jugador con ayudantes).
@@ -47,7 +47,7 @@ Cuando todos los porteadores son humanos (por defecto, 2 de 2), se activa la fí
 
 Con ayudantes de la máquina se mantiene la física original (sofá ligero, fuerza sin límite y sin pérdidas de equilibrio). Los ayudantes y el piloto automático están ajustados a ella; con la física cooperativa los ayudantes sueltan y reagarran para desatascarse y se caían una y otra vez.
 
-**Por qué esta ruta.** El juego ya tenía partida completa, dos jugadores en un teclado, cronómetro, victoria, reinicio, sonido y pruebas; faltaba que hiciera falta cooperar y que hubiera tropiezos y caídas. Del laboratorio se trajo primero el modelo de equilibrio (la física) y después el muñeco (ver [Personajes](#personajes-el-muñeco-del-laboratorio)). La caída reutiliza el estado «tumbado» del juego, ya estable, en lugar de volcar la cápsula física como en el laboratorio.
+**Por qué esta ruta.** El juego ya tenía partida completa, dos jugadores en un teclado, cronómetro, victoria, reinicio, sonido y pruebas; faltaba que hiciera falta cooperar y que hubiera tropiezos y caídas. Del laboratorio se trajo primero el modelo de equilibrio (la física) y después el muñeco (ver [Personajes](#personajes-el-muñeco-del-laboratorio)). Al principio la caída solo se dibujaba; desde el ciclo 1 la cápsula física se tumba de verdad (ver [Coherencia entre dibujo y física](#coherencia-entre-dibujo-y-física-ciclo-1)).
 
 ## Personajes: el muñeco del laboratorio
 
@@ -64,8 +64,9 @@ Los jugadores humanos usan el muñeco desarrollado en `../mudanza-imposible-char
 | Física del personaje del laboratorio (cápsula que se vuelca, control propio, agarre) | **No** | Habría sustituido la física cooperativa que ya funciona. El muñeco del laboratorio solo lee datos; no mueve nada físico |
 | Equilibrio, caer y levantarse | Ya estaba (simplificado) en `carrier.ts` | El muñeco lo dibuja con sus propios gestos |
 
-**Adaptador** (`src/view/doll/dollView.ts`). Traduce el porteador del juego a lo que lee el muñeco (`DollSource`): estado, velocidad, orientación, desequilibrio, agarre y esfuerzo (sale de la tensión del agarre). Dos diferencias con el laboratorio:
-- **Caída.** En el juego, la cápsula sigue de pie mientras el porteador está en el suelo. El giro del cuerpo tumbado (hacia donde perdió el equilibrio, o hacia donde le lanzó un coche) y el levantarse se sintetizan aquí, girando alrededor de los pies y sin bajar del suelo.
+**Adaptador** (`src/view/doll/dollView.ts`). Traduce el porteador del juego a lo que lee el muñeco (`DollSource`): estado, velocidad, orientación, desequilibrio, agarre y esfuerzo (sale de la tensión del agarre). Diferencias con el laboratorio:
+- **Escala.** El muñeco se dibuja a escala 0,89 (`DOLL_SCALE`): su tronco tiene el radio de la cápsula física (0,32 m) y su altura, la de la cápsula (1,38 m).
+- **Caída.** El collider del porteador se tumba de verdad (`Carrier.stepDown`) y el muñeco se dibuja con su pose, sin inventarla.
 - **Altura del suelo.** El laboratorio la tenía como función; aquí es un rayo de Rapier solo contra la geometría fija (ni el sofá ni otros porteadores).
 
 **Identificación.** J1 conserva los colores originales (peto y gorra rojos). J2 lleva peto y gorra turquesa y pelo oscuro; J3 y J4 tienen variantes rosa y verde. Además, cada uno tiene su aro y su etiqueta de color, y su nombre en la interfaz («Porteador rojo», «Porteador turquesa»).
@@ -79,8 +80,7 @@ Los jugadores humanos usan el muñeco desarrollado en `../mudanza-imposible-char
 
 **Límites del muñeco en el juego:**
 - **La cara se ve poco con la cámara del juego.** La cámara es alta y desde el sur, y al llevar el sofá hacia el norte se les ve sobre todo de espaldas y desde arriba: se les reconoce por la gorra, el color del peto, el aro y la etiqueta. Solo giran la cabeza hacia la cámara (hasta 1 rad) cuando hacen mucha fuerza o se tambalean.
-- **El muñeco es unos 4 cm más ancho que su cápsula.** Desde el 19-10-2026, si el tronco o la cabeza entran en el sofá, el dibujo se aparta lo justo (ver [Colisiones con el sofá](#colisiones-con-el-sofá-corregido-el-19-10-2026)). Contra paredes y otros objetos puede rozar unos centímetros.
-- **El cuerpo tumbado es dibujo:** la cápsula física sigue de pie. Desde el 19-10-2026 se dibuja hacia una dirección libre de sofá y paredes. Si no hay ninguna libre (un rincón), puede seguir entrando en una pared.
+- **Lo dibujado es el cuerpo físico** (desde el ciclo 1; antes el muñeco era 4 cm más ancho que la cápsula y el dibujo se apartaba del sofá para esconderlo). Ver [Coherencia entre dibujo y física](#coherencia-entre-dibujo-y-física-ciclo-1).
 - **No lleva contorno de dibujo animado** como el resto del juego. Es un diseño provisional.
 - **Coste de dibujo.** Con los materiales físicos del laboratorio (capa transparente y brillo de tela), dos muñecos dejaban el render por software de este contenedor en 3,7 fotogramas por segundo. Las pruebas en tiempo real empezaron a fallar porque algunas pulsaciones cortas caían entre dos fotogramas.
   - En el juego, el muñeco usa materiales estándar, como el resto de la escena, y solo sus piezas grandes proyectan sombra.
@@ -135,7 +135,7 @@ Hecha el 19-10-2026 sobre la partida a dos. Punto de partida: rama limpia, 26 de
 - **La espera al semáforo** (hasta 17 s) es tiempo muerto para los dos.
 - **Leve deriva del sofá** agarrado y quieto.
 - **Q/E** hace que quien lo pulsa rodee el sofá. Falta comprobar con personas si se entiende o si basta con tirar a la contra.
-- **Las pruebas con dos pilotos automáticos** a veces se bloquean entre sí: cada piloto retrocede por su cuenta. Es una limitación de las pruebas, no del juego.
+- **Las pruebas con varios pilotos automáticos** se bloqueaban entre sí: cada piloto retrocedía por su cuenta. Corregido en el ciclo 1 (paso 4): los pilotos de un equipo comparten la ruta (ver [Piloto para 2, 3 y 4 humanos](#piloto-para-2-3-y-4-humanos-y-scripts-de-navegador-ciclo-1)).
 
 ## Colisiones con el sofá (corregido el 19-10-2026)
 
@@ -171,6 +171,7 @@ En el gameplay, los porteadores parecían atravesar el sofá. Se midió antes de
 3. **En la vista, el dibujo se distingue de la cápsula de forma explícita** (`DollView`):
    - Si el tronco o la cabeza dibujados entran en el sofá, el muñeco se aparta lo justo y de forma suave: hasta 20 cm de pie y 60 cm tumbado. Nunca mientras agarra, para que las manos sigan en el asa.
    - Al caer, el cuerpo se dibuja hacia la dirección del golpe si cabe; si no, hacia la dirección libre más parecida, comprobando el sofá y las paredes.
+   - *Retirado en el ciclo 1:* apartar el dibujo escondía los solapes en vez de evitarlos. Ver [Coherencia entre dibujo y física](#coherencia-entre-dibujo-y-física-ciclo-1).
 
 **En el modo con ayudantes no se activó el choque al agarrar.** Se probó y su fuerza sin límite empujaba y lanzaba el sofá: 4 de 8 partidas de prueba acababan con el sofá roto, y 6 de 10 aun limitando su empuje. Además, la mano que sigue al sofá arrastraba a los cuatro ayudantes a su alrededor. Ese modo queda exactamente como antes: mismos resultados en las simulaciones de referencia. En él, el jugador humano puede seguir solapando el sofá al girarlo agarrado.
 
@@ -194,6 +195,63 @@ En el gameplay, los porteadores parecían atravesar el sofá. Se midió antes de
 - Soltar tirando: 36 de 42 caídas ahora, 37 antes; tambaleo en los 42 casos en las dos versiones.
 - Girar primero y soltar después: 16 de 24 caídas en las dos versiones.
 - El recorrido a dos con el piloto automático se completa (42,4 s, antes 46,4 s).
+
+## Coherencia entre dibujo y física (ciclo 1)
+
+Objetivos T-coh-1 y T-coh-2 de `docs/quality/cycles/ciclo-1.md`. Ya no hay desplazamiento del dibujo (`visOff`): lo que se ve es lo que choca.
+
+**Anchura y altura.** El muñeco medía 0,359 m de tronco y 1,55 m con la gorra; la cápsula, 0,32 × 1,30 m.
+- Se ajusta el muñeco a la cápsula: se dibuja entero a escala 0,89, con las mismas proporciones (`DOLL_MODEL` y `DOLL_SCALE` en `carrier.ts`). La cápsula conserva su radio y pasa a medir lo que el muñeco escalado, 1,38 m (la dirección artística pide unos 1,3 m).
+- Ensanchar la cápsula al muñeco empeoraba el juego. Con 0,36 m, uno a cada lado del sofá ya no pasa con él por la puerta de 1,6 m (2 · 0,36 + 0,9 = 1,62 m), y con 6 ayudantes despistados se entregaban 3 o 4 partidas de 8. Con 0,34 m, con 4 ayudantes atentos había partidas con 9 caídas y 84 s.
+- La nariz, la visera y los tirantes se han recortado un poco: sobresalen de la cápsula 1,5 cm como mucho. Aplastado, el tronco se acorta sin ensancharse.
+- Lo que cuesta la cápsula más alta: el recorrido a dos con el piloto pasa de 39,4 s a 43,8 s (todo en la rampa); con 4 ayudantes atentos, de 39,9 s a 41,4 s de media (24 semillas). Con 6 ayudantes despistados se entregan las mismas partidas (23 de 24), pero hay más caídas: 6,1 por partida frente a 2,9.
+
+**Inclinarse sin atravesar.** El muñeco se inclina (desequilibrio, tirar), se mece al andar y cabecea alrededor de los pies, pero la cápsula de pie no. Antes de dibujarlo, pregunta qué parte de esa inclinación cabe (`fitTilt`, una consulta de forma con bisección) y se queda en eso. Contra una pared o el sofá se inclina menos; nunca se desplaza.
+
+**Caída física** (`Carrier.stepDown`).
+- Al caer o ser derribado, el collider se tumba de verdad (`setRotationWrtParent` y `setTranslationWrtParent`) en 0,35 s, girando alrededor de la esfera de los pies.
+- La dirección se elige con consultas de forma contra todo (sofá, paredes, otros porteadores): la del golpe si la cápsula cabe tumbada y en todo el giro; si no, la libre más parecida; acorralado, la que más deja inclinarse, y queda recostado.
+- Al levantarse, vuelve a la cápsula de pie solo si cabe. Si no, espera en el suelo y se aparta a rastras hacia el hueco más cercano.
+- El muñeco (y el dibujo de los ayudantes) se pinta con la pose del collider; la cámara despeja las paredes que tapan el cuerpo tumbado.
+
+**Medidas** (`tests/coherence.test.ts`, Node):
+- Tronco y cabeza dibujados, metidos en algo: 0,1 cm empujando el sofá, 0 llevándolo y girándolo, 0 tambaleándose hacia él (0,7 rad), 1,5 cm andando contra una pared y 1,1 cm pegado a ella.
+- Caídas en 6 direcciones junto al sofá (respaldo y extremo), una pared y otro porteador: el collider se solapa 1,2 cm como mucho, queda tumbado (1,57 rad) y de pie a los 1,27 s. Acorralado en una celda de 1,1 m: recostado 0,37 rad, solape 0,6 cm. Con una balda encima: espera 1,2 s, se aparta y se levanta a 0,96 m.
+- En el navegador (`scripts/sofa-contact-check.cjs`), el cuerpo dibujado ya no entra en el sofá más que la cápsula (como mucho 5,7 cm frente a 6,1 cm de la cápsula, al chocar a la carrera).
+
+## Piloto para 2, 3 y 4 humanos y scripts de navegador (ciclo 1)
+
+Objetivos T-route y T-e2e de `docs/quality/cycles/ciclo-1.md`.
+
+**Piloto para N humanos** (`autopilot.ts`).
+- `Autopilot.team(g)` crea un piloto por cada humano. Comparten la ruta (`PilotCrew`): el punto de paso, la comprobación de atasco, la maniobra de desatasco y a qué asa va cada uno. El movimiento de carga se calcula una vez por paso y lo usan todos.
+- Antes cada jugador tenía un piloto independiente. Quien se soltaba en la puerta se quedaba con un punto de paso anterior y, al volver a agarrar, tiraba del sofá hacia atrás. Con 3 humanos el sofá llegó a bajar la escalera entera (131 s); con 4, 102 s y 10 caídas.
+- **Fallo de `lastDist` corregido.** Al pasar de punto de paso no se reiniciaba, y además se comparaba con la distancia al punto anterior. Frente al punto nuevo, más lejano, el piloto nunca «se acercaba» y retrocedía a los 2,5 s sin motivo; en la escalera dejaba caer el sofá. Ahora hay 0 maniobras de desatasco en el recorrido con 2, 3 y 4 humanos (la auditoría contó 7 retrocesos en el recorrido a dos).
+
+| Recorrido con el piloto (Node) | Antes | Ahora |
+|---|---|---|
+| 2 humanos | 44,5 s | 33,3 s |
+| 3 humanos | 131,4 s | 32,2 s |
+| 4 humanos | 102,1 s, sofá al 97 %, 10 caídas | 31,9 s, 0 caídas |
+| 1 humano con ayudantes (2, 3, 4 atentos; 4 y 6 despistados; semillas 1–8) | 39 de 40 entregas; 44 s con 2 atentos | 40 de 40 entregas; 33 s con 2 atentos |
+
+Con humanos y ayudantes mezclados (2 + 1, 2 + 2, 3 + 1, 4 + 2 atentos y 2 + 2 despistados, semillas 1–3), todas las partidas ganan en 31,6–33,6 s, con el sofá al 100 %.
+
+**Scripts de navegador con los controles nuevos.**
+- `keyboard-e2e.cjs`: ya no usa Mayús. En su lugar comprueba que, al agarrar entre varios, el sofá se levanta solo más de 0,2 m desde el reposo (el mismo umbral que tenía «Con Mayús se alza el sofá»). Las esperas pasan a tiempo de juego, como en `duo-e2e`: con la máquina cargada el juego avanzaba 0,3 s por segundo de reloj y «W durante 2,5 s» eran unos 0,7 s de juego (1,40 m en vez de 6,1). Respeta los parámetros de la URL (antes `url + '?humans=1&carriers=4'` rompía una URL con `?`) y sale con código 1 si falla algo.
+- `duo-e2e.cjs`: sin `coop` (la física es única) y con el aviso nuevo («Pesa mucho»). Correr contra la pared vale contra cualquier cosa fija, según el propio juego (`Game.touchesWall`): antes J1 parado contra la carretilla del patio contaba como fallo.
+- `sofa-contact-check.cjs`, `doll-check.cjs` y `grip-check.ts`, sin `lift` en las entradas. `record-duo.cjs` ya no habla de «física cooperativa».
+
+**El fallo intermitente «J2 se levanta solo» de la línea base.**
+- No se ha podido reproducir: 0 de 7 repeticiones del tramo en el navegador con el código de la línea base y 0 de 4 con el actual. En Node, con el código de la línea base y con el actual, tampoco: 0 de 400 partidas emuladas de la parte A de la prueba (con fotogramas de 1 a 5 pasos al azar) y 0 de unos 800 casos dirigidos (varias direcciones de tirón, el sofá a lo largo de z, tirar los dos hacia el mismo lado, J1 recién agarrado).
+- En el navegador actual, J2 pasa en el suelo 1,28–1,30 s, lo que dice `CARRIER.fallTime`.
+- La comprobación miraba un solo instante, 1,5 s después de la ventana, y no dejaba rastro de qué pasaba. Además, desde el paso 3 levantarse depende de si hay sitio: si no cabe de pie, J2 espera tumbado hasta 4 s (`maxWaitRoom`).
+- Ahora espera sin pulsar nada lo que permiten esas reglas y mide con el registro de pasos cuánto estuvo J2 en el suelo, si esperó a tener sitio y si se vuelve a caer al levantarse. Exige 1,3 s (más 0,05 de tolerancia), o 1,3 s más la espera que el propio juego dice haber hecho por falta de sitio. Si falla, imprime los sucesos y las posiciones.
+
+**Resultados en Chromium** (19-10-2026, build de este paso, `vite preview` en :4174):
+- `duo-e2e.cjs`: **20/20.** Juntos 5,18 m y uno solo 1,63 m en 2,5 s; giro de 1,75 rad; J2 cae y pasa 1,28 s en el suelo; J1 se para contra la alfombra enrollada del patio sin caerse. Con el piloto llevando a los dos: victoria a los 33,3 s, con el sofá al 100 % (antes 42,4 s). Sin errores.
+- `keyboard-e2e.cjs '?carriers=4'`: **todo OK.** Al agarrar entre cuatro, el sofá pasa de 0,20 a 0,65 m sin tecla. Con W, 6,02 m en 2,53 s de juego; con Q, 1,21 rad.
+- `sofa-contact-check.cjs` (cuerpo dibujado / cápsula en el sofá): empujar el lateral 3,7 / 3,7 cm, soltar y empujar 5,7 / 6,1 cm, caer contra el sofá 0,6 / 1,0 cm y el resto 0–0,5 cm. Son los mismos valores que en el paso 3, sin errores.
 
 ## Escenario: decoración por zonas
 
@@ -260,16 +318,20 @@ No se ha construido nada de esta arquitectura todavía: no hacía falta para cor
 
 ## Controles
 
-| Acción | J1 (teclado) | J2 (teclado) | Mando (J1–J4) |
-|---|---|---|---|
-| Moverse | W A S D | Flechas | Stick izquierdo o cruceta |
-| Agarrar / soltar | Espacio | Intro | A |
-| Alzar (mantener) | Mayús izq. | Mayús dcha. | B o gatillos |
-| Girar el sofá (rodeándolo; también tus ayudantes) | Q / E | , / . | LB / RB |
-| Enderezar el sofá volcado | R | - | Y |
-| Pausa | Esc | | Start |
-| Reiniciar | Retroceso | | Start (en resultados) |
-| Silenciar | M | | |
+| Acción | J1 | J2 | J3 | J4 | Mando |
+|---|---|---|---|---|---|
+| Moverse | W A S D | Flechas | I J K L | Numérico 8 4 5 6 | Stick izquierdo o cruceta |
+| Agarrar / soltar (la carga sube sola) | Espacio | Intro | U | Numérico 0 | A |
+| Enderezar el sofá volcado | R | - | O | Numérico + | Y |
+| Pedir un giro a los ayudantes (opcional; quien lo pide rodea el sofá) | Q / E | , / . | H / Ñ | Numérico 7 / 9 | LB / RB |
+| Pausa | Esc | | | | Start (cualquier mando) |
+| Reiniciar | Retroceso | | | | Start o A (en resultados) |
+| Silenciar | M | | | | |
+
+- **Mandos.** Se identifican por `Gamepad.index`. Al empezar la partida, el teclado lleva a los primeros jugadores y los mandos, por orden de índice, a los últimos: con 4 jugadores y 2 mandos, J1 y J2 juegan con el teclado y J3 y J4 con mando; con 2 jugadores y 2 mandos, uno cada uno. El menú muestra el reparto antes de empezar.
+- Durante la partida nadie cambia de mando. Si uno se desconecta, al volver recupera su jugador; un mando nuevo va a quien se quedó sin el suyo o al último jugador sin mando. El botón con el que el navegador descubre un mando no cuenta como pulsación.
+- **Pulsaciones.** Agarrar y enderezar se guardan hasta el siguiente paso de física: no se pierden en pantallas de más de 60 Hz, donde hay fotogramas sin ningún paso. La lógica está en `src/input/inputCore.ts`, sin DOM, y la prueban `tests/input.test.ts`.
+- Cuatro personas en un mismo teclado pueden saturarlo (fantasmas de teclas, según el teclado). Con mandos no pasa.
 
 **Objetivo:** dejar el sofá en la zona amarilla junto al camión en menos de 3 minutos, sin que su estado llegue a 0 %.
 
@@ -321,7 +383,7 @@ No se ha construido nada de esta arquitectura todavía: no hacía falta para cor
   - Acompañan los giros que se piden con Q/E.
   - Si empujan contra algo sin avanzar, sueltan el asa y vuelven a agarrar al poco. Así pasan la puerta.
   - En modo «Despistados» reaccionan más tarde y se desvían.
-- **Piloto automático** (`autopilot.ts`): conoce la ruta y lleva al jugador 1. Sirve para el modo demo y para comprobar con la física real que el nivel se puede completar. No es una IA de juego.
+- **Piloto automático** (`autopilot.ts`): conoce la ruta y lleva al jugador 1 (modo demo) o, con `Autopilot.team`, a todos los humanos con la ruta compartida (`PilotCrew`). Sirve para el modo demo y para comprobar con la física real que el nivel se puede completar con 1 a 4 humanos. No es una IA de juego.
 - **Cámara:** cenital oblicua (unos 53°) con el norte siempre arriba, centrada en el sofá con un poco de adelanto y de peso hacia los humanos.
   - Se aleja si el grupo se dispersa.
   - Las paredes que tapan la acción se recortan hasta un zócalo opaco (corte de maqueta). Ventanas, toldos y el dintel de la puerta se ocultan; las jambas quedan a la vista para que se lea lo estrecha que es la puerta.
@@ -347,11 +409,13 @@ mudanza-imposible/
   src/view/             dibujo con Three.js (escena, sofá, personajes, coches, efectos, cámara)
     textures.ts         texturas procedurales (asfalto, baldosa, ladrillo, tablas, tejas, chapa, tela, fachadas)
     decor.ts            decoración por zonas: objetos de props.ts y detalles sin choque
-    doll/               muñeco del laboratorio adaptado a los jugadores (dibujo separado de la cápsula física)
-  src/input/input.ts    teclado (2 jugadores) y mandos (hasta 4)
+    doll/               muñeco del laboratorio adaptado a los jugadores (dibuja la cápsula física: anchura, altura y pose)
+  src/input/inputCore.ts  entradas sin DOM: teclas de J1–J4, mandos por Gamepad.index, pulsaciones retenidas y paso fijo
+  src/input/input.ts    conexión con los eventos de teclado y la Gamepad API del navegador
   src/audio/sfx.ts      sonidos sintetizados
   src/ui/hud.ts         interfaz durante la partida
   tests/sim.test.ts     pruebas de la física sin navegador (Vitest)
+  tests/input.test.ts   pruebas de las entradas sin navegador (Vitest)
   scripts/              simulación por consola, rendimiento, pruebas en Chromium, capturas y vídeo
     stills.cjs          capturas fijas en momentos fijos de una partida automática (?capture=1)
     record.cjs          graba la partida real fotograma a fotograma con su sonido
@@ -655,7 +719,7 @@ Ninguno contiene recursos 3D utilizables. Del segundo solo se tomó como referen
 - Las constantes de la física cooperativa (`CARRIER.pullForce`, `releaseKick`, `deadZone`, `shoveGain`, `SOFA.coopMass`, `coopFriction`): ajustadas con simulaciones y con el piloto automático, **no con personas**. Pueden resultar demasiado blandas o demasiado castigadoras.
 - La ayuda de muñecas y sus constantes: `RULES.wristK`, `wristDamp` y los umbrales de daño, sin ajustar con jugadores.
 - Los mandos están implementados con la asignación estándar, pero **no se han probado con un mando físico**. Las pruebas automáticas solo usan teclado.
-- Las animaciones son procedurales (ver [Pase visual](#pase-visual-y-de-animación)). No hay animación esquelética ni caídas tipo muñeco de trapo: el porteador sigue siendo una cápsula física y el cuerpo dibujado reacciona a su estado.
+- Las animaciones son procedurales (ver [Pase visual](#pase-visual-y-de-animación)). No hay animación esquelética ni caídas tipo muñeco de trapo: el porteador es una cápsula física que se tumba al caer, y el cuerpo dibujado la sigue.
 - La escalera física es una rampa lisa con peldaños dibujados encima.
 
 **No existe todavía**
@@ -691,7 +755,7 @@ Las comprobaciones de arriba son técnicas. Que la demo sea divertida es una **h
   - **No la ha jugado ninguna persona.** Todo lo de arriba son pulsaciones enviadas por scripts y el piloto automático.
   - **Teclados que no registran tantas teclas a la vez.** Algunos teclados no admiten más de unas pocas pulsaciones simultáneas (por ejemplo, WASD, flechas y las dos Mayús). Es una limitación del teclado, no del juego. Con un mando para cada uno no pasa.
   - **Velocidad del piloto con dos.** Con dos porteadores y la física cooperativa, el piloto automático tarda 42,4 s (46,4 s antes de corregir las colisiones; 34 s sin el límite de fuerza). La escalera es el tramo más lento.
-  - **Las caídas no usan física de cuerpo.** La cápsula sigue de pie y el muñeco dibujado cae hacia donde se desequilibró, o hacia la dirección libre más parecida si ahí hay sofá o pared. Es la solución estable más sencilla.
+  - **Las caídas son de cápsula, no de muñeco de trapo.** Desde el ciclo 1 el collider se tumba hacia una dirección libre y el muñeco se dibuja con su pose; brazos y piernas siguen siendo solo dibujo.
   - **Chocar a la carrera con el sofá** mete la cápsula de 5 a 8 cm durante 1–3 pasos de física; el motor lo resuelve enseguida.
   - **Agarrar y girar el sofá ya no lo atraviesa, pero el giro se siente distinto.** Quien agarra se queda frente a su punto de agarre y el sofá le arrastra al girar. Las medidas de giro, tirones y caídas no cambian, pero falta comprobar con personas si se entiende.
 

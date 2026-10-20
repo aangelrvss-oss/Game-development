@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { CARRIER, CENTER_Y, type Carrier } from '../../sim/carrier';
+import { CARRIER, CENTER_Y, DOLL_HEIGHT, DOLL_SCALE, type Carrier } from '../../sim/carrier';
 import { PLAYER_COLORS } from '../carrierView';
 import { textSprite } from '../text';
 import { CharacterRig, LOOK, type DollSource, type DollState, type Look } from './dollRig';
@@ -22,22 +22,19 @@ export const PLAYER_NAMES = ['Porteador rojo', 'Porteador turquesa', 'Porteadora
 /** Nombre para mensajes: el del jugador si es humano, el del reparto si es un ayudante. */
 export const carrierName = (c: Carrier) => (c.human !== null ? PLAYER_NAMES[c.human] ?? `J${c.human + 1}` : c.cast.name);
 
-/** Al caer: tiempo hasta quedar tumbado (s) y lo que dura levantarse al final del tiempo en el suelo. */
-const FALL_TIME = 0.35;
-const RECOVER_TIME = 0.6;
-const LIE_ANGLE = 1.45;
-
-const smooth = (t: number) => { const x = Math.min(1, Math.max(0, t)); return x * x * (3 - 2 * x); };
-/** Desplazamiento máximo del dibujo respecto a la cápsula física (m): de pie y tumbado. */
-const MAX_OFF_UP = 0.2;
-const MAX_OFF_DOWN = 0.6;
+/** Escala del muñeco (del modelo al mundo) y su inversa. */
+const S = DOLL_SCALE, IS = 1 / DOLL_SCALE;
 
 /**
- * Vista de un jugador humano con el muñeco del laboratorio. Adapta el porteador del juego (cápsula de pie,
- * física cooperativa, agarre por rótula) a lo que lee el muñeco (`DollSource`). No cambia nada de la física:
- * - De pie: posición, velocidad, orientación, desequilibrio y agarre salen tal cual del porteador.
- * - En el suelo: la cápsula sigue de pie en el juego, así que el giro del cuerpo tumbado (hacia donde perdió el
- *   equilibrio, o hacia donde salió despedido por un coche) y el levantarse se sintetizan aquí.
+ * Vista de un jugador humano con el muñeco del laboratorio. Adapta el porteador del juego a lo que lee el muñeco
+ * (`DollSource`) y no cambia nada de la física. Lo dibujado es el cuerpo físico, sin desplazarlo nunca:
+ * - El muñeco se dibuja a escala `DOLL_SCALE`: su tronco tiene el radio de la cápsula y su altura, la de la cápsula.
+ *   El muñeco trabaja en las unidades del modelo; aquí se pasan posiciones y velocidades del mundo a ellas.
+ * - De pie, el muñeco ocupa la cápsula (misma anchura y altura, `CARRIER`). Su inclinación (el desequilibrio,
+ *   colgarse hacia atrás al tirar, adelantarse al andar) es solo de dibujo: se limita a lo que cabe sin meterse en
+ *   nada (`fitLean`), en vez de apartar el muñeco de lo que atraviesa.
+ * - En el suelo, el muñeco se dibuja con la pose del collider tumbado (`Carrier.stepDown`): la misma dirección y el
+ *   mismo ángulo que la simulación, no una caída inventada.
  * - El suelo bajo los pies se consulta con un rayo solo contra la geometría fija (ni el sofá ni otros porteadores).
  */
 export class DollView {
@@ -48,22 +45,28 @@ export class DollView {
   private stars: THREE.Group;
   label?: THREE.Sprite;
   private src: DollSource;
-  private wasStunned = false;
-  private stunTotal = 1;
-  private fallDir = { x: 0, z: 1 };
   private effort = 0;
-
   /**
-   * Desplazamiento del dibujo respecto al cuerpo físico (solo horizontal). La cápsula física es algo más
-   * estrecha que el muñeco (0,32 m frente a 0,36 m de tronco) y el muñeco se inclina y se tumba sin que la
-   * cápsula lo haga: cuando el dibujo se mete en el sofá, se aparta lo justo, de forma suave.
+   * Parte de arriba del cuerpo dibujado (tronco y cabeza, del ombligo a la gorra) como cápsula del radio del tronco:
+   * con ella se comprueba si la inclinación dibujada cabe. Sin margen: lo que sobresale del tronco (la nariz, la
+   * visera) ya gasta casi todo el de las pruebas. `upperMid` es la altura de su centro sobre los pies.
    */
-  private visOff = new THREE.Vector3();
-  private ball = new RAPIER.Ball(0.25);
+  private upper: RAPIER.Capsule;
+  private upperMid: number;
+  /** Fracción de la inclinación dibujada que cabe (baja al momento; sube suavizada) y paso del fotograma. */
+  private leanFit = 1;
+  private dt = 1 / 60;
+  /** La cámara, en las unidades del modelo (el muñeco mira hacia ella). */
+  private eye = { position: new THREE.Vector3() };
 
-  constructor(readonly carrier: Carrier, playerIndex: number, private world: RAPIER.World, private camera: THREE.Camera, private sofaColliders: RAPIER.Collider[] = []) {
+  constructor(readonly carrier: Carrier, playerIndex: number, private world: RAPIER.World, private camera: THREE.Camera) {
     this.rig = new CharacterRig(PLAYER_LOOKS[playerIndex % PLAYER_LOOKS.length]);
     this.group = this.rig.group;
+    this.group.scale.setScalar(S);
+    // Centros de sus esferas: a la altura del ombligo y en la de arriba de la cápsula (bajo la gorra)
+    const y0 = 0.75 * S, y1 = DOLL_HEIGHT - CARRIER.radius;
+    this.upper = new RAPIER.Capsule((y1 - y0) / 2, CARRIER.radius);
+    this.upperMid = (y0 + y1) / 2;
     const color = PLAYER_COLORS[playerIndex] ?? '#ffffff';
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.54, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false }));
     this.ring.rotation.x = -Math.PI / 2;
@@ -86,7 +89,8 @@ export class DollView {
       state: 'idle', pos: c.pos, vel: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 }, upright: true,
       facing: c.facing, lean: { x: 0, z: 0 }, leanDev: c.lean, leanVel: c.leanVel, holding: false, effort: 0,
       wantVel: c.wantVel, handDir: c.handDir, grabWorld: () => null,
-      heightAt: (x, z) => self.heightAt(x, z),
+      heightAt: (x, z) => self.heightAt(x * S, z * S) * IS,
+      fitTilt: (x, z) => self.fitTilt(x, z),
     };
     this.rig.snap();
   }
@@ -111,39 +115,27 @@ export class DollView {
     const c = this.carrier, s = this.src;
     const p = c.pos, v = c.body.linvel();
     this.footY = p.y - CENTER_Y;
-    const stunned = c.stunned > 0;
-    if (stunned && !this.wasStunned) {
-      // Empieza la caída: hacia donde perdió el equilibrio, o hacia donde le lanzó el golpe (lo decide el juego)
-      this.stunTotal = c.knock === 'balance' ? CARRIER.fallTime : CARRIER.stunTime;
-      this.fallDir = this.freeFallDir(c.fallDir);
-    }
-    this.wasStunned = stunned;
     const speed = Math.hypot(v.x, v.z), want = Math.hypot(c.wantVel.x, c.wantVel.z);
-    // Esfuerzo: tensión del agarre (la mano se separa del punto agarrado) y empujar sin avanzar
+    // Esfuerzo: lo que tira la mano (`strain`: arrastrar solo algo pesado lo pone al límite), que el punto agarrado
+    // se le separe de la mano, y empujar sin avanzar
     let strain = 0;
     if (sofaGrab) {
       const h = c.handWorld();
-      strain = Math.min(1, Math.hypot(sofaGrab.x - h.x, sofaGrab.y - h.y, sofaGrab.z - h.z) / CARRIER.gripBreak);
+      strain = Math.max(c.strain, Math.min(1, Math.hypot(sofaGrab.x - h.x, sofaGrab.y - h.y, sofaGrab.z - h.z) / CARRIER.gripBreak));
     }
     const effortGoal = c.holding ? Math.min(1, 0.35 + strain * 0.9 + (want > 0.3 && speed < want * 0.6 ? 0.45 : 0)) : 0;
     this.effort += (effortGoal - this.effort) * Math.min(1, dt * 4);
 
     let state: DollState;
-    let upright = true;
-    if (stunned) {
-      upright = false;
-      const elapsed = this.stunTotal - c.stunned;
-      const recovering = c.stunned < RECOVER_TIME;
-      state = recovering ? 'recovering' : 'falling';
-      const a = recovering ? LIE_ANGLE * smooth(c.stunned / RECOVER_TIME) : LIE_ANGLE * smooth(elapsed / FALL_TIME);
-      const d = this.fallDir, h = Math.sin(a / 2);
-      // Giro alrededor del eje horizontal perpendicular a la caída: el cuerpo se va hacia `d`
-      s.rotation = { x: d.z * h, y: 0, z: -d.x * h, w: Math.cos(a / 2) };
-      // Gira alrededor de los pies, sin hundirse en el suelo (tumbado, el tronco queda a su grosor del suelo)
-      const ground = this.heightAt(p.x, p.z);
-      s.pos = { x: p.x + d.x * Math.sin(a) * CENTER_Y, y: Math.max(this.footY + Math.cos(a) * CENTER_Y, ground + 0.3), z: p.z + d.z * Math.sin(a) * CENTER_Y };
+    const upright = !c.down;
+    // Pose de la cápsula física: tumbada (o levantándose), el muñeco va exactamente con ella
+    const k = c.collider.translation(), q = c.collider.rotation();
+    if (c.down) {
+      state = c.down === 'rising' ? 'recovering' : 'falling';
+      s.rotation = { x: q.x, y: q.y, z: q.z, w: q.w };
+      s.pos = { x: k.x * IS, y: k.y * IS, z: k.z * IS };
     } else {
-      s.pos = p;
+      s.pos = { x: p.x * IS, y: p.y * IS, z: p.z * IS };
       s.rotation = { x: 0, y: 0, z: 0, w: 1 };
       if (c.wobbling) state = 'losingBalance';
       else if (c.holding) state = want > 0.3 || this.effort > 0.55 ? 'pulling' : 'grabbing';
@@ -151,93 +143,63 @@ export class DollView {
     }
     s.state = state;
     s.upright = upright;
-    s.vel = v;
+    s.vel = { x: v.x * IS, y: v.y * IS, z: v.z * IS };
     s.facing = c.facing;
     s.leanDev = c.lean;
     s.leanVel = c.leanVel;
-    // Inclinación total: el desequilibrio, más colgarse hacia atrás al tirar o adelantarse al andar
+    // Inclinación total: el desequilibrio, más colgarse hacia atrás al tirar o adelantarse al andar (el muñeco la
+    // reduce a lo que cabe con `fitTilt`)
     s.lean = c.holding
       ? { x: c.lean.x - c.handDir.x * 0.16 * this.effort, z: c.lean.z - c.handDir.z * 0.16 * this.effort }
       : { x: c.lean.x + c.wantVel.x * 0.02, z: c.lean.z + c.wantVel.z * 0.02 };
     s.holding = c.holding && !!sofaGrab;
     s.effort = this.effort;
-    s.wantVel = c.wantVel;
+    s.wantVel = { x: c.wantVel.x * IS, z: c.wantVel.z * IS };
     s.handDir = c.handDir;
-    s.grabWorld = () => (sofaGrab ? { x: sofaGrab.x, y: sofaGrab.y, z: sofaGrab.z } : null);
-    this.rig.sync(s, dt, this.camera);
-    // Agarrando, las manos van al asa y el cuerpo ya no solapa (el choque físico está activo): sin desplazar.
-    const offGoal = s.holding ? new THREE.Vector3() : this.pushOut(upright ? MAX_OFF_UP : MAX_OFF_DOWN);
-    this.visOff.lerp(offGoal, 1 - Math.exp(-dt * 18));
-    this.group.position.copy(this.visOff);
+    s.grabWorld = () => (sofaGrab ? { x: sofaGrab.x * IS, y: sofaGrab.y * IS, z: sofaGrab.z * IS } : null);
+    this.eye.position.copy(this.camera.position).multiplyScalar(IS);
+    this.dt = dt;
+    this.rig.sync(s, dt, this.eye);
 
-    // Aro de jugador, punto de agarre, etiqueta y estrellas de mareo
-    const o = this.visOff;
-    this.ring.position.set(p.x + o.x, this.footY + 0.04, p.z + o.z);
+    // Aro de jugador (bajo el cuerpo, de pie o tumbado), punto de agarre, etiqueta y estrellas de mareo sobre la cabeza
+    this.ring.position.set(k.x, this.footY + 0.04, k.z);
     this.grip.visible = !!sofaGrab;
     if (sofaGrab) this.grip.position.copy(sofaGrab);
-    const top = upright ? p.y + 1.15 : s.pos.y + 0.7;
-    if (this.label) this.label.position.set(s.pos.x + o.x, top + 0.25, s.pos.z + o.z);
-    this.stars.visible = stunned && c.stunned > RECOVER_TIME;
-    if (this.stars.visible) { this.stars.position.set(s.pos.x + o.x, top - 0.05, s.pos.z + o.z); this.stars.rotation.y += dt * 5; }
-  }
-
-  /** Cuánto entra la esfera en el sofá (m, positivo = dentro) y hacia dónde salir (horizontal). */
-  private sofaDepth(c: THREE.Vector3, r: number): { d: number; nx: number; nz: number } {
-    let best = { d: -Infinity, nx: 0, nz: 0 };
-    for (const col of this.sofaColliders) {
-      const pr = col.projectPoint(c, false);
-      if (!pr) continue;
-      let nx = c.x - pr.point.x, nz = c.z - pr.point.z;
-      const dist = Math.hypot(nx, c.y - pr.point.y, nz);
-      const d = pr.isInside ? r + dist : r - dist;
-      if (d <= best.d) continue;
-      if (pr.isInside) { nx = -nx; nz = -nz; }
-      let l = Math.hypot(nx, nz);
-      if (l < 1e-3) { const o = col.translation(); nx = c.x - o.x; nz = c.z - o.z; l = Math.hypot(nx, nz) || 1; }
-      best = { d, nx: nx / l, nz: nz / l };
-    }
-    return best;
-  }
-
-  /** Desplazamiento horizontal que saca el tronco y la cabeza dibujados del sofá (hasta `max` m). */
-  private pushOut(max: number) {
-    const spheres = this.rig.bodySpheres();
-    const off = new THREE.Vector3();
-    const c = new THREE.Vector3();
-    for (let it = 0; it < 4; it++) {
-      let worst = { d: 0.004, nx: 0, nz: 0 };
-      for (const sp of spheres) {
-        const k = this.sofaDepth(c.copy(sp.c).add(off), sp.r);
-        if (k.d > worst.d) worst = k;
-      }
-      if (worst.nx === 0 && worst.nz === 0) break;
-      off.x += worst.nx * (worst.d + 0.005); off.z += worst.nz * (worst.d + 0.005);
-    }
-    if (off.length() > max) off.setLength(max);
-    return off;
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w));
+    const head = new THREE.Vector3(k.x, k.y, k.z).addScaledVector(up, CARRIER.halfHeight);
+    const top = upright ? p.y + DOLL_HEIGHT - CENTER_Y : head.y + CARRIER.radius;
+    if (this.label) this.label.position.set(head.x, top + 0.4, head.z);
+    this.stars.visible = !!c.down && c.down !== 'rising';
+    if (this.stars.visible) { this.stars.position.set(head.x, top + 0.1, head.z); this.stars.rotation.y += dt * 5; }
   }
 
   /**
-   * Hacia dónde se dibuja la caída: la dirección del golpe si el cuerpo tumbado cabe ahí; si no (el sofá, una
-   * pared), la libre más parecida. Se decide una vez, al empezar la caída.
+   * Fracción de la inclinación (x, z) de la parte de arriba del cuerpo que cabe (la pide el muñeco, `DollSource`). Se
+   * inclina alrededor de los pies y la cápsula de pie no: se prueban el tronco y la cabeza inclinados contra todo
+   * (sofá, paredes, otros porteadores) con una consulta de forma y, si no caben, se busca por bisección cuánto
+   * inclinarse. Baja al momento y vuelve a subir suavizada.
    */
-  private freeFallDir(d0: { x: number; z: number }) {
-    const p = this.carrier.pos, feetY = p.y - CENTER_Y;
-    const fits = (dx: number, dz: number) => {
-      for (const h of [0.5, 0.85, 1.15]) {
-        const c = new THREE.Vector3(p.x + dx * h, feetY + 0.32, p.z + dz * h);
-        if (this.sofaDepth(c, 0.28).d > 0) return false;
-        let hit = false;
-        this.world.intersectionsWithShape(c, { x: 0, y: 0, z: 0, w: 1 }, this.ball, () => { hit = true; return false; }, RAPIER.QueryFilterFlags.ONLY_FIXED);
-        if (hit) return false;
-      }
-      return true;
+  private fitTilt(x: number, z: number) {
+    const fit = this.tiltRoom(x, z);
+    this.leanFit = fit < this.leanFit ? fit : this.leanFit + (fit - this.leanFit) * Math.min(1, this.dt * 6);
+    return this.leanFit;
+  }
+
+  private tiltRoom(x: number, z: number) {
+    const l = Math.min(1.2, Math.hypot(x, z)); // el muñeco no se inclina más
+    if (l < 0.01) return 1;
+    const d = { x: x / Math.hypot(x, z), z: z / Math.hypot(x, z) };
+    const fits = (a: number) => {
+      const h = Math.sin(a / 2), m = this.upperMid, p = this.carrier.pos;
+      const c = { x: p.x + d.x * Math.sin(a) * m, y: p.y - CENTER_Y + Math.cos(a) * m, z: p.z + d.z * Math.sin(a) * m };
+      let hit = false;
+      this.world.intersectionsWithShape(c, { x: d.z * h, y: 0, z: -d.x * h, w: Math.cos(a / 2) }, this.upper, () => { hit = true; return false; }, undefined, undefined, this.carrier.collider);
+      return !hit;
     };
-    for (const a of [0, 0.5, -0.5, 1, -1, 1.5, -1.5, 2, -2, 2.6, -2.6, Math.PI]) {
-      const cs = Math.cos(a), sn = Math.sin(a), dx = d0.x * cs - d0.z * sn, dz = d0.x * sn + d0.z * cs;
-      if (fits(dx, dz)) return { x: dx, z: dz };
-    }
-    return { ...d0 };
+    if (fits(l)) return 1;
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 3; i++) { const mid = (lo + hi) / 2; if (fits(l * mid)) lo = mid; else hi = mid; }
+    return lo;
   }
 
   dispose() {

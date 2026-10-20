@@ -45,12 +45,13 @@
   .card p.sub { margin:6px 0 16px; font-weight:600; opacity:.8; }
   .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:10px 0; }
   .row > label { font-weight:800; min-width:180px; }
+  .row.focus { outline:3px solid #facc15; outline-offset:4px; border-radius:12px; }
   .seg button { border:0; background:#ede9fe; color:var(--ink); font-weight:800; padding:8px 12px; border-radius:10px; cursor:pointer; margin:2px; }
   .seg button.on { background:#7c3aed; color:#fff; }
   .seg button:disabled { opacity:.35; cursor:default; }
   .go-btn { border:0; background:#facc15; color:var(--ink); font-weight:900; font-size:20px; padding:12px 22px; border-radius:16px; cursor:pointer; box-shadow:0 4px 0 #ca8a04; }
   .go-btn.alt { background:#e5e7eb; box-shadow:0 4px 0 #9ca3af; font-size:16px; }
-  table.ctl { border-collapse:collapse; width:100%; font-size:14px; margin-top:8px; }
+  table.ctl { border-collapse:collapse; width:100%; font-size:13px; margin-top:8px; }
   table.ctl td, table.ctl th { padding:5px 6px; border-bottom:1px solid #e9e1cf; text-align:left; }
   kbd { background:#1f1633; color:#fff; border-radius:6px; padding:1px 6px; font-size:12px; font-weight:800; }
   .note { font-size:13px; opacity:.75; margin-top:10px; }
@@ -75,35 +76,36 @@
   <div id="h-light"></div>
   <div id="h-toasts"></div>
   <div id="h-players"></div>
-  <div id="h-hint" class="pill"><kbd>Esc</kbd> pausa · <kbd>Retroceso</kbd> reiniciar · <kbd>M</kbd> sonido</div>
+  <div id="h-hint" class="pill"><kbd>Esc</kbd> o Start pausa · <kbd>Retroceso</kbd> reiniciar · <kbd>M</kbd> sonido</div>
 </div>
 
 <div class="overlay" id="menu" style="display:flex">
   <div class="card">
     <h1>LA MUDANZA <span>IMPOSIBLE</span></h1>
-    <p class="sub">Demo para dos en el mismo teclado · Llevad entre los dos el sofá desde la casa hasta la zona verde del camión: calle con tráfico, puerta estrecha, escalera con giro y rampa sin barandilla. Tenéis 3 minutos.</p>
+    <p class="sub">Demo para 1 a 4 jugadores, en el mismo teclado o con mandos · Llevad entre todos el sofá desde la casa hasta la zona verde del camión: calle con tráfico, puerta estrecha, escalera con giro y rampa sin barandilla. Tenéis 3 minutos.</p>
     <div class="row"><label>Jugadores humanos</label><div class="seg" id="opt-humans"></div></div>
     <div class="row"><label>Porteadores en total</label><div class="seg" id="opt-carriers"></div></div>
     <div class="row"><label>Ayudantes de la máquina</label><div class="seg" id="opt-style"></div></div>
-    <div class="row" style="margin-top:16px"><button class="go-btn" id="btn-start">¡A mover! (Intro)</button><button class="go-btn alt" id="btn-demo">Ver demo automática</button></div>
+    <div class="row" style="margin-top:16px"><button class="go-btn" id="btn-start">¡A mover! (Intro o A)</button><button class="go-btn alt" id="btn-demo">Ver demo automática (X)</button></div>
     <table class="ctl">
-      <tr><th></th><th>J1</th><th>J2</th><th>Mando (J1–J4)</th></tr>
-      <tr><td>Moverse</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>Flechas</td><td>Stick izquierdo</td></tr>
-      <tr><td>Agarrar / soltar</td><td><kbd>Espacio</kbd></td><td><kbd>Intro</kbd></td><td>A</td></tr>
-      <tr><td>Alzar (mantener)</td><td><kbd>Mayús izq.</kbd></td><td><kbd>Mayús dcha.</kbd></td><td>B / gatillos</td></tr>
-      <tr><td>Girar el sofá (rodeándolo)</td><td><kbd>Q</kbd> <kbd>E</kbd></td><td><kbd>,</kbd> <kbd>.</kbd></td><td>LB / RB</td></tr>
-      <tr><td>Enderezar el sofá volcado</td><td><kbd>R</kbd></td><td><kbd>-</kbd></td><td>Y</td></tr>
+      <tr><th></th><th>J1</th><th>J2</th><th>J3</th><th>J4</th><th>Mando</th></tr>
+      <tr><td>Moverse</td><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td><td>Flechas</td><td><kbd>I</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd></td><td>Numérico <kbd>8</kbd><kbd>4</kbd><kbd>5</kbd><kbd>6</kbd></td><td>Stick o cruceta</td></tr>
+      <tr><td>Agarrar / soltar</td><td><kbd>Espacio</kbd></td><td><kbd>Intro</kbd></td><td><kbd>U</kbd></td><td><kbd>0</kbd></td><td>A</td></tr>
+      <tr><td>Enderezar el sofá volcado</td><td><kbd>R</kbd></td><td><kbd>-</kbd></td><td><kbd>O</kbd></td><td><kbd>+</kbd></td><td>Y</td></tr>
+      <tr><td>Pedir un giro a los ayudantes (opcional)</td><td><kbd>Q</kbd> <kbd>E</kbd></td><td><kbd>,</kbd> <kbd>.</kbd></td><td><kbd>H</kbd> <kbd>Ñ</kbd></td><td><kbd>7</kbd> <kbd>9</kbd></td><td>LB / RB</td></tr>
+      <tr><td>Pausa</td><td colspan="4"><kbd>Esc</kbd></td><td>Start (cualquier mando)</td></tr>
     </table>
-    <p class="note"><b>Sin ayudantes</b> (tantos porteadores como jugadores, la opción por defecto): el sofá pesa de verdad. Uno solo apenas lo arrastra; entre los dos se lleva bien. Si soltáis mientras tiráis, o el compañero os arrolla, os tambaleáis y podéis acabar en el suelo un momento.</p>
-    <p class="note"><b>Con ayudantes de la máquina:</b> agarran un asa libre e imitan cómo te mueves cuando tú también cargas; con <kbd>Q</kbd>/<kbd>E</kbd> les pides que giren. Usan la física original, más ligera y sin pérdidas de equilibrio.</p>
-    <p class="note">Durante la partida: <kbd>Esc</kbd> pausa · <kbd>Retroceso</kbd> reiniciar · <kbd>M</kbd> sonido. Gana quien deja el sofá en la zona verde antes de 3 minutos y sin destrozarlo.</p>
+    <p class="note"><b>No hay tecla de alzar.</b> El sofá pesa de verdad: al agarrarlo, las manos lo suben solas a la altura de carga. Uno solo levanta un extremo y lo arrastra despacio; entre dos se lleva en el aire. Si soltáis mientras tiráis, o el compañero os arrolla, os tambaleáis y podéis acabar en el suelo un momento.</p>
+    <p class="note"><b>Con ayudantes de la máquina:</b> agarran un asa libre e imitan cómo te mueves cuando tú también cargas; si quieres, les pides que giren (<kbd>Q</kbd>/<kbd>E</kbd> o LB/RB). Tienen la misma fuerza y el mismo equilibrio que los jugadores.</p>
+    <p class="note"><b>Mandos:</b> el teclado lleva a los primeros jugadores y los mandos, a los últimos (con 2 jugadores y un mando: J1 con WASD y J2 con el mando). Cuatro en un mismo teclado pueden saturarlo y perder teclas; con mandos no pasa.</p>
+    <p class="note">Durante la partida: <kbd>Esc</kbd> o Start pausa · <kbd>Retroceso</kbd> reiniciar · <kbd>M</kbd> sonido. Gana quien deja el sofá en la zona verde antes de 3 minutos y sin destrozarlo.</p>
     <p class="note" id="pads-note"></p>
   </div>
 </div>
 
 <div class="overlay" id="pause">
   <div class="card"><h1>Pausa</h1>
-    <div class="row" style="margin-top:16px"><button class="go-btn" id="btn-resume">Seguir (Esc)</button><button class="go-btn alt" id="btn-restart-p">Reiniciar</button><button class="go-btn alt" id="btn-menu-p">Menú</button></div>
+    <div class="row" style="margin-top:16px"><button class="go-btn" id="btn-resume">Seguir (Esc o Start)</button><button class="go-btn alt" id="btn-restart-p">Reiniciar</button><button class="go-btn alt" id="btn-menu-p">Menú</button></div>
   </div>
 </div>
 
@@ -113,7 +115,7 @@
     <p class="sub" id="r-sub"></p>
     <div class="stars" id="r-stars"></div>
     <div class="res-grid" id="r-grid"></div>
-    <div class="row"><button class="go-btn" id="btn-again">Otra vez (Intro)</button><button class="go-btn alt" id="btn-menu">Menú (Esc)</button></div>
+    <div class="row"><button class="go-btn" id="btn-again">Otra vez (Intro o A)</button><button class="go-btn alt" id="btn-menu">Menú (Esc o B)</button></div>
   </div>
 </div>
 

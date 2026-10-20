@@ -9,6 +9,8 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const url = process.argv[2] || 'http://localhost:4173/';
+/** La url con estos parámetros añadidos o cambiados (la url puede traer ya los suyos). */
+const withParams = (u, q) => { const x = new URL(u); for (const [k, v] of Object.entries(q)) x.searchParams.set(k, v); return x.href; };
 let fails = 0;
 const ok = (cond, msg, extra = '') => { if (!cond) fails++; console.log(cond ? 'OK   ' : 'FALLA', msg, extra); };
 /** Tambaleos y caídas de cada jugador entre dos estados (diagnóstico). */
@@ -33,8 +35,8 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   const st = () => p.evaluate(() => {
     const g = window.__mudanza.game;
     return {
-      t: g.time, coop: g.coop, phase: g.phase, sofa: [g.sofaPos.x, g.sofaPos.y, g.sofaPos.z], yaw: g.sofaYaw,
-      cs: g.carriers.map((c) => ({ h: c.holding, gl: c.grabLocal, x: c.pos.x, z: c.pos.z, wob: c.wobbling, stun: c.stunned, knock: c.knock, human: c.human, nw: c.wobbles, nf: c.falls })),
+      t: g.time, helpers: g.bots.size, phase: g.phase, sofa: [g.sofaPos.x, g.sofaPos.y, g.sofaPos.z], yaw: g.sofaYaw,
+      cs: g.carriers.map((c) => ({ h: c.holding, gl: c.grabLocal, x: c.pos.x, z: c.pos.z, wob: c.wobbling, stun: c.stunned, knock: c.knock, down: c.down, human: c.human, nw: c.wobbles, nf: c.falls })),
       solo: g.soloDrag,
       warn: document.getElementById('h-warn').textContent,
     };
@@ -43,11 +45,20 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   await p.evaluate(() => {
     const g = window.__mudanza.game; window.__ev = [];
     const orig = g.step.bind(g);
-    g.step = (dt, inputs) => { orig(dt, inputs); for (const e of g.out) if (['grab', 'release', 'gripBreak', 'fall', 'stun'].includes(e.type)) window.__ev.push(`${g.time.toFixed(2)} ${e.type} J${e.carrier + 1}`); };
+    // También cuándo se levanta cada uno del suelo y cuánto esperó a tener sitio para ponerse de pie
+    const down = g.carriers.map((c) => c.stunned > 0);
+    g.step = (dt, inputs) => {
+      orig(dt, inputs);
+      for (const e of g.out) if (['grab', 'release', 'gripBreak', 'wobble', 'fall', 'stun'].includes(e.type)) window.__ev.push(`${g.time.toFixed(2)} ${e.type} J${e.carrier + 1}`);
+      g.carriers.forEach((c, i) => {
+        if (down[i] && c.stunned <= 0) window.__ev.push(`${g.time.toFixed(2)} up J${i + 1} ${c.waitRoom.toFixed(2)}`);
+        down[i] = c.stunned > 0;
+      });
+    };
   });
   const evSince = async (t) => (await p.evaluate(() => window.__ev)).filter((e) => parseFloat(e) >= t - 1e-6).join(', ');
   let s = await st();
-  ok(s.coop && s.cs.length === 2 && s.cs.every((c) => c.human !== null), 'partida a dos con física cooperativa');
+  ok(s.helpers === 0 && s.cs.length === 2 && s.cs.every((c) => c.human !== null), 'partida a dos, sin ayudantes');
   /** Mantiene teclas durante `sec` segundos de juego (y llama a `each` mientras tanto). */
   async function hold(keys, sec, each) {
     const t0 = (await st()).t;
@@ -154,11 +165,11 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   z0 = s.sofa[2]; ph = s;
   const tSolo = (await st()).t - 0.7;
   let sawSolo = false, maxSolo = 0;
-  await hold(['KeyS'], 2.5, async (n) => { maxSolo = Math.max(maxSolo, n.solo); if (/Uno solo/.test(n.warn)) sawSolo = true; });
+  await hold(['KeyS'], 2.5, async (n) => { maxSolo = Math.max(maxSolo, n.solo); if (/Pesa mucho/.test(n.warn)) sawSolo = true; });
   s = await st();
   const solo = Math.hypot(s.sofa[0] - ph.sofa[0], s.sofa[2] - z0);
   ok(solo < together * 0.5, 'uno solo lo arrastra a menos de la mitad de velocidad', `${solo.toFixed(2)} m en 2,5 s (juntos: ${together.toFixed(2)} m en 2,5 s) ${bal(ph, s)}`);
-  ok(sawSolo, 'aviso en pantalla: «¡Uno solo apenas puede con él!»', `(contador ${maxSolo.toFixed(2)} s; sucesos: ${await evSince(tSolo)})`);
+  ok(sawSolo, 'aviso en pantalla: «Pesa mucho: falta alguien en el otro extremo»', `(contador ${maxSolo.toFixed(2)} s; sucesos: ${await evSince(tSolo)})`);
   await p.screenshot({ path: 'shots/duo/a2-uno-solo.png' });
 
   // 4c. Vuelven a agarrar los dos y tiran en sentidos opuestos, de través al sofá (según su orientación real)
@@ -202,10 +213,37 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   await p.keyboard.up(outKey(0)); await p.keyboard.up(outKey(1));
   ok(wob && fell, 'soltar mientras tira: J2 se tambalea y cae', `tambaleo ${wob}, caída ${fell}`);
 
-  // 5. Se recupera y vuelve a agarrar
-  await hold([], 1.5);
-  s = await st();
-  ok(s.cs[1].stun === 0, 'J2 se levanta solo');
+  // 5. Se levanta solo y vuelve a agarrar.
+  // Desde el ciclo 1 (paso 3) la caída es física: a los 1,3 s en el suelo (`CARRIER.fallTime`) se levanta si cabe de pie;
+  // si no, espera tumbado y se aparta a rastras hasta que cabe (como mucho `CARRIER.maxWaitRoom`, 4 s; después se
+  // levanta igualmente). Antes se miraba un solo instante, 1,5 s después de la ventana, sin dejar rastro: en la línea
+  // base falló así una vez y no se ha podido reproducir (ver el commit). Ahora se espera, sin pulsar nada, como mucho lo
+  // que permiten esas reglas y se mide con el registro de pasos: cuánto estuvo en el suelo, si esperó a tener sitio y
+  // si se volvió a caer al levantarse. Sin sitio, solo vale la espera que el juego dice haber hecho.
+  // `CARRIER.fallTime`, `stunTime` (derribado: atropello o golpe fuerte), `maxWaitRoom` y `riseTime` de carrier.ts
+  const FALL_TIME = 1.3, STUN_TIME = 1.8, MAX_WAIT_ROOM = 4, RISE_TIME = 0.6;
+  const evJ2 = async () => (await p.evaluate(() => window.__ev)).filter((e) => parseFloat(e) >= t1 - 1e-6 && / J2/.test(e)).map((e) => { const [t, type, , w] = e.split(' '); return { t: parseFloat(t), type, w: w === undefined ? 0 : parseFloat(w) }; });
+  const fallEv = (await evJ2()).find((e) => e.type === 'fall' || e.type === 'stun');
+  if (!fallEv) ok(true, 'J2 se levanta solo', '(no llegó a caer)');
+  else {
+    const base = fallEv.type === 'stun' ? STUN_TIME : FALL_TIME;
+    let up = null;
+    for (;;) {
+      await hold([], 0.2);
+      up = (await evJ2()).find((e) => e.type === 'up' && e.t > fallEv.t);
+      if (up || (await st()).t > fallEv.t + base + MAX_WAIT_ROOM + RISE_TIME + 0.5) break;
+    }
+    // Medio segundo más: ¿se vuelve a caer nada más levantarse?
+    if (up) await hold([], 0.5);
+    const after = (await evJ2()).filter((e) => (e.type === 'fall' || e.type === 'stun') && up && e.t >= up.t);
+    const onFloor = up ? up.t - fallEv.t : null;
+    const riseOk = up !== null && (onFloor <= base + 0.05 || (up.w > 0 && up.w <= MAX_WAIT_ROOM + 0.05 && onFloor <= base + up.w + 0.05));
+    s = await st();
+    ok(riseOk && after.length === 0, 'J2 se levanta solo',
+      (up ? `en el suelo ${onFloor.toFixed(2)} s${up.w > 0 ? `, de ellos ${up.w.toFixed(2)} esperando sitio para ponerse de pie` : ''}${after.length ? `; se vuelve a caer a los ${(after[0].t - up.t).toFixed(2)} s de levantarse` : ''}`
+        : `(sigue en el suelo ${(s.t - fallEv.t).toFixed(2)} s después de caer)`)
+      + (riseOk && !after.length ? '' : ` (sucesos desde que suelta: ${await evSince(t1)}; J2 ${s.cs[1].down ?? 'de pie'} en (${s.cs[1].x.toFixed(2)}, ${s.cs[1].z.toFixed(2)}); sofá (${s.sofa[0].toFixed(2)}, ${s.sofa[2].toFixed(2)}) yaw ${s.yaw.toFixed(2)}; J1 (${s.cs[0].x.toFixed(2)}, ${s.cs[0].z.toFixed(2)}))`));
+  }
   ok(await grabBoth(), 'tras levantarse, J2 vuelve a agarrar');
 
   // 6. Chocar con una pared (J1 suelta y corre hacia el este hasta la valla): frena, no se cae.
@@ -216,8 +254,11 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   await hold([], 1.0, async (n) => { if (n.cs[0].wob || n.cs[0].stun > 0) releaseWob = true; });
   for (let i = 0; i < 60 && ((await st()).cs[0].wob || (await st()).cs[0].stun > 0); i++) await p.waitForTimeout(100);
   // Corre hacia el lado contrario al sofá (para que el sofá no le corte el paso) hasta que algo fijo le para: la
-  // valla del patio (x ±7,8), el seto junto a la salida (desde x ±8,2, z 3,6–4,4) o, en la acera, el límite de la
-  // calle (x ±18). Si se queda antes, la prueba no vale y se anota qué tenía cerca.
+  // valla del patio (x ±7,8), el seto junto a la salida (desde x ±8,2, z 3,6–4,4), un objeto fijo de decoración (la
+  // carretilla de (-6,3, 5,3), el cartel de (-5,0, 4,7)…) o, en la acera, el límite de la calle (x ±18). Antes solo
+  // valían la valla, el seto y el límite por su posición, y J1 parado contra la carretilla contaba como fallo. Ahora
+  // decide el propio juego: choque de lado contra algo fijo (`touchesWall`, lo mismo que usa el equilibrio para que
+  // una pared frene y no tumbe). Si se para sin tocar nada fijo, la prueba no vale y se anota qué tenía cerca.
   const s0 = await st();
   const free = !s0.cs[0].h;
   const dir = s0.cs[0].x >= s0.sofa[0] ? 1 : -1;
@@ -233,13 +274,20 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
     lastX = n.cs[0].x;
     if (still >= 5 || n.t - tWall > 6) break;
   }
+  // Con la tecla aún pulsada: ¿contra qué fijo empuja? (centro de su caja de choque)
+  const wall = await p.evaluate(() => {
+    const g = window.__mudanza.game, c = g.carriers[0];
+    if (!g.touchesWall(c)) return null;
+    let at = null;
+    g.world.contactPairsWith(c.collider, (o) => { if (!at && o.parent()?.isFixed() && o.translation().y > 0) { const t = o.translation(); at = [t.x, t.z]; } });
+    return at ?? [NaN, NaN];
+  });
   await p.keyboard.up(runKey);
   s = await st();
-  const wx = s.cs[0].x, wz = s.cs[0].z, ax = Math.abs(wx);
-  const atWall = (wz > 3.3 && wz < 17 && Math.abs(ax - 7.8) < 0.6) || Math.abs(ax - 18) < 0.6;
+  const wx = s.cs[0].x, wz = s.cs[0].z;
   const near = `sofá (${s.sofa[0].toFixed(2)}, ${s.sofa[2].toFixed(2)}), J2 (${s.cs[1].x.toFixed(2)}, ${s.cs[1].z.toFixed(2)})`;
-  ok(free && atWall && !wallFall, 'correr contra la pared frena sin tumbar',
-    `J1 corre con ${runKey} y se para en x=${wx.toFixed(2)}, z=${wz.toFixed(2)}${free ? '' : ' (J1 seguía agarrado)'}${atWall ? '' : ` (no llegó a una pared; ${near})`}${releaseWob ? ' (al soltar antes de correr se tambaleó: tensión del sofá)' : ''}`);
+  ok(free && wall && !wallFall, 'correr contra la pared frena sin tumbar',
+    `J1 corre con ${runKey} y se para en x=${wx.toFixed(2)}, z=${wz.toFixed(2)}${wall ? `, contra lo fijo de (${wall[0].toFixed(2)}, ${wall[1].toFixed(2)})` : ''}${free ? '' : ' (J1 seguía agarrado)'}${wall ? '' : ` (no llegó a nada fijo; ${near})`}${releaseWob ? ' (al soltar antes de correr se tambaleó: tensión del sofá)' : ''}`);
 
   // 7. Reiniciar con Retroceso
   await p.keyboard.press('Backspace');
@@ -248,7 +296,7 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   ok(s.cs.every((c) => !c.h) && Math.abs(s.sofa[2] - 10) < 0.3, 'Retroceso reinicia la partida (sofá en la salida, nadie agarra)');
 
   // ---------- Parte B: partida completa hasta el camión ----------
-  await p.goto(url + '?capture=1');
+  await p.goto(withParams(url, { capture: '1' }));
   await p.waitForFunction(() => window.__mudanza && document.getElementById('menu').style.display === 'flex');
   await p.evaluate(() => window.__mudanza.start(false));
   let res;

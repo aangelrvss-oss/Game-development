@@ -1,4 +1,4 @@
-// Graba una partida a dos (física cooperativa) fotograma a fotograma (?capture=1): cada fotograma son
+// Graba una partida a dos (sin ayudantes) fotograma a fotograma (?capture=1): cada fotograma son
 // 1/30 s de juego, así que el vídeo va a velocidad real aunque el contenedor dibuje despacio (sin GPU).
 // Tramo 1: J1 (WASD + Espacio) y J2 (flechas + Intro) con pulsaciones que envía Playwright al teclado del
 //          juego, sin salir del patio: agarran, tiran juntos, tiran a la contra (gira), cada uno tira hacia
@@ -122,7 +122,7 @@ const ZOOM = process.env.REC_ZOOM ? Number(process.env.REC_ZOOM) : null;
       <div style="font-size:24px;font-weight:700;max-width:1080px;line-height:1.35;background:rgba(0,0,0,.22);padding:12px 22px;border-radius:14px">
         Juego real (física Rapier), capturado fotograma a fotograma a velocidad real.<br>Las pulsaciones las envía un script, no dos personas. Solo se cortan esperas al semáforo.</div>${VERSION ? `<div style="margin-top:14px;font-size:20px;font-weight:700;opacity:.9">Versión grabada: ${VERSION}</div>` : ''}</div>`,
     'chip-teclado': `${base}<div class="chip">J1 (WASD + Espacio) y J2 (flechas + Intro): agarrar, tirar juntos, tirar a la contra, soltar tirando<small>Pulsaciones de teclado enviadas por un script de prueba</small></div>`,
-    'chip-piloto': `${base}<div class="chip">El piloto automático del juego lleva a J1 y a J2 hasta el camión<small>Misma física cooperativa: sin ayudantes de la máquina</small></div>`,
+    'chip-piloto': `${base}<div class="chip">El piloto automático del juego lleva a J1 y a J2 hasta el camión<small>La misma física que con ayudantes; aquí, sin ayudantes de la máquina</small></div>`,
     'chip-corte': `${base}<div class="chip">✂ Espera al semáforo en rojo, cortada</div>`,
   };
   for (const [name, html] of Object.entries(cards)) {

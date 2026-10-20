@@ -5,17 +5,15 @@ export interface PlayerInput {
   /** Movimiento en el suelo: x hacia la derecha, z hacia la cámara. Magnitud 0..1. */
   mx: number;
   mz: number;
-  /** Pulsación de agarrar/soltar en este paso (flanco). */
+  /** Pulsación de agarrar/soltar en este paso (flanco). Al agarrar, la mano sube sola a la altura de carga. */
   grab: boolean;
-  /** Mantener: subir los brazos para alzar el mueble. */
-  lift: boolean;
   /** Orden de giro a los ayudantes: +1 antihorario visto desde arriba, -1 horario. */
   turn: -1 | 0 | 1;
   /** Pulsación de enderezar el sofá (flanco). */
   right: boolean;
 }
 
-export const NO_INPUT: PlayerInput = { mx: 0, mz: 0, grab: false, lift: false, turn: 0, right: false };
+export const NO_INPUT: PlayerInput = { mx: 0, mz: 0, grab: false, turn: 0, right: false };
 
 export type GameEvent =
   | { type: 'grab'; carrier: number; pos: Vec3 }

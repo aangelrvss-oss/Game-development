@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { CENTER_Y } from '../../sim/carrier';
+import { DOLL_MODEL } from '../../sim/carrier';
 import { FlexTube, twoBone } from './tube';
 
 /** Estados del muñeco (los mismos que en el laboratorio de personaje). */
@@ -10,13 +10,14 @@ type V3 = { x: number; y: number; z: number };
 /**
  * Lo que el muñeco necesita saber del personaje en cada fotograma. El laboratorio lo leía de su simulación;
  * en el juego lo rellena un adaptador (`dollView.ts`) a partir del porteador. El muñeco solo lee: no mueve nada físico.
+ * Todo va en las unidades del modelo (el muñeco tal como está modelado, `DOLL_MODEL`): el adaptador escala.
  */
 export interface DollSource {
   state: DollState;
-  /** Centro del cuerpo (la cápsula de pie: los pies están CENTER_Y por debajo). */
+  /** Centro del cuerpo, a media altura del muñeco (los pies están `CENTER` por debajo, a lo largo de su eje). */
   pos: V3;
   vel: V3;
-  /** Giro del cuerpo cuando no está de pie (en el suelo o levantándose). */
+  /** Giro del cuerpo cuando no está de pie (en el suelo o levantándose): el de su cápsula física. */
   rotation: { x: number; y: number; z: number; w: number };
   upright: boolean;
   facing: { x: number; z: number };
@@ -32,6 +33,12 @@ export interface DollSource {
   grabWorld(): V3 | null;
   /** Altura del suelo (solo geometría fija) bajo un punto. */
   heightAt(x: number, z: number): number;
+  /**
+   * De pie, qué fracción (0..1) de una inclinación (x, z) de la parte de arriba del cuerpo cabe sin meterse en nada.
+   * El muñeco se inclina, se mece y cabecea alrededor de los pies, pero su cápsula física no: con esto reduce esos
+   * movimientos a lo que cabe, en vez de atravesar lo que tiene al lado. Sin ella, cabe todo.
+   */
+  fitTilt?(x: number, z: number): number;
 }
 
 /**
@@ -73,6 +80,8 @@ const DIM = {
   neckY: 0.93, headC: 0.17, capY: 0.33,
 };
 const LEG = DIM.thigh + DIM.shin;
+/** Altura del centro del cuerpo sobre los pies (la mitad del muñeco: el centro de su cápsula física). */
+const CENTER = DOLL_MODEL.height / 2;
 
 // En el juego, materiales estándar (como el resto de la escena): los físicos del laboratorio (capa transparente
 // y brillo de tela) costaban demasiado con render por software (3,7 fotogramas por segundo con dos muñecos)
@@ -121,7 +130,10 @@ export class CharacterRig {
   private yaw = 0;
   private yawFall = 0;
   private squash = 0; private squashV = 0;
-  private headYaw = 0; private headPitch = 0;
+  private headYaw = 0; private headPitch = 0; private headRoll = 0;
+  /** Balanceo de la pelvis (rad) y fracción que cabe de la inclinación de la parte de arriba del cuerpo (`fitTilt`). */
+  private sway = 0;
+  private fit = 1;
   private capWob = 0; private capWobV = 0; private capPrev = 0;
   private prevRootY = 0; private prevRootVy = 0;
   private scrabbleT = 0;
@@ -161,7 +173,7 @@ export class CharacterRig {
     (bib.material as THREE.Material).side = THREE.DoubleSide;
     add(this.torso, new THREE.BoxGeometry(0.13, 0.075, 0.018), overDark, 0, 0.74, -0.348);
     for (const s of [-1, 1]) {
-      const strap = new THREE.CatmullRomCurve3([new THREE.Vector3(s * 0.13, 0.84, -0.3), new THREE.Vector3(s * 0.165, 0.92, -0.21), new THREE.Vector3(s * 0.19, 0.965, 0.0), new THREE.Vector3(s * 0.17, 0.9, 0.24), new THREE.Vector3(s * 0.12, 0.66, 0.335)]);
+      const strap = new THREE.CatmullRomCurve3([new THREE.Vector3(s * 0.13, 0.84, -0.3), new THREE.Vector3(s * 0.165, 0.92, -0.21), new THREE.Vector3(s * 0.19, 0.965, 0.0), new THREE.Vector3(s * 0.17, 0.9, 0.24), new THREE.Vector3(s * 0.12, 0.66, 0.325)]);
       add(this.torso, new THREE.TubeGeometry(strap, 20, 0.028, 8), over);
       add(this.torso, new THREE.SphereGeometry(0.034, 14, 10), rubber(look.button, 0.35), s * 0.12, 0.835, -0.314);
     }
@@ -178,7 +190,7 @@ export class CharacterRig {
     this.torso.add(this.head);
     add(this.head, lathe([[0.2, 0.0], [0.265, 0.045], [0.31, 0.11], [0.332, 0.2], [0.33, 0.29], [0.305, 0.39], [0.25, 0.47], [0.15, 0.53], [0, 0.55]]), skin);
     // Nariz redonda, colorete, ojos ovalados con brillo, cejas y boca (solo en apuros)
-    add(this.head, new THREE.SphereGeometry(0.05, 16, 12), rubber('#efa07c', 0.5), 0, DIM.headC + 0.005, -0.335);
+    add(this.head, new THREE.SphereGeometry(0.05, 16, 12), rubber('#efa07c', 0.5), 0, DIM.headC + 0.005, -0.32);
     const eyeMat = new THREE.MeshStandardMaterial({ color: look.eye, roughness: 0.2 });
     const browMat = rubber(look.brow, 0.7);
     for (const s of [-1, 1]) {
@@ -209,7 +221,8 @@ export class CharacterRig {
     this.cap.rotation.set(-0.1, 0.18, 0.06);
     this.head.add(this.cap);
     add(this.cap, new THREE.SphereGeometry(0.336, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), cap, 0, -0.01, 0).scale.y = 0.78;
-    const brim = add(this.cap, new THREE.CylinderGeometry(0.21, 0.21, 0.024, 32, 1, false, Math.PI - 1.2, 2.4), cap, 0, 0.0, -0.2);
+    // Visera corta: como la nariz y los tirantes, apenas sobresale de la cápsula física (ver `CARRIER`)
+    const brim = add(this.cap, new THREE.CylinderGeometry(0.18, 0.18, 0.024, 32, 1, false, Math.PI - 1.2, 2.4), cap, 0, 0.0, -0.19);
     brim.rotation.x = 0.16;
     add(this.cap, new THREE.SphereGeometry(0.034, 12, 8), cap, 0, 0.255, 0);
     add(this.cap, new THREE.TorusGeometry(0.332, 0.016, 8, 48), rubber(look.capBand, 0.6), 0, 0.0, 0).rotation.x = Math.PI / 2;
@@ -284,20 +297,6 @@ export class CharacterRig {
   /** Coloca de golpe los pies (al reiniciar una prueba). */
   snap() { this.needSnap = true; }
 
-  /**
-   * Volumen del cuerpo dibujado como esferas (centro y radio, en coordenadas del grupo): tronco y cabeza, sin
-   * brazos ni piernas. Sirve para que el muñeco no se dibuje dentro de otros objetos (ver `DollView`).
-   */
-  bodySpheres(): { c: THREE.Vector3; r: number }[] {
-    this.group.updateMatrixWorld(true);
-    const s = this.torso.getWorldScale(new THREE.Vector3()).x;
-    const at = (o: THREE.Object3D, y: number) => o.localToWorld(new THREE.Vector3(0, y, 0)).sub(this.group.position);
-    return [
-      ...([[0.45, 0.33], [0.6, 0.355], [0.75, 0.335], [0.88, 0.27]] as const).map(([y, r]) => ({ c: at(this.torso, y), r: r * s })),
-      { c: at(this.head, 0.25), r: 0.33 * s },
-    ];
-  }
-
   /** Altura del suelo bajo la suela entera (la esquina más alta manda: así nunca se hunde) e inclinación de la suela. */
   private ground(src: DollSource, x: number, z: number, yaw: number) {
     const f = { x: -Math.sin(yaw), z: -Math.cos(yaw) }, r = { x: Math.cos(yaw), z: -Math.sin(yaw) };
@@ -313,7 +312,7 @@ export class CharacterRig {
     return { y: flat ? Math.max(toe, heel, left, rightH, mid) : Math.max(mid, (toe + heel) / 2), pitch: flat ? 0 : pitch, roll: flat ? 0 : roll };
   }
 
-  sync(src: DollSource, dt: number, camera: THREE.Camera) {
+  sync(src: DollSource, dt: number, camera: { position: THREE.Vector3 }) {
     const c = src;
     dt = Math.min(dt, 0.05);
     this.t += dt;
@@ -329,24 +328,31 @@ export class CharacterRig {
     const dyaw = wrap(yawTarget - this.yaw);
     if (upright) this.yaw += Math.sign(dyaw) * Math.min(Math.abs(dyaw), dt * (c.state === 'losingBalance' ? 4 : 7.5));
     const qYaw = new THREE.Quaternion().setFromAxisAngle(UP, this.yaw);
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(qYaw);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(qYaw);
     const rootPos = new THREE.Vector3();
     const rootQ = new THREE.Quaternion();
     if (upright) {
       this.yawFall = this.yaw;
-      const lx = c.lean.x, lz = c.lean.z, l = Math.min(1.2, Math.hypot(lx, lz));
+      // Inclinación de la parte de arriba del cuerpo: el desequilibrio, más lo que la ladean el balanceo de la pelvis y
+      // el cabeceo (los del fotograma anterior; la cabeza mueve como un 30 % de lo que mueve el tronco entero). Solo lo
+      // que cabe sin meterse en nada (`fitTilt`): se reducen los tres a la vez.
+      const lx = c.lean.x, lz = c.lean.z;
+      const sx = this.sway + this.headRoll * 0.3, fy = this.headPitch * 0.3;
+      this.fit = c.fitTilt ? c.fitTilt(lx - right.x * sx - fwd.x * fy, lz - right.z * sx - fwd.z * fy) : 1;
+      const l = Math.min(1.2, Math.hypot(lx, lz)) * this.fit;
       const tilt = l > 1e-5 ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(lz, 0, -lx).normalize(), l) : new THREE.Quaternion();
       rootQ.copy(tilt).multiply(qYaw);
-      rootPos.set(p.x, p.y - CENTER_Y, p.z);
+      rootPos.set(p.x, p.y - CENTER, p.z);
     } else {
+      this.fit = 1;
       const bq = c.rotation;
       const bodyQ = new THREE.Quaternion(bq.x, bq.y, bq.z, bq.w);
       rootQ.copy(bodyQ).multiply(new THREE.Quaternion().setFromAxisAngle(UP, this.yawFall));
-      rootPos.set(0, -CENTER_Y, 0).applyQuaternion(bodyQ).add(new THREE.Vector3(p.x, p.y, p.z));
+      rootPos.set(0, -CENTER, 0).applyQuaternion(bodyQ).add(new THREE.Vector3(p.x, p.y, p.z));
     }
     this.root.position.copy(rootPos);
     this.root.quaternion.copy(rootQ);
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(qYaw);
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(qYaw);
     const stumbling = c.state === 'losingBalance';
     const pulling = c.holding && c.effort > 0.5;
     const scrabble = pulling && speed < 0.35 && Math.hypot(c.wantVel.x, c.wantVel.z) > 0.3;
@@ -362,7 +368,8 @@ export class CharacterRig {
       bob -= 0.012 * Math.min(1, speed / 2);
     }
     this.pelvis.position.y = damp(this.pelvis.position.y, bob, 18, dt);
-    this.pelvis.rotation.z = damp(this.pelvis.rotation.z, sway, 10, dt);
+    this.sway = damp(this.sway, sway, 10, dt);
+    this.pelvis.rotation.z = this.sway * this.fit;
 
     // --- Aplastamiento de la judía: aterrizajes, pasos y esfuerzo ---
     const vy = (rootPos.y - this.prevRootY) / Math.max(dt, 1e-4);
@@ -373,7 +380,9 @@ export class CharacterRig {
     this.squash += this.squashV * dt;
     const sq = THREE.MathUtils.clamp(this.squash, -0.2, 0.2);
     const breathe = Math.sin(this.t * 2.4) * 0.01;
-    this.torso.scale.set(1 - sq * 0.5, 1 + sq + breathe, 1 - sq * 0.5);
+    // Aplastado se acorta sin ensancharse: el tronco ya tiene la anchura de la cápsula física
+    const wide = Math.min(1, 1 - sq * 0.5);
+    this.torso.scale.set(wide, 1 + sq + breathe, wide);
     // Contrarrotación del tronco con los pasos
     const fo = this.feet.map((f) => (upright ? f.pos.clone().sub(rootPos).dot(fwd) : 0));
     this.torso.rotation.y = damp(this.torso.rotation.y, THREE.MathUtils.clamp((fo[0] - fo[1]) * 0.5, -0.25, 0.25), 8, dt);
@@ -500,7 +509,10 @@ export class CharacterRig {
     const leanVel = new THREE.Vector3(c.leanVel.x, 0, c.leanVel.z);
     const lagPitch = upright ? THREE.MathUtils.clamp(leanVel.dot(fwd) * 0.25, -0.35, 0.35) : 0;
     this.headPitch = damp(this.headPitch, lagPitch + (c.holding ? -0.18 * c.effort : 0) + (stumbling ? -0.2 : 0), 8, dt);
-    this.head.rotation.set(this.headPitch, this.headYaw, upright ? THREE.MathUtils.clamp(leanVel.dot(right) * -0.2, -0.3, 0.3) : Math.sin(this.t * 5) * 0.12 * (c.state === 'falling' ? 1 : 0));
+    this.headRoll = upright ? THREE.MathUtils.clamp(leanVel.dot(right) * -0.2, -0.3, 0.3) : Math.sin(this.t * 5) * 0.12 * (c.state === 'falling' ? 1 : 0);
+    // De pie, cabecea solo lo que cabe (como la inclinación del tronco)
+    const hk = upright ? this.fit : 1;
+    this.head.rotation.set(this.headPitch * hk, this.headYaw, this.headRoll * hk);
     this.capWobV += (-this.capWob * 220 - this.capWobV * 9 + (this.headPitch - this.capPrev) * 900) * dt;
     this.capPrev = this.headPitch;
     this.capWob += this.capWobV * dt;

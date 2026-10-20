@@ -1,10 +1,18 @@
 // Ayudantes controlados por la máquina. Son deliberadamente simples:
 // van a un asa libre, la agarran e imitan el movimiento de los jugadores humanos que cargan,
 // añadiendo la componente de giro que pidan (Q/E). No esquivan obstáculos ni deciden la ruta.
+//
+// Tienen la misma física que los jugadores (mano blanda, fuerza y equilibrio de `carrier.ts` y `hand.ts`). Lo
+// que los distingue está solo aquí, en cómo deciden: se acercan a su asa sin correr y rodeando a los demás
+// porteadores (`personal`: a la carrera o de frente chocarían con ellos y los tumbarían) y, cuando sueltan por
+// estar bloqueados, primero dejan de tirar y acompañan al sofá un momento (`letGo`): soltar de golpe con el
+// sofá tirando de ellos los tumbaría, igual que a un jugador. Y si notan que empiezan a perder el equilibrio
+// (`steady`), dejan de imitar y se dejan llevar por el sofá hasta recuperarlo: imitan con retraso, y cuando el
+// jugador frena de golpe seguirían empujando contra todos.
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { CARRIER, type Carrier } from './carrier';
 import { SLOTS, localToWorld, rotate } from './sofa';
-import type { PlayerInput } from './types';
+import type { PlayerInput, Vec3 } from './types';
 
 export type BotStyle = 'atentos' | 'despistados';
 
@@ -12,6 +20,15 @@ export const BOT = {
   /** Retraso de reacción en pasos de 1/60 s. */
   delay: { atentos: 10, despistados: 28 },
   turnRate: 0.9,
+  /** Fracción de la velocidad de andar con la que van a por su asa. */
+  approach: 0.5,
+  /** Tiempo acompañando al sofá sin tirar antes de soltarlo (s). */
+  letGo: 0.5,
+  /** Distancia a la que rodean y frenan ante otro porteador cuando van a por su asa (m). */
+  personal: 1.1,
+  /** Desviación del tronco (rad) a partir de la cual dejan de tirar y acompañan al sofá, y a la que vuelven. */
+  steady: 0.1,
+  steadyBack: 0.04,
 };
 
 export class BotBrain {
@@ -23,14 +40,24 @@ export class BotBrain {
   blocked = 0;
   /** Espera antes de volver a agarrar tras soltar por bloqueo. */
   regrab = 0;
+  /** Soltando con cuidado: tiempo que queda acompañando al sofá antes de soltar. */
+  letGo = 0;
+  /** Se está dejando llevar por el sofá para no perder el equilibrio. */
+  yielding = false;
   constructor(slot: number, readonly style: BotStyle, private rng: () => number) { this.slot = slot; }
 
   /** Calcula el mando del ayudante para este paso. */
-  think(me: Carrier, sofa: RAPIER.RigidBody, lead: { x: number; z: number; w: number; active: boolean }, taken: Set<number>, dt: number): PlayerInput {
-    const input: PlayerInput = { mx: 0, mz: 0, grab: false, lift: false, turn: 0, right: false };
-    if (me.stunned > 0) return input;
+  think(me: Carrier, sofa: RAPIER.RigidBody, lead: { x: number; z: number; w: number; active: boolean }, taken: Set<number>, dt: number, others: Vec3[] = []): PlayerInput {
+    const input: PlayerInput = { mx: 0, mz: 0, grab: false, turn: 0, right: false };
+    if (me.stunned > 0) { this.letGo = 0; return input; }
     const p = me.pos;
     if (!me.holding) {
+      this.letGo = 0;
+      // Su asa la ha cogido otro (también un jugador): busca otra libre
+      if (taken.has(this.slot)) {
+        const free = SLOTS.map((_, i) => i).filter((i) => !taken.has(i));
+        if (free.length) this.slot = free[Math.floor(this.rng() * free.length)];
+      }
       if (this.regrab > 0) {
         // Se aparta un poco y deja pasar al sofá; después vuelve a por un asa.
         this.regrab -= dt;
@@ -48,8 +75,22 @@ export class BotBrain {
       if (d < 0.45 && Math.abs(anchor.y - p.y) < 1.2) {
         input.grab = true;
       } else {
-        const s = Math.min(1, d / 0.8);
-        input.mx = (dx / d) * s; input.mz = (dz / d) * s;
+        let s = Math.min(BOT.approach, d / 0.8);
+        let ux = dx / d, uz = dz / d;
+        // Espacio personal: rodea a quien tiene delante y frena si está muy cerca (no los arrolla)
+        for (const o of others) {
+          const ox = o.x - p.x, oz = o.z - p.z, od = Math.hypot(ox, oz);
+          if (od < 1e-3 || od > BOT.personal || od > d + 0.3) continue;
+          const ahead = (ox * ux + oz * uz) / od;
+          if (ahead < 0.2) continue;
+          // Se desvía hacia el lado contrario al que queda el otro respecto a su camino
+          const px = -uz, pz = ux, side = ox * px + oz * pz > 0 ? -1 : 1, k = 1.5 * ahead * (1 - od / BOT.personal);
+          ux += px * side * k; uz += pz * side * k;
+          const ul = Math.hypot(ux, uz) || 1;
+          ux /= ul; uz /= ul;
+          s *= Math.max(0.35, od / BOT.personal);
+        }
+        input.mx = ux * s; input.mz = uz * s;
       }
       // Si no llega en un rato (bloqueado), prueba otra asa libre.
       if (this.tryTime > 5) {
@@ -60,6 +101,30 @@ export class BotBrain {
       return input;
     }
     this.tryTime = 0;
+    const lean = Math.hypot(me.lean.x, me.lean.z);
+    this.yielding = lean > BOT.steady || (this.yielding && lean > BOT.steadyBack) || me.wobbling;
+    if (this.yielding && this.letGo <= 0) {
+      // Pierde el equilibrio: deja de tirar y acompaña al sofá (la historia sigue llenándose para luego)
+      this.history.push({ x: lead.x, z: lead.z, w: lead.w });
+      while (this.history.length > BOT.delay[this.style]) this.history.shift();
+      const g = me.grabWorld();
+      if (g) { const v = sofa.velocityAtPoint(g); input.mx = v.x / CARRIER.carrySpeed; input.mz = v.z / CARRIER.carrySpeed; }
+      return input;
+    }
+    if (this.letGo > 0) {
+      // Soltando con cuidado: deja de tirar y acompaña al sofá; después suelta
+      this.letGo -= dt;
+      const g = me.grabWorld();
+      if (g && this.letGo > 0) {
+        const v = sofa.velocityAtPoint(g);
+        input.mx = v.x / CARRIER.carrySpeed; input.mz = v.z / CARRIER.carrySpeed;
+        return input;
+      }
+      this.letGo = 0;
+      this.regrab = 2.2;
+      input.grab = true; // en un ayudante que carga, «agarrar» significa soltar
+      return input;
+    }
     // Imita a los humanos con retraso de reacción.
     this.history.push({ x: lead.x, z: lead.z, w: lead.w });
     const delay = BOT.delay[this.style];
@@ -80,15 +145,18 @@ export class BotBrain {
     }
     input.mx = vx / CARRIER.carrySpeed;
     input.mz = vz / CARRIER.carrySpeed;
-    // ¿Atascado contra algo? Si empuja y no avanza, suelta para no bloquear al grupo (pasa en puertas).
+    // ¿Atascado contra algo? Si se queda atrás de su asa (la mano se estira) o empuja y no avanza mientras el
+    // sofá sí avanza, suelta para no bloquear al grupo (pasa en puertas). Si todo el grupo va despacio (la
+    // escalera, un peso grande), no es él quien se atasca: sigue agarrando.
     const want = Math.hypot(vx, vz);
-    const v = me.body.linvel();
+    const v = me.body.linvel(), sv = sofa.linvel();
     const along = want > 1e-3 ? (v.x * vx + v.z * vz) / want : 0;
-    this.blocked = want > 0.9 && along < 0.3 * want ? this.blocked + dt : 0;
+    const stuck = want > 0.9 && along < 0.3 * want && Math.hypot(sv.x, sv.z) > 0.6;
+    this.blocked = stuck || me.handSep > 0.3 ? this.blocked + dt : 0;
     if (this.blocked > 0.7) {
+      // Bloqueado: suelta para no frenar al grupo (pasa en puertas), pero con cuidado (`letGo`)
       this.blocked = 0;
-      this.regrab = 2.2;
-      input.grab = true; // en un ayudante que carga, «agarrar» significa soltar
+      this.letGo = BOT.letGo;
       const free = SLOTS.map((_, i) => i).filter((i) => !taken.has(i) && i !== this.slot);
       if (free.length) this.slot = free[Math.floor(this.rng() * free.length)];
     }

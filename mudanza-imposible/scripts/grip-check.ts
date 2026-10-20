@@ -8,7 +8,7 @@ for (let seed = 1; seed <= 12; seed++) for (const n of [3, 4, 6]) {
   const me = g.carriers[0];
   let grabbed = false;
   for (let i = 0; i < 60 * 8; i++) {
-    let inp = { mx: 0, mz: 0, grab: false, lift: false, turn: 0 as const, right: false };
+    let inp = { mx: 0, mz: 0, grab: false, turn: 0 as const, right: false };
     if (g.phase === 'playing' && !grabbed) {
       // Camina hacia el asa +x y agarra
       const a = localToWorld(g.sofa, SLOTS[0].p);
