@@ -1,6 +1,7 @@
 // Ayudantes controlados por la máquina. Son deliberadamente simples:
-// van a un asa libre, la agarran e imitan el movimiento de los jugadores humanos que cargan,
-// añadiendo la componente de giro que pidan (Q/E). No esquivan obstáculos ni deciden la ruta.
+// van a un asa libre del objeto (las de su definición, `ItemDef.handles`), la agarran e imitan el movimiento de los
+// jugadores humanos que cargan, añadiendo la componente de giro que pidan (Q/E). No esquivan obstáculos ni deciden
+// la ruta.
 //
 // Tienen la misma física que los jugadores (mano blanda, fuerza y equilibrio de `carrier.ts` y `hand.ts`). Lo
 // que los distingue está solo aquí, en cómo deciden: se acercan a su asa sin correr y rodeando a los demás
@@ -9,9 +10,9 @@
 // sofá tirando de ellos los tumbaría, igual que a un jugador. Y si notan que empiezan a perder el equilibrio
 // (`steady`), dejan de imitar y se dejan llevar por el sofá hasta recuperarlo: imitan con retraso, y cuando el
 // jugador frena de golpe seguirían empujando contra todos.
-import type RAPIER from '@dimforge/rapier3d-compat';
 import { CARRIER, type Carrier } from './carrier';
-import { SLOTS, localToWorld, rotate } from './sofa';
+import type { Item } from './items';
+import { localToWorld, rotate } from './sofa';
 import type { PlayerInput, Vec3 } from './types';
 
 export type BotStyle = 'atentos' | 'despistados';
@@ -32,6 +33,7 @@ export const BOT = {
 };
 
 export class BotBrain {
+  /** Asa a la que va o que agarra (índice en las asas de la definición del objeto). */
   slot: number;
   history: { x: number; z: number; w: number }[] = [];
   tryTime = 0;
@@ -46,16 +48,17 @@ export class BotBrain {
   yielding = false;
   constructor(slot: number, readonly style: BotStyle, private rng: () => number) { this.slot = slot; }
 
-  /** Calcula el mando del ayudante para este paso. */
-  think(me: Carrier, sofa: RAPIER.RigidBody, lead: { x: number; z: number; w: number; active: boolean }, taken: Set<number>, dt: number, others: Vec3[] = []): PlayerInput {
+  /** Calcula el mando del ayudante para este paso. `item`: el objeto que lleva o al que va; `taken`: sus asas ocupadas. */
+  think(me: Carrier, item: Item, lead: { x: number; z: number; w: number; active: boolean }, taken: Set<number>, dt: number, others: Vec3[] = []): PlayerInput {
     const input: PlayerInput = { mx: 0, mz: 0, grab: false, turn: 0, right: false };
+    const body = item.body, handles = item.def.handles;
     if (me.stunned > 0) { this.letGo = 0; return input; }
     const p = me.pos;
     if (!me.holding) {
       this.letGo = 0;
       // Su asa la ha cogido otro (también un jugador): busca otra libre
       if (taken.has(this.slot)) {
-        const free = SLOTS.map((_, i) => i).filter((i) => !taken.has(i));
+        const free = handles.map((_, i) => i).filter((i) => !taken.has(i));
         if (free.length) this.slot = free[Math.floor(this.rng() * free.length)];
       }
       if (this.regrab > 0) {
@@ -64,9 +67,9 @@ export class BotBrain {
         input.mx = lead.x / CARRIER.carrySpeed * 0.8; input.mz = lead.z / CARRIER.carrySpeed * 0.8;
         return input;
       }
-      const slot = SLOTS[this.slot];
-      const anchor = localToWorld(sofa, slot.p);
-      const out = rotate(sofa.rotation(), slot.out);
+      const slot = handles[this.slot];
+      const anchor = localToWorld(body, slot.p);
+      const out = rotate(body.rotation(), slot.out);
       const ol = Math.hypot(out.x, out.z) || 1;
       const goal = { x: anchor.x + (out.x / ol) * 0.6, z: anchor.z + (out.z / ol) * 0.6 };
       const dx = goal.x - p.x, dz = goal.z - p.z;
@@ -95,7 +98,7 @@ export class BotBrain {
       // Si no llega en un rato (bloqueado), prueba otra asa libre.
       if (this.tryTime > 5) {
         this.tryTime = 0;
-        const free = SLOTS.map((_, i) => i).filter((i) => !taken.has(i) && i !== this.slot);
+        const free = handles.map((_, i) => i).filter((i) => !taken.has(i) && i !== this.slot);
         if (free.length) this.slot = free[Math.floor(this.rng() * free.length)];
       }
       return input;
@@ -108,7 +111,7 @@ export class BotBrain {
       this.history.push({ x: lead.x, z: lead.z, w: lead.w });
       while (this.history.length > BOT.delay[this.style]) this.history.shift();
       const g = me.grabWorld();
-      if (g) { const v = sofa.velocityAtPoint(g); input.mx = v.x / CARRIER.carrySpeed; input.mz = v.z / CARRIER.carrySpeed; }
+      if (g) { const v = body.velocityAtPoint(g); input.mx = v.x / CARRIER.carrySpeed; input.mz = v.z / CARRIER.carrySpeed; }
       return input;
     }
     if (this.letGo > 0) {
@@ -116,7 +119,7 @@ export class BotBrain {
       this.letGo -= dt;
       const g = me.grabWorld();
       if (g && this.letGo > 0) {
-        const v = sofa.velocityAtPoint(g);
+        const v = body.velocityAtPoint(g);
         input.mx = v.x / CARRIER.carrySpeed; input.mz = v.z / CARRIER.carrySpeed;
         return input;
       }
@@ -131,7 +134,7 @@ export class BotBrain {
     while (this.history.length > delay) this.history.shift();
     const h = this.history[0];
     if (!lead.active && h.x === 0 && h.z === 0 && h.w === 0) return input;
-    const c = sofa.translation();
+    const c = body.translation();
     const rx = p.x - c.x, rz = p.z - c.z;
     // v = v_líder + ω × r (ω sobre +y)
     let vx = h.x + h.w * rz;
@@ -149,7 +152,7 @@ export class BotBrain {
     // sofá sí avanza, suelta para no bloquear al grupo (pasa en puertas). Si todo el grupo va despacio (la
     // escalera, un peso grande), no es él quien se atasca: sigue agarrando.
     const want = Math.hypot(vx, vz);
-    const v = me.body.linvel(), sv = sofa.linvel();
+    const v = me.body.linvel(), sv = body.linvel();
     const along = want > 1e-3 ? (v.x * vx + v.z * vz) / want : 0;
     const stuck = want > 0.9 && along < 0.3 * want && Math.hypot(sv.x, sv.z) > 0.6;
     this.blocked = stuck || me.handSep > 0.3 ? this.blocked + dt : 0;
@@ -157,7 +160,7 @@ export class BotBrain {
       // Bloqueado: suelta para no frenar al grupo (pasa en puertas), pero con cuidado (`letGo`)
       this.blocked = 0;
       this.letGo = BOT.letGo;
-      const free = SLOTS.map((_, i) => i).filter((i) => !taken.has(i) && i !== this.slot);
+      const free = handles.map((_, i) => i).filter((i) => !taken.has(i) && i !== this.slot);
       if (free.length) this.slot = free[Math.floor(this.rng() * free.length)];
     }
     return input;

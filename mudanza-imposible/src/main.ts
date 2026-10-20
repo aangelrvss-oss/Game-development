@@ -223,23 +223,29 @@ function handle(e: GameEvent, g: Game) {
     case 'impact':
       sfx.play('impact', e.strength);
       view.fx.dust(e.pos, 5 + Math.min(8, Math.round(e.strength)), 0.8);
-      view.sofa.bump(e.strength);
+      if (e.item === g.sofaItem.index) view.sofa.bump(e.strength);
       if (e.strength > 3) view.fx.ring(e.pos, '#fff7d6', Math.min(1.6, 0.6 + e.strength * 0.12));
       view.fx.shake = Math.min(0.8, view.fx.shake + e.strength * 0.05);
       // Tras un atropello, el «¡CATAPUM!» ya lo dice: el texto de daño pequeño se taparía con él
       if (e.damage > 0 && g.phase === 'playing' && simTime - (toastCooldown.get('carHit') ?? -99) > 0.8) view.fx.text(e.pos, `-${e.damage}%`, '#fca5a5', 42);
       break;
-    case 'carHit':
+    case 'carHit': {
       toastCooldown.set('carHit', simTime);
       sfx.play('crash');
       view.fx.stars(e.pos, 8);
       view.fx.ring(e.pos, '#fde047', 1.4);
       view.fx.dust(e.pos, 8, 1.2);
-      if (e.target === 'sofa') view.sofa.bump(10);
+      const hit = e.target === 'item' ? g.items[e.item!] : null;
+      if (hit === g.sofaItem) view.sofa.bump(10);
       view.fx.shake = Math.min(1, view.fx.shake + 0.6);
-      if (e.target === 'sofa') { view.fx.text(e.pos, '¡CATAPUM!', '#ffffff', 50, '#dc2626', 2.3); hud.toast(`¡Atropello al sofá! −${RULES.carDamage}%`, 'bad'); }
-      else if (cooled(`run${e.carrier}`, 1.5)) hud.toast(`¡Han atropellado a ${who(e.carrier!).human !== null ? `J${who(e.carrier!).human! + 1}` : carrierName(who(e.carrier!))}!`, 'bad');
+      if (hit) {
+        view.fx.text(e.pos, '¡CATAPUM!', '#ffffff', 50, '#dc2626', 2.3);
+        const cost = hit.def.fragility ? ` −${RULES.carDamage}%` : '';
+        hud.toast(hit === g.sofaItem ? `¡Atropello al sofá!${cost}` : `¡Atropello! ${hit.def.name}${cost}`, 'bad');
+      } else if (cooled(`run${e.carrier}`, 1.5)) hud.toast(`¡Han atropellado a ${who(e.carrier!).human !== null ? `J${who(e.carrier!).human! + 1}` : carrierName(who(e.carrier!))}!`, 'bad');
       break;
+    }
+    case 'itemBroken': sfx.play('crash'); hud.toast(`¡Se ha roto: ${g.items[e.item].def.name}!`, 'bad'); break;
     case 'stun': sfx.play('stun'); view.fx.stars(e.pos, 5); break;
     case 'wobble':
       sfx.play('wobble');
@@ -291,7 +297,7 @@ function results(g: Game) {
   const t = `${Math.floor(g.time / 60)}:${(g.time % 60).toFixed(1).padStart(4, '0')}`;
   $('r-grid').innerHTML = [
     ['Tiempo', t, `★ si ≤ ${RULES.parTime} s`],
-    ['Estado del sofá', `${Math.round(g.integrity)}%`, '★ si ≥ 70 %'],
+    ['Estado del sofá', `${Math.round(g.sofaItem.integrity)}%`, '★ si ≥ 70 %'],
     ['Etapa alcanzada', g.stageLabel, ''],
     ...(best !== null ? [['Mejor tiempo', `${best.toFixed(1)} s`, 'en este navegador']] : []),
   ].map(([a, b, c]) => `<div><small>${a}</small>${b}<small>${c}</small></div>`).join('');

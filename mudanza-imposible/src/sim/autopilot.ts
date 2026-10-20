@@ -3,7 +3,7 @@
 // y como modo demostración. No es una IA de juego: conoce la ruta de antemano.
 import type { Game } from './game';
 import { ROUTE } from './level';
-import { SLOTS, localToWorld, rotate } from './sofa';
+import { localToWorld, rotate } from './sofa';
 import type { PlayerInput } from './types';
 
 const wrapHalfPi = (a: number) => {
@@ -28,7 +28,7 @@ export class PilotCrew {
   lastDist = Infinity;
   /** Maniobras de desatasco seguidas sin llegar al punto de paso. */
   wiggles = 0;
-  /** Asa a la que va cada piloto que todavía no agarra (índice del porteador → índice de `SLOTS`). */
+  /** Asa a la que va cada piloto que todavía no agarra (índice del porteador → índice en las asas del sofá). */
   readonly claims = new Map<number, number>();
   /** Movimiento del grupo en este paso (lo calcula el primer piloto que carga y lo reutilizan los demás). */
   private move: PlayerInput = { mx: 0, mz: 0, grab: false, turn: 0, right: false };
@@ -130,7 +130,7 @@ export class Autopilot {
       // Ve al asa libre más cercana y agárrala (si en 3 s no llega a ella, prueba otra). Una asa la ocupa quien ya
       // la agarra o un compañero del equipo que va a por ella.
       let best = Infinity, goal = { x: 0, z: 0 }, face = { x: 0, z: 0 }, pick = -1;
-      for (const [i, s] of SLOTS.entries()) {
+      for (const [i, s] of g.sofaItem.def.handles.entries()) {
         if (this.skip.has(i)) continue;
         const a = localToWorld(g.sofa, s.p);
         const out = rotate(g.sofa.rotation(), s.out);

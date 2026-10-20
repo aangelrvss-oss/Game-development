@@ -1,3 +1,5 @@
+import type { ItemId } from './items';
+
 export interface Vec3 { x: number; y: number; z: number }
 
 /** Mando de un jugador en un paso de simulación. Lo rellenan el teclado, el mando, la IA o el piloto automático. */
@@ -19,8 +21,11 @@ export type GameEvent =
   | { type: 'grab'; carrier: number; pos: Vec3 }
   | { type: 'release'; carrier: number; pos: Vec3 }
   | { type: 'gripBreak'; carrier: number; pos: Vec3 }
-  | { type: 'impact'; pos: Vec3; strength: number; damage: number }
-  | { type: 'carHit'; pos: Vec3; target: 'sofa' | 'carrier'; carrier?: number }
+  /** Golpe de un objeto (`item`: su posición en `Game.items`). */
+  | { type: 'impact'; pos: Vec3; strength: number; damage: number; item: number }
+  | { type: 'carHit'; pos: Vec3; target: 'item' | 'carrier'; item?: number; carrier?: number }
+  /** Un objeto se ha roto (su integridad ha llegado a 0). */
+  | { type: 'itemBroken'; item: number; id: ItemId; pos: Vec3 }
   | { type: 'stun'; carrier: number; pos: Vec3 }
   | { type: 'wobble'; carrier: number; pos: Vec3 }
   | { type: 'fall'; carrier: number; pos: Vec3 }

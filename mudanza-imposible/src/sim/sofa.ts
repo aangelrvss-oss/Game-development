@@ -14,6 +14,9 @@ export const SOFA = {
   /**
    * Una sola física para cualquier número de humanos y ayudantes: pesa más de lo que una persona sostiene
    * (`HAND.maxV`), así que uno solo levanta un extremo y lo arrastra, y entre dos lo llevan en el aire.
+   * Ojo: `createSofa` reparte estos 90 kg en el volumen envolvente de sus cajas, pero Rapier pesa la caja redondeada
+   * del asiento solo por su caja interior: el cuerpo pesa 66,46 kg (652 N, aún más que `HAND.maxV`). Es la masa con la
+   * que se midió todo el ciclo 1, y la que conserva el sofá del catálogo (`ITEMS.sofa` en `items.ts`).
    */
   mass: 90,
   /** Roce a rastras (se promedia con el del suelo): uno solo, con un extremo en alto, apenas puede con él. */

@@ -109,7 +109,7 @@ describe('Tráfico', () => {
     place(g, 8, -1.6, 0, 0.3);
     const x0 = g.sofaPos.x;
     const ev = play(g, 8);
-    expect(ev.some((e) => e.type === 'carHit' && e.target === 'sofa')).toBe(true);
+    expect(ev.some((e) => e.type === 'carHit' && e.target === 'item' && e.item === g.sofaItem.index)).toBe(true);
     expect(ev.some((e) => e.type === 'honk')).toBe(true);
     expect(g.integrity).toBeLessThanOrEqual(100 - RULES.carDamage);
     expect(Math.abs(g.sofaPos.x - x0)).toBeGreaterThan(1);
