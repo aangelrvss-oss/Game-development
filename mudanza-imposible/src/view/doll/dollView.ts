@@ -3,6 +3,8 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { CARRIER, CENTER_Y, DOLL_HEIGHT, DOLL_SCALE, type Carrier } from '../../sim/carrier';
 import { PLAYER_COLORS } from '../carrierView';
 import { textSprite } from '../text';
+import { TiltFit } from '../tiltFit';
+import type { Fx } from '../fx';
 import { CharacterRig, LOOK, type DollSource, type DollState, type Look } from './dollRig';
 
 /**
@@ -25,6 +27,48 @@ export const carrierName = (c: Carrier) => (c.human !== null ? PLAYER_NAMES[c.hu
 /** Escala del muñeco (del modelo al mundo) y su inversa. */
 const S = DOLL_SCALE, IS = 1 / DOLL_SCALE;
 
+/** Rayas de esfuerzo de cómic (tres trazos en abanico, tinta con borde claro), para dibujar sobre la cabeza. */
+function effortMarks(): THREE.Sprite {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 64;
+  const ctx = c.getContext('2d')!;
+  ctx.lineCap = 'round';
+  for (const [w, color] of [[16, '#fff7d6'], [8, '#1f1a2e']] as const) {
+    ctx.lineWidth = w; ctx.strokeStyle = color;
+    for (const a of [-0.55, 0, 0.55]) {
+      ctx.beginPath();
+      ctx.moveTo(64 + Math.sin(a) * 18, 58 - Math.cos(a) * 18);
+      ctx.lineTo(64 + Math.sin(a) * 50, 58 - Math.cos(a) * 50);
+      ctx.stroke();
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  sp.renderOrder = 9;
+  sp.scale.set(0.6, 0.3, 1);
+  sp.visible = false;
+  return sp;
+}
+
+/**
+ * Cómo se ve el esfuerzo desde la cámara de juego (unos 53° desde arriba, lejos): cejas, boca y temblor no se
+ * distinguían. `calm` es el esfuerzo de agarrar sin más (no cuenta); `lean`, cuánto se cuelga hacia atrás al tirar
+ * (rad por unidad de esfuerzo, antes 0,16); el aro late (`ringPulse`, a `pulseHz`), la bola de agarre crece con la
+ * tensión (`gripGrow`) y se enrojece, por encima de `sweatAt` suda cada `sweatEvery` s y
+ * salen rayas de esfuerzo sobre la cabeza (`effortMarks`).
+ */
+export const EFFORT = {
+  calm: 0.35,
+  lean: 0.28,
+  ringPulse: 0.12,
+  pulseHz: 2.5,
+  gripGrow: 1.4,
+  strainColor: new THREE.Color('#ef4444'),
+  sweatAt: 0.6,
+  sweatEvery: 0.45,
+};
+
 /**
  * Vista de un jugador humano con el muñeco del laboratorio. Adapta el porteador del juego a lo que lee el muñeco
  * (`DollSource`) y no cambia nada de la física. Lo dibujado es el cuerpo físico, sin desplazarlo nunca:
@@ -32,7 +76,7 @@ const S = DOLL_SCALE, IS = 1 / DOLL_SCALE;
  *   El muñeco trabaja en las unidades del modelo; aquí se pasan posiciones y velocidades del mundo a ellas.
  * - De pie, el muñeco ocupa la cápsula (misma anchura y altura, `CARRIER`). Su inclinación (el desequilibrio,
  *   colgarse hacia atrás al tirar, adelantarse al andar) es solo de dibujo: se limita a lo que cabe sin meterse en
- *   nada (`fitLean`), en vez de apartar el muñeco de lo que atraviesa.
+ *   nada (`TiltFit`, la misma consulta que los ayudantes), en vez de apartar el muñeco de lo que atraviesa.
  * - En el suelo, el muñeco se dibuja con la pose del collider tumbado (`Carrier.stepDown`): la misma dirección y el
  *   mismo ángulo que la simulación, no una caída inventada.
  * - El suelo bajo los pies se consulta con un rayo solo contra la geometría fija (ni el sofá ni otros porteadores).
@@ -43,35 +87,37 @@ export class DollView {
   private ring: THREE.Mesh;
   private grip: THREE.Mesh;
   private stars: THREE.Group;
+  /** Rayas de esfuerzo sobre la cabeza. */
+  private marks: THREE.Sprite;
   label?: THREE.Sprite;
   private src: DollSource;
   private effort = 0;
+  /** Color del jugador (la bola de agarre se enrojece con la tensión) y espera hasta las próximas gotas de sudor. */
+  private color: THREE.Color;
+  private sweatT = 0;
   /**
-   * Parte de arriba del cuerpo dibujado (tronco y cabeza, del ombligo a la gorra) como cápsula del radio del tronco:
-   * con ella se comprueba si la inclinación dibujada cabe. Sin margen: lo que sobresale del tronco (la nariz, la
-   * visera) ya gasta casi todo el de las pruebas. `upperMid` es la altura de su centro sobre los pies.
+   * Cuánto de la inclinación dibujada cabe: prueba la parte de arriba del cuerpo (tronco y cabeza, del ombligo a la
+   * gorra) como cápsula del radio del tronco. Sin margen: lo que sobresale del tronco (la nariz, la visera) ya gasta
+   * casi todo el de las pruebas.
    */
-  private upper: RAPIER.Capsule;
-  private upperMid: number;
-  /** Fracción de la inclinación dibujada que cabe (baja al momento; sube suavizada) y paso del fotograma. */
-  private leanFit = 1;
+  private tilt: TiltFit;
+  /** Paso del fotograma (la inclinación que cabe vuelve a subir suavizada). */
   private dt = 1 / 60;
   /** La cámara, en las unidades del modelo (el muñeco mira hacia ella). */
   private eye = { position: new THREE.Vector3() };
 
-  constructor(readonly carrier: Carrier, playerIndex: number, private world: RAPIER.World, private camera: THREE.Camera) {
+  constructor(readonly carrier: Carrier, playerIndex: number, private world: RAPIER.World, private camera: THREE.Camera, private fx?: Fx) {
     this.rig = new CharacterRig(PLAYER_LOOKS[playerIndex % PLAYER_LOOKS.length]);
     this.group = this.rig.group;
     this.group.scale.setScalar(S);
-    // Centros de sus esferas: a la altura del ombligo y en la de arriba de la cápsula (bajo la gorra)
-    const y0 = 0.75 * S, y1 = DOLL_HEIGHT - CARRIER.radius;
-    this.upper = new RAPIER.Capsule((y1 - y0) / 2, CARRIER.radius);
-    this.upperMid = (y0 + y1) / 2;
+    this.tilt = new TiltFit(world, carrier);
     const color = PLAYER_COLORS[playerIndex] ?? '#ffffff';
+    this.color = new THREE.Color(color);
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.54, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false }));
     this.ring.rotation.x = -Math.PI / 2;
     this.grip = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), new THREE.MeshBasicMaterial({ color }));
     this.grip.visible = false;
+    this.marks = effortMarks();
     this.label = textSprite(`J${playerIndex + 1}`, { size: 40, color: '#1f2937', bg: color, pad: 8 });
     this.label.scale.multiplyScalar(0.5);
     this.stars = new THREE.Group();
@@ -90,13 +136,13 @@ export class DollView {
       facing: c.facing, lean: { x: 0, z: 0 }, leanDev: c.lean, leanVel: c.leanVel, holding: false, effort: 0,
       wantVel: c.wantVel, handDir: c.handDir, grabWorld: () => null,
       heightAt: (x, z) => self.heightAt(x * S, z * S) * IS,
-      fitTilt: (x, z) => self.fitTilt(x, z),
+      fitTilt: (x, z) => self.tilt.fraction(x, z, self.dt),
     };
     this.rig.snap();
   }
 
   /** Objetos que viven en el mundo (no giran con el personaje). */
-  worldObjects(): THREE.Object3D[] { return [this.ring, this.grip, this.stars, ...(this.label ? [this.label] : [])]; }
+  worldObjects(): THREE.Object3D[] { return [this.ring, this.grip, this.stars, this.marks, ...(this.label ? [this.label] : [])]; }
 
   /** El tirón que arranca el asa ya lo muestra el equilibrio (tambaleo o caída). */
   stumble() {}
@@ -111,7 +157,7 @@ export class DollView {
     return hit ? top - hit.timeOfImpact : this.footY;
   }
 
-  sync(sofaGrab: THREE.Vector3 | null, _t: number, dt: number) {
+  sync(sofaGrab: THREE.Vector3 | null, t: number, dt: number) {
     const c = this.carrier, s = this.src;
     const p = c.pos, v = c.body.linvel();
     this.footY = p.y - CENTER_Y;
@@ -150,7 +196,7 @@ export class DollView {
     // Inclinación total: el desequilibrio, más colgarse hacia atrás al tirar o adelantarse al andar (el muñeco la
     // reduce a lo que cabe con `fitTilt`)
     s.lean = c.holding
-      ? { x: c.lean.x - c.handDir.x * 0.16 * this.effort, z: c.lean.z - c.handDir.z * 0.16 * this.effort }
+      ? { x: c.lean.x - c.handDir.x * EFFORT.lean * this.effort, z: c.lean.z - c.handDir.z * EFFORT.lean * this.effort }
       : { x: c.lean.x + c.wantVel.x * 0.02, z: c.lean.z + c.wantVel.z * 0.02 };
     s.holding = c.holding && !!sofaGrab;
     s.effort = this.effort;
@@ -161,45 +207,37 @@ export class DollView {
     this.dt = dt;
     this.rig.sync(s, dt, this.eye);
 
-    // Aro de jugador (bajo el cuerpo, de pie o tumbado), punto de agarre, etiqueta y estrellas de mareo sobre la cabeza
+    // Aro de jugador (bajo el cuerpo, de pie o tumbado), punto de agarre, etiqueta y estrellas de mareo sobre la cabeza.
+    // El esfuerzo se lee desde la cámara de juego (desde arriba no se ven cejas ni boca): el aro late, la bola de
+    // agarre crece y se enrojece con la tensión y, al límite, suda
+    const e = Math.max(0, (this.effort - EFFORT.calm) / (1 - EFFORT.calm));
     this.ring.position.set(k.x, this.footY + 0.04, k.z);
+    this.ring.scale.setScalar(1 + EFFORT.ringPulse * e * Math.sin(t * EFFORT.pulseHz * Math.PI * 2));
     this.grip.visible = !!sofaGrab;
-    if (sofaGrab) this.grip.position.copy(sofaGrab);
+    if (sofaGrab) {
+      this.grip.position.copy(sofaGrab);
+      this.grip.scale.setScalar(1 + EFFORT.gripGrow * strain + 0.25 * e * Math.max(0, Math.sin(t * EFFORT.pulseHz * Math.PI * 2)));
+      (this.grip.material as THREE.MeshBasicMaterial).color.copy(this.color).lerp(EFFORT.strainColor, Math.min(1, strain * 1.2));
+    }
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion(q.x, q.y, q.z, q.w));
     const head = new THREE.Vector3(k.x, k.y, k.z).addScaledVector(up, CARRIER.halfHeight);
     const top = upright ? p.y + DOLL_HEIGHT - CENTER_Y : head.y + CARRIER.radius;
-    if (this.label) this.label.position.set(head.x, top + 0.4, head.z);
+    this.sweatT -= dt;
+    if (upright && this.effort > EFFORT.sweatAt && this.sweatT <= 0 && this.fx) {
+      this.sweatT = EFFORT.sweatEvery;
+      this.fx.sweat({ x: head.x, y: top, z: head.z });
+    }
+    // Rayas de esfuerzo: aparecen al tirar con fuerza y laten con el aro
+    this.marks.visible = upright && e > 0.3;
+    if (this.marks.visible) {
+      this.marks.position.set(head.x, top + 0.22, head.z);
+      (this.marks.material as THREE.SpriteMaterial).opacity = Math.min(1, e * 1.4);
+      const k = 1 + 0.15 * Math.sin(t * EFFORT.pulseHz * Math.PI * 2);
+      this.marks.scale.set(0.9 * k, 0.45 * k, 1);
+    }
+    if (this.label) this.label.position.set(head.x, top + (this.marks.visible ? 0.8 : 0.4), head.z);
     this.stars.visible = !!c.down && c.down !== 'rising';
     if (this.stars.visible) { this.stars.position.set(head.x, top + 0.1, head.z); this.stars.rotation.y += dt * 5; }
-  }
-
-  /**
-   * Fracción de la inclinación (x, z) de la parte de arriba del cuerpo que cabe (la pide el muñeco, `DollSource`). Se
-   * inclina alrededor de los pies y la cápsula de pie no: se prueban el tronco y la cabeza inclinados contra todo
-   * (sofá, paredes, otros porteadores) con una consulta de forma y, si no caben, se busca por bisección cuánto
-   * inclinarse. Baja al momento y vuelve a subir suavizada.
-   */
-  private fitTilt(x: number, z: number) {
-    const fit = this.tiltRoom(x, z);
-    this.leanFit = fit < this.leanFit ? fit : this.leanFit + (fit - this.leanFit) * Math.min(1, this.dt * 6);
-    return this.leanFit;
-  }
-
-  private tiltRoom(x: number, z: number) {
-    const l = Math.min(1.2, Math.hypot(x, z)); // el muñeco no se inclina más
-    if (l < 0.01) return 1;
-    const d = { x: x / Math.hypot(x, z), z: z / Math.hypot(x, z) };
-    const fits = (a: number) => {
-      const h = Math.sin(a / 2), m = this.upperMid, p = this.carrier.pos;
-      const c = { x: p.x + d.x * Math.sin(a) * m, y: p.y - CENTER_Y + Math.cos(a) * m, z: p.z + d.z * Math.sin(a) * m };
-      let hit = false;
-      this.world.intersectionsWithShape(c, { x: d.z * h, y: 0, z: -d.x * h, w: Math.cos(a / 2) }, this.upper, () => { hit = true; return false; }, undefined, undefined, this.carrier.collider);
-      return !hit;
-    };
-    if (fits(l)) return 1;
-    let lo = 0, hi = 1;
-    for (let i = 0; i < 3; i++) { const mid = (lo + hi) / 2; if (fits(l * mid)) lo = mid; else hi = mid; }
-    return lo;
   }
 
   dispose() {
@@ -213,6 +251,7 @@ export class DollView {
       });
     }
     if (this.label) { this.label.material.map?.dispose(); mats.add(this.label.material); }
+    this.marks.material.map?.dispose(); mats.add(this.marks.material);
     // Todos los materiales son propios de este muñeco (ninguno sale de la caché compartida)
     for (const m of mats) m.dispose();
   }

@@ -5,7 +5,7 @@ import type { BotStyle } from './sim/bots';
 import type { GameEvent, PlayerInput } from './sim/types';
 import { WorldView } from './view/world';
 import { InputManager } from './input/input';
-import { FixedStep, planPads, playerControls, type PadEvent } from './input/inputCore';
+import { FixedStep, globalKeyAction, planPads, playerControls, stepFrame, type PadEvent, type Screen } from './input/inputCore';
 import { Sfx, renderTrack, type SfxName } from './audio/sfx';
 import { NO_INPUT } from './sim/types';
 import { Hud } from './ui/hud';
@@ -43,7 +43,7 @@ const hud = new Hud(() => simTime);
 let game: Game | null = null;
 let autopilot: Autopilot | null = null;
 let paused = false;
-let screen: 'menu' | 'play' | 'results' = 'menu';
+let screen: Screen = 'menu';
 let last = performance.now();
 let simTime = 0;
 let pendingResults: { g: Game; at: number } | null = null;
@@ -113,16 +113,21 @@ $('btn-resume').onclick = () => setPaused(false);
 $('btn-restart-p').onclick = () => start(!!autopilot);
 $('btn-menu-p').onclick = () => toMenu();
 
+// Retroceso reinicia solo desde la pausa (`globalKeyAction`): está encima de Intro, la tecla de agarrar de J2
 input.onGlobal = (code) => {
   sfx.unlock();
-  if (code === 'KeyM') { const m = sfx.toggleMute(); hud.toast(m ? 'Sonido apagado' : 'Sonido encendido'); }
-  const arrow = ({ ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] } as Record<string, number[]>)[code];
-  if (screen === 'menu' && arrow) menuNav(arrow[0], arrow[1]);
-  else if (screen === 'menu' && code === 'Enter') start(false);
-  else if (screen === 'results' && (code === 'Enter' || code === 'KeyR')) start(!!autopilot);
-  else if (screen === 'results' && code === 'Escape') toMenu();
-  else if (screen === 'play' && code === 'Escape') setPaused(!paused);
-  else if (screen === 'play' && code === 'Backspace') start(!!autopilot);
+  const a = globalKeyAction(screen, paused, code);
+  if (!a) return;
+  switch (a.act) {
+    case 'mute': { const m = sfx.toggleMute(); hud.toast(m ? 'Sonido apagado' : 'Sonido encendido'); break; }
+    case 'nav': menuNav(a.dx, a.dy); break;
+    case 'start': start(false); break;
+    case 'again': case 'restart': start(!!autopilot); break;
+    case 'menu': toMenu(); break;
+    case 'pause': setPaused(true); break;
+    case 'resume': setPaused(false); break;
+    case 'restartHint': if (cooled('restartHint', 3)) hud.toast('Para reiniciar: pausa (Esc) y Retroceso', 'info'); break;
+  }
 };
 
 function show(id: string, on: boolean) { $(id).style.display = on ? 'flex' : 'none'; }
@@ -310,15 +315,16 @@ function frame(now: number) {
     if (!paused) {
       const humans = g.carriers.filter((c) => c.human !== null).length;
       // Las pulsaciones (agarrar, enderezar) esperan en `input` hasta el primer paso que se ejecute: a más de
-      // 60 Hz hay fotogramas sin ningún paso, y antes se perdían
-      const steps = stepper.frame(dtReal);
-      for (let i = 0; i < steps; i++) {
-        let inputs: PlayerInput[] = input.step(Math.max(1, humans));
-        if (autopilot) inputs = [autopilot.input(g, DT)];
+      // 60 Hz hay fotogramas sin ningún paso, y antes se perdían. `stepFrame` lee las entradas en cada paso (lo
+      // comprueba tests/input.test.ts con el mismo código)
+      stepFrame(stepper, dtReal, () => {
+        const keys: PlayerInput[] = input.step(Math.max(1, humans));
+        return autopilot ? [autopilot.input(g, DT)] : keys;
+      }, (inputs) => {
         g.step(DT, inputs);
         simTime += DT;
         for (const e of g.out) handle(e, g);
-      }
+      });
       if (g.light.ped === 'green' && cooled('pedtick', 0.5) && g.sofaPos.z < 7 && g.sofaPos.z > -12) sfx.play('pedTick');
     }
     hud.update(g);

@@ -26,7 +26,7 @@ npm run dev          # abre http://localhost:5173
 2. **J1** (muñeco de peto y gorra rojos, aro amarillo): **WASD** para moverse y **Espacio** para agarrar o soltar.
 3. **J2** (muñeco de peto y gorra turquesa, aro azul claro): **flechas** para moverse e **Intro** para agarrar o soltar. **J3** usa **IJKL** y **U**; **J4**, el teclado numérico (**8 4 5 6** y **0**). Con mandos, el teclado lleva a los primeros jugadores y los mandos, a los últimos.
 4. Cada uno se pone en un extremo del sofá, lo agarran y lo llevan hacia arriba de la pantalla. El aro amarillo en el suelo marca el siguiente objetivo. **No hay tecla de alzar:** al agarrar, las manos suben el sofá solas. Uno solo apenas lo arrastra por un extremo; entre dos va en el aire y sube la escalera.
-5. **Objetivo:** dejar el sofá en la zona verde junto al camión en menos de 3 minutos sin destrozarlo. **Retroceso** reinicia en cualquier momento; en la pantalla final, **Intro** vuelve a empezar.
+5. **Objetivo:** dejar el sofá en la zona verde junto al camión en menos de 3 minutos sin destrozarlo. Para reiniciar, **Esc** (pausa) y **Retroceso**: en juego, Retroceso no hace nada, porque en el teclado español está encima de Intro, la tecla de agarrar de J2. En la pantalla final, **Intro** vuelve a empezar.
 
 Para ver una partida completa sin tocar nada, usa «Ver demo automática» o abre `http://localhost:5173/?auto=1` (1 jugador con ayudantes).
 
@@ -325,7 +325,7 @@ No se ha construido nada de esta arquitectura todavía: no hacía falta para cor
 | Enderezar el sofá volcado | R | - | O | Numérico + | Y |
 | Pedir un giro a los ayudantes (opcional; quien lo pide rodea el sofá) | Q / E | , / . | H / Ñ | Numérico 7 / 9 | LB / RB |
 | Pausa | Esc | | | | Start (cualquier mando) |
-| Reiniciar | Retroceso | | | | Start o A (en resultados) |
+| Reiniciar | Retroceso, en la pausa | | | | Start o A (en resultados) |
 | Silenciar | M | | | | |
 
 - **Mandos.** Se identifican por `Gamepad.index`. Al empezar la partida, el teclado lleva a los primeros jugadores y los mandos, por orden de índice, a los últimos: con 4 jugadores y 2 mandos, J1 y J2 juegan con el teclado y J3 y J4 con mando; con 2 jugadores y 2 mandos, uno cada uno. El menú muestra el reparto antes de empezar.

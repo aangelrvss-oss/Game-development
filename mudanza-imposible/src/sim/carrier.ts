@@ -77,10 +77,20 @@ export const CARRIER = {
   /**
    * Agarrando, no se aleja de su mano más que esto (m): las piernas siguen al punto agarrado y es la mano
    * (fuerza limitada, `HAND`) la que mueve el objeto. Así nadie arrastra algo pesado más deprisa de lo que puede.
+   * Salvo en un tira y afloja que pierde (`Carrier.control`): ahí las piernas aguantan y la mano se le escapa.
    */
   leash: 0.15,
   /** Rapidez con la que recupera la distancia de la correa (1/s). */
   leashRate: 5,
+  /**
+   * Tira y afloja: la correa cede si el punto agarrado se aleja de la mano a más de `tugAway` m/s y el jugador pide
+   * alejarse de él (componente de su mando hacia fuera mayor que `tugBack`). Medido con el piloto y ayudantes
+   * despistados (semillas 1–8): con 0,05 m/s y 0,3, con 4 se perdía una partida (22 caídas); con 0,25 m/s y 0,7,
+   * con 6 había partidas de 143 s. Con 0,4 m/s y 0,7 se entregan todas al 100 % (con 6, 34–52 s; en el paso 4,
+   * 33–39 s): el piloto, cuando cinco ayudantes se llevan el sofá a otro lado, ahora lo suelta en vez de dejarse llevar.
+   */
+  tugAway: 0.4,
+  tugBack: 0.7,
   // Equilibrio (modelo del laboratorio de personaje: péndulo invertido empujado por fuerzas medidas)
   comHeight: 0.9,
   ankleMax: 6,
@@ -184,6 +194,8 @@ export class Carrier implements HandOwner {
   handSep = 0;
   /** Tiempo que la mano lleva sin dar abasto y separada más de `gripBreak`. */
   private gripStrain = 0;
+  /** En el último paso la mano no dio abasto en horizontal (la exigencia superó su fuerza). */
+  private handSatH = false;
   /** Tiempo colgado del objeto (sin suelo y tirando de él hacia abajo con toda la fuerza de la mano). */
   private hangTime = 0;
   stunned = 0;
@@ -358,6 +370,7 @@ export class Carrier implements HandOwner {
     this.gripStrain = 0;
     this.hangTime = 0;
     this.handSep = 0;
+    this.handSatH = false;
     if (calm) this.heldTension = null;
   }
 
@@ -437,9 +450,15 @@ export class Carrier implements HandOwner {
       if (d > 1e-3) {
         const ux = sx / d, uz = sz / d;
         const vg = this.heldBody.velocityAtPoint(g);
-        const min = vg.x * ux + vg.z * uz - CARRIER.leashRate * (CARRIER.leash - d);
+        const away = vg.x * ux + vg.z * uz;
+        // Tira y afloja perdido: otros se llevan el objeto (el punto agarrado se aleja de la mano), él tira claramente
+        // hacia el otro lado y la mano no da abasto. La correa no le hace andar hacia el objeto contra lo que pide: las
+        // piernas aguantan, la mano se separa y, pasado `gripBreak` durante `gripHold`, se le escapa (`handResult`).
+        // Sin esto le arrastraban pegado al objeto (5,6 m en 6 s, tres contra uno) y nunca se soltaba.
+        const resist = this.handSatH && away > CARRIER.tugAway && mx * ux + mz * uz < -CARRIER.tugBack;
+        const min = away - CARRIER.leashRate * (CARRIER.leash - d);
         const cur = tx * ux + tz * uz;
-        if (cur < min) { tx += (min - cur) * ux; tz += (min - cur) * uz; }
+        if (!resist && cur < min) { tx += (min - cur) * ux; tz += (min - cur) * uz; }
       }
     }
     let fx = ((tx - v.x) / dt) * mass, fz = ((tz - v.z) / dt) * mass;
@@ -477,6 +496,7 @@ export class Carrier implements HandOwner {
   handResult(r: HandResult, dt: number): boolean {
     this.handForce = r.force;
     this.handSep = r.separation;
+    this.handSatH = r.satH;
     const p = this.pos;
     // Si no puede con el peso, la mano no sigue subiendo sola: se queda con el objeto, tirando con todo
     const vmax = HAND.maxV / HAND.k, gy = r.grab.y - p.y;

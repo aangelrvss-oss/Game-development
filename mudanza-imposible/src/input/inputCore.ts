@@ -296,6 +296,47 @@ export class FixedStep {
   reset() { this.acc = 0; }
 }
 
+/**
+ * Pasos de física de un fotograma (el bucle de `main.ts`, sin DOM, para poder probarlo): los que diga el paso fijo,
+ * cada uno con las entradas que lea `read` justo antes de darlo. Así una pulsación guardada en `InputCore` la recibe
+ * el primer paso que se ejecute, aunque el fotograma en que se pulsó no ejecutara ninguno (a más de 60 Hz). Leer
+ * las entradas una vez por fotograma, antes de los pasos, perdía esas pulsaciones. Devuelve cuántos pasos ha dado.
+ */
+export function stepFrame(stepper: FixedStep, dtReal: number, read: () => PlayerInput[], step: (inputs: PlayerInput[]) => void): number {
+  const n = stepper.frame(dtReal);
+  for (let i = 0; i < n; i++) step(read());
+  return n;
+}
+
+/** Pantalla en la que está el juego. */
+export type Screen = 'menu' | 'play' | 'results';
+
+/** Lo que hace una tecla global (de nadie en concreto) según la pantalla. */
+export type GlobalKeyAction =
+  | { act: 'mute' } | { act: 'nav'; dx: number; dy: number } | { act: 'start' } | { act: 'again' } | { act: 'menu' }
+  | { act: 'pause' } | { act: 'resume' } | { act: 'restart' } | { act: 'restartHint' } | null;
+
+/**
+ * Teclas globales: M (sonido), flechas e Intro en el menú, Intro/R/Esc en los resultados, Esc (pausa) y Retroceso
+ * (reiniciar). Retroceso solo reinicia desde la pausa: en el teclado español está justo encima de Intro, la tecla de
+ * agarrar de J2, y un manotazo tiraba la partida de todos sin preguntar. En juego solo recuerda cómo se hace.
+ */
+export function globalKeyAction(screen: Screen, paused: boolean, code: string): GlobalKeyAction {
+  if (code === 'KeyM') return { act: 'mute' };
+  const arrow = ({ ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] } as Record<string, number[]>)[code];
+  if (screen === 'menu') {
+    if (arrow) return { act: 'nav', dx: arrow[0], dy: arrow[1] };
+    return code === 'Enter' ? { act: 'start' } : null;
+  }
+  if (screen === 'results') {
+    if (code === 'Enter' || code === 'KeyR') return { act: 'again' };
+    return code === 'Escape' ? { act: 'menu' } : null;
+  }
+  if (code === 'Escape') return paused ? { act: 'resume' } : { act: 'pause' };
+  if (code === 'Backspace') return paused ? { act: 'restart' } : { act: 'restartHint' };
+  return null;
+}
+
 /** Cómo se maneja un jugador, para el panel de la partida y los avisos. */
 export interface PlayerControls {
   /** Línea de ayuda del panel inferior. */

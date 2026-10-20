@@ -2,7 +2,8 @@
 //   NODE_PATH=$(npm root -g) node scripts/duo-e2e.cjs
 // Parte A (modo normal, teclas reales de Playwright, que entran por el mismo teclado que un jugador):
 //   menú → Intro → los dos se mueven a la vez → agarran a la vez → tiran juntos, en sentidos opuestos
-//   y uno solo → soltar tirando (se tambalea y cae) → se recupera y vuelve a agarrar → pared → Retroceso.
+//   y uno solo → soltar tirando (se tambalea y cae) → se recupera y vuelve a agarrar → pared → Retroceso (en juego
+//   no reinicia; en la pausa, sí).
 // Parte B (modo captura, misma física y dibujo): el piloto automático lleva a J1 y a J2 hasta el camión;
 //   victoria, pantalla de resultados e Intro real para volver a jugar.
 // Los tiempos se miden en tiempo de juego: con render por software el navegador va lento.
@@ -42,20 +43,39 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
     };
   });
   // Diagnóstico: registra los sucesos de agarre de cada paso de física (agarra, suelta, se le escapa)
-  await p.evaluate(() => {
+  await p.evaluate(([riseTime, fitTol]) => {
     const g = window.__mudanza.game; window.__ev = [];
     const orig = g.step.bind(g);
-    // También cuándo se levanta cada uno del suelo y cuánto esperó a tener sitio para ponerse de pie
-    const down = g.carriers.map((c) => c.stunned > 0);
+    /**
+     * ¿Cabe de pie donde está y en todo el giro desde el suelo? Lo mide la prueba por su cuenta, con datos públicos
+     * del porteador (posición, dirección e inclinación de la caída) y consultas de forma contra el mundo: la cápsula,
+     * menos el margen de las pruebas, de pie y a 0,35 y 0,7 de su inclinación (la regla de «levantarse cuando hay
+     * sitio»). Antes la prueba aceptaba la espera que el propio juego decía haber hecho (un campo privado).
+     */
+    const roomToStand = (c) => {
+      const sh = c.collider.shape, probe = new sh.constructor(sh.halfHeight, sh.radius - fitTol), p = c.pos, d = c.fallDir;
+      for (const k of [0.7, 0.35, 0]) {
+        const a = c.tilt * k, h = Math.sin(a / 2), s = Math.sin(a) * sh.halfHeight;
+        const at = { x: p.x + d.x * s, y: p.y + (Math.cos(a) - 1) * sh.halfHeight, z: p.z + d.z * s };
+        let hit = false;
+        g.world.intersectionsWithShape(at, { x: d.z * h, y: 0, z: -d.x * h, w: Math.cos(a / 2) }, probe, () => { hit = true; return false; }, undefined, undefined, c.collider);
+        if (hit) return false;
+      }
+      return true;
+    };
+    // También cuándo se levanta cada uno del suelo y cuánto esperó tumbado sin sitio para ponerse de pie (según la prueba)
+    const down = g.carriers.map((c) => c.stunned > 0), blocked = g.carriers.map(() => 0);
     g.step = (dt, inputs) => {
       orig(dt, inputs);
       for (const e of g.out) if (['grab', 'release', 'gripBreak', 'wobble', 'fall', 'stun'].includes(e.type)) window.__ev.push(`${g.time.toFixed(2)} ${e.type} J${e.carrier + 1}`);
       g.carriers.forEach((c, i) => {
-        if (down[i] && c.stunned <= 0) window.__ev.push(`${g.time.toFixed(2)} up J${i + 1} ${c.waitRoom.toFixed(2)}`);
+        // Tumbado con el tiempo en el suelo cumplido (le toca levantarse) y sin sitio para hacerlo
+        if (c.down === 'lying' && c.stunned <= riseTime + 1e-6 && !roomToStand(c)) blocked[i] += dt;
+        if (down[i] && c.stunned <= 0) { window.__ev.push(`${g.time.toFixed(2)} up J${i + 1} ${blocked[i].toFixed(2)}`); blocked[i] = 0; }
         down[i] = c.stunned > 0;
       });
     };
-  });
+  }, [0.6, 0.03]); // `CARRIER.riseTime` y `CARRIER.fitTol` de carrier.ts
   const evSince = async (t) => (await p.evaluate(() => window.__ev)).filter((e) => parseFloat(e) >= t - 1e-6).join(', ');
   let s = await st();
   ok(s.helpers === 0 && s.cs.length === 2 && s.cs.every((c) => c.human !== null), 'partida a dos, sin ayudantes');
@@ -219,7 +239,8 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   // levanta igualmente). Antes se miraba un solo instante, 1,5 s después de la ventana, sin dejar rastro: en la línea
   // base falló así una vez y no se ha podido reproducir (ver el commit). Ahora se espera, sin pulsar nada, como mucho lo
   // que permiten esas reglas y se mide con el registro de pasos: cuánto estuvo en el suelo, si esperó a tener sitio y
-  // si se volvió a caer al levantarse. Sin sitio, solo vale la espera que el juego dice haber hecho.
+  // si se volvió a caer al levantarse. El límite es el estricto (`fallTime` + 0,05 s) más solo el tiempo que la propia
+  // prueba ha comprobado, con sus consultas de forma, que no cabía de pie (`roomToStand`).
   // `CARRIER.fallTime`, `stunTime` (derribado: atropello o golpe fuerte), `maxWaitRoom` y `riseTime` de carrier.ts
   const FALL_TIME = 1.3, STUN_TIME = 1.8, MAX_WAIT_ROOM = 4, RISE_TIME = 0.6;
   const evJ2 = async () => (await p.evaluate(() => window.__ev)).filter((e) => parseFloat(e) >= t1 - 1e-6 && / J2/.test(e)).map((e) => { const [t, type, , w] = e.split(' '); return { t: parseFloat(t), type, w: w === undefined ? 0 : parseFloat(w) }; });
@@ -237,10 +258,10 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
     if (up) await hold([], 0.5);
     const after = (await evJ2()).filter((e) => (e.type === 'fall' || e.type === 'stun') && up && e.t >= up.t);
     const onFloor = up ? up.t - fallEv.t : null;
-    const riseOk = up !== null && (onFloor <= base + 0.05 || (up.w > 0 && up.w <= MAX_WAIT_ROOM + 0.05 && onFloor <= base + up.w + 0.05));
+    const riseOk = up !== null && onFloor <= base + Math.min(up.w, MAX_WAIT_ROOM) + 0.05;
     s = await st();
     ok(riseOk && after.length === 0, 'J2 se levanta solo',
-      (up ? `en el suelo ${onFloor.toFixed(2)} s${up.w > 0 ? `, de ellos ${up.w.toFixed(2)} esperando sitio para ponerse de pie` : ''}${after.length ? `; se vuelve a caer a los ${(after[0].t - up.t).toFixed(2)} s de levantarse` : ''}`
+      (up ? `en el suelo ${onFloor.toFixed(2)} s${up.w > 0 ? `, de ellos ${up.w.toFixed(2)} sin sitio para ponerse de pie (medido por la prueba)` : ''}${after.length ? `; se vuelve a caer a los ${(after[0].t - up.t).toFixed(2)} s de levantarse` : ''}`
         : `(sigue en el suelo ${(s.t - fallEv.t).toFixed(2)} s después de caer)`)
       + (riseOk && !after.length ? '' : ` (sucesos desde que suelta: ${await evSince(t1)}; J2 ${s.cs[1].down ?? 'de pie'} en (${s.cs[1].x.toFixed(2)}, ${s.cs[1].z.toFixed(2)}); sofá (${s.sofa[0].toFixed(2)}, ${s.sofa[2].toFixed(2)}) yaw ${s.yaw.toFixed(2)}; J1 (${s.cs[0].x.toFixed(2)}, ${s.cs[0].z.toFixed(2)}))`));
   }
@@ -289,11 +310,19 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   ok(free && wall && !wallFall, 'correr contra la pared frena sin tumbar',
     `J1 corre con ${runKey} y se para en x=${wx.toFixed(2)}, z=${wz.toFixed(2)}${wall ? `, contra lo fijo de (${wall[0].toFixed(2)}, ${wall[1].toFixed(2)})` : ''}${free ? '' : ' (J1 seguía agarrado)'}${wall ? '' : ` (no llegó a nada fijo; ${near})`}${releaseWob ? ' (al soltar antes de correr se tambaleó: tensión del sofá)' : ''}`);
 
-  // 7. Reiniciar con Retroceso
+  // 7. Retroceso: en juego no reinicia (en el teclado español está encima de Intro, la tecla de agarrar de J2: un
+  // manotazo tiraba la partida); en la pausa, sí
+  const tBack = (await st()).t;
+  await p.keyboard.press('Backspace');
+  await hold([], 0.3);
+  s = await st();
+  ok(s.phase === 'playing' && s.t > tBack, 'Retroceso en juego no reinicia la partida', `t ${tBack.toFixed(2)} → ${s.t.toFixed(2)}`);
+  await p.keyboard.press('Escape');
+  await p.waitForFunction(() => document.getElementById('pause').style.display === 'flex', null, { timeout: 10000 });
   await p.keyboard.press('Backspace');
   await p.waitForFunction(() => window.__mudanza.game.phase === 'countdown' && window.__mudanza.game.time === 0, null, { timeout: 10000 });
   s = await st();
-  ok(s.cs.every((c) => !c.h) && Math.abs(s.sofa[2] - 10) < 0.3, 'Retroceso reinicia la partida (sofá en la salida, nadie agarra)');
+  ok(s.cs.every((c) => !c.h) && Math.abs(s.sofa[2] - 10) < 0.3, 'en la pausa, Retroceso reinicia la partida (sofá en la salida, nadie agarra)');
 
   // ---------- Parte B: partida completa hasta el camión ----------
   await p.goto(withParams(url, { capture: '1' }));

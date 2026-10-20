@@ -1,5 +1,5 @@
 // Prueba de extremo a extremo con teclado real en Chromium: menú → agarrar (el sofá se levanta solo entre varios, sin
-// tecla de alzar) → mover → girar → soltar → pausa → reinicio.
+// tecla de alzar) → mover → girar → soltar → pausa → Retroceso en juego no reinicia; en la pausa, sí.
 // Uso: NODE_PATH=$(npm root -g) node scripts/keyboard-e2e.cjs [url]   (demo servida en :4173)
 // Escenario: 1 jugador y 3 ayudantes. Los parámetros que ya traiga la url (p. ej. `?carriers=4`) se respetan; los que
 // falten se completan (antes se añadía `?humans=1&carriers=4` al final y una url con `?` quedaba mal formada).
@@ -89,12 +89,16 @@ const check = (name, ok, info) => { results.push({ name, ok, info }); console.lo
   check('Esc pausa la partida (el tiempo se detiene)', pauseVisible && Math.abs(t2 - t1) < 0.01);
   await p.screenshot({ path: 'shots/k03-pausa.png' });
   await p.keyboard.press('Escape'); await p.waitForTimeout(500);
-  // 6) Reiniciar con Retroceso
+  // 6) Retroceso: en juego no reinicia (está encima de Intro, la tecla de agarrar de J2); en la pausa, sí
   await p.waitForTimeout(1000);
   const tBefore = (await st()).t;
+  await p.keyboard.press('Backspace'); await hold([], 0.3);
+  s = await st();
+  check('Retroceso en juego no reinicia', s.phase === 'playing' && s.t > tBefore, `t ${tBefore.toFixed(2)} → ${s.t.toFixed(2)}`);
+  await p.keyboard.press('Escape'); await p.waitForTimeout(400);
   await p.keyboard.press('Backspace'); await p.waitForTimeout(400);
   s = await st();
-  check('Retroceso reinicia la partida', s.phase === 'countdown' && s.t < 0.01 && tBefore > 0.5, `t antes ${tBefore.toFixed(1)}`);
+  check('En la pausa, Retroceso reinicia la partida', s.phase === 'countdown' && s.t < 0.01 && tBefore > 0.5, `t antes ${tBefore.toFixed(1)}`);
   check('Sin errores en la consola', errors.length === 0, errors.slice(0, 3).join(' | '));
   const fps = await p.evaluate(() => window.__mudanza.fps());
   // La cifra de FPS no baja de 10 (cada fotograma cuenta como mucho 0,1 s); el ritmo del juego dice cuánto avanzó de verdad
