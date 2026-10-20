@@ -34,9 +34,18 @@ export const BOT = {
   steadyBack: 0.04,
   /** Dentro del camión, tiempo con los jugadores que cargan parados tras el que dejan el objeto (s). */
   stowAfter: 0.4,
+  /**
+   * Sin nada que llevar, esperan fuera del camión: `foot` m más allá del pie de la rampa y `aside` m al lado de la caja de
+   * carga; para salir, bajan por la rampa a menos de `down` m de su eje (m).
+   */
+  park: { foot: 0.6, aside: 1.6, down: 1.0 },
+  /** Al cambiar de asa, las que están a menos de esto (m) de la más alejada de las ocupadas valen igual. */
+  farTie: 0.05,
 };
 
 export class BotBrain {
+  /** Objeto al que va o que lleva (índice en `Game.items`; lo elige `Game` entre los que necesitan manos). */
+  item = 0;
   /** Asa a la que va o que agarra (índice en las asas de la definición del objeto). */
   slot: number;
   history: { x: number; z: number; w: number }[] = [];
@@ -53,6 +62,39 @@ export class BotBrain {
   constructor(slot: number, readonly style: BotStyle, private rng: () => number) { this.slot = slot; }
 
   /**
+   * Hacia (`dx`, `dz`), a `d` m, sin correr: rodea a quien tiene delante y frena si está muy cerca (no los arrolla).
+   */
+  private approach(p: Vec3, dx: number, dz: number, d: number, others: Vec3[], input: PlayerInput) {
+    let s = Math.min(BOT.approach, d / 0.8);
+    let ux = dx / d, uz = dz / d;
+    // Espacio personal: rodea a quien tiene delante y frena si está muy cerca (no los arrolla)
+    for (const o of others) {
+      const ox = o.x - p.x, oz = o.z - p.z, od = Math.hypot(ox, oz);
+      if (od < 1e-3 || od > BOT.personal || od > d + 0.3) continue;
+      const ahead = (ox * ux + oz * uz) / od;
+      if (ahead < 0.2) continue;
+      // Se desvía hacia el lado contrario al que queda el otro respecto a su camino
+      const px = -uz, pz = ux, side = ox * px + oz * pz > 0 ? -1 : 1, k = 1.5 * ahead * (1 - od / BOT.personal);
+      ux += px * side * k; uz += pz * side * k;
+      const ul = Math.hypot(ux, uz) || 1;
+      ux /= ul; uz /= ul;
+      s *= Math.max(0.35, od / BOT.personal);
+    }
+    input.mx = ux * s; input.mz = uz * s;
+  }
+
+  /**
+   * Sin nada que llevar (su objeto ya está cargado y ninguno necesita manos): va a `goal` (fuera del camión, a un lado de
+   * la rampa, para no quedarse en el carril de los que llegan) y allí espera.
+   */
+  park(me: Carrier, goal: { x: number; z: number }, others: Vec3[]): PlayerInput {
+    const input: PlayerInput = { mx: 0, mz: 0, grab: false, turn: 0, right: false };
+    const p = me.pos, dx = goal.x - p.x, dz = goal.z - p.z, d = Math.hypot(dx, dz);
+    if (me.stunned <= 0 && !me.holding && d > 0.3) this.approach(p, dx, dz, d, others, input);
+    return input;
+  }
+
+  /**
    * Calcula el mando del ayudante para este paso. `item`: el objeto que lleva o al que va; `taken`: sus asas ocupadas;
    * `stow`: el objeto ya está dentro del camión y ningún jugador lo lleva (se suelta y se deja).
    */
@@ -65,10 +107,14 @@ export class BotBrain {
       this.letGo = 0;
       // Ya está cargado (o a punto): no se vuelve a agarrar
       if (stow) { this.regrab = 0; return input; }
-      // Su asa la ha cogido otro (también un jugador): busca otra libre
+      // Su asa la ha cogido otro (también un jugador): busca otra libre, de las más alejadas de las ocupadas (el otro
+      // extremo: el peso se reparte y el objeto va derecho; agarrado por un extremo y por un costado, la mesa iba
+      // inclinada y sus patas topaban con el pie de la rampa). Entre las igual de alejadas, una al azar
       if (taken.has(this.slot)) {
         const free = handles.map((_, i) => i).filter((i) => !taken.has(i));
-        if (free.length) this.slot = free[Math.floor(this.rng() * free.length)];
+        const far = free.map((i) => Math.min(...[...taken].map((k) => Math.hypot(handles[i].p.x - handles[k].p.x, handles[i].p.z - handles[k].p.z))));
+        const best = Math.max(...far), pick = free.filter((_, j) => far[j] > best - BOT.farTie);
+        if (free.length) this.slot = pick[Math.floor(this.rng() * pick.length)];
       }
       if (this.regrab > 0) {
         // Se aparta un poco y deja pasar al sofá; después vuelve a por un asa.
@@ -87,22 +133,7 @@ export class BotBrain {
       if (d < 0.45 && Math.abs(anchor.y - p.y) < 1.2) {
         input.grab = true;
       } else {
-        let s = Math.min(BOT.approach, d / 0.8);
-        let ux = dx / d, uz = dz / d;
-        // Espacio personal: rodea a quien tiene delante y frena si está muy cerca (no los arrolla)
-        for (const o of others) {
-          const ox = o.x - p.x, oz = o.z - p.z, od = Math.hypot(ox, oz);
-          if (od < 1e-3 || od > BOT.personal || od > d + 0.3) continue;
-          const ahead = (ox * ux + oz * uz) / od;
-          if (ahead < 0.2) continue;
-          // Se desvía hacia el lado contrario al que queda el otro respecto a su camino
-          const px = -uz, pz = ux, side = ox * px + oz * pz > 0 ? -1 : 1, k = 1.5 * ahead * (1 - od / BOT.personal);
-          ux += px * side * k; uz += pz * side * k;
-          const ul = Math.hypot(ux, uz) || 1;
-          ux /= ul; uz /= ul;
-          s *= Math.max(0.35, od / BOT.personal);
-        }
-        input.mx = ux * s; input.mz = uz * s;
+        this.approach(p, dx, dz, d, others, input);
       }
       // Si no llega en un rato (bloqueado), prueba otra asa libre.
       if (this.tryTime > 5) {

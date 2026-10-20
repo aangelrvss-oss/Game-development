@@ -36,7 +36,8 @@ export type GameEvent =
   | { type: 'honk'; car: number; pos: Vec3 }
   | { type: 'light'; ped: 'green' | 'red' }
   | { type: 'stage'; index: number; label: string }
-  | { type: 'righted'; pos: Vec3 }
+  /** Un objeto volcado se ha enderezado (`item`: su posición en `Game.items`). */
+  | { type: 'righted'; item: number; pos: Vec3 }
   /** Un objeto se ha caído del mapa y reaparece (`item`: su posición en `Game.items`). */
   | { type: 'respawnItem'; item: number; pos: Vec3 }
   | { type: 'win' }

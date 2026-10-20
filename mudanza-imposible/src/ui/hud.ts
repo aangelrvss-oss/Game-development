@@ -126,6 +126,8 @@ export class Hud {
   /** Panel de jugadores con los controles de cada uno (también cuando un mando se conecta o se va a media partida). */
   setControls(game: Game, controls: PlayerControls[]) {
     this.controls = controls;
+    // Con 3 o 4 paneles de jugador, el recordatorio de teclas sube para no taparlos (`#hud.many` en index.html)
+    this.root.classList.toggle('many', game.carriers.filter((c) => c.human !== null).length >= 3);
     this.players.innerHTML = game.carriers
       .filter((c) => c.human !== null)
       .map((c) => `<div class="pl" style="--c:${PLAYER_COLORS[c.human!]}"><b>J${c.human! + 1}</b> ${carrierName(c)}<span id="pl-${c.id}"></span><small>${controls[c.human!]?.line ?? ''}</small></div>`)

@@ -33,10 +33,22 @@ function kindLook(kind: Box['kind']): { color: string; tex?: THREE.Texture; tile
   }
 }
 
+/** Una pieza del camión tal como se dibuja: su tipo y las 8 esquinas de su caja, en el mundo. */
+export interface TruckPart {
+  kind: Box['kind'];
+  corners: Vec3[];
+}
+
 export interface LevelView {
   group: THREE.Group;
   /** Mallas que se recortan o se ocultan si tapan la acción. */
   fadeables: THREE.Mesh[];
+  /**
+   * Piezas del camión dibujadas (suelo, paredes y techo de la caja de carga, bajos, cabina y rampa), en el orden de
+   * `truckBoxes`, medidas al construirlas (antes de fundir lo estático). `tests/view.test.ts` comprueba que coinciden
+   * con sus colliders.
+   */
+  truckParts: TruckPart[];
   /** `main`: posición del objeto principal (el aro del siguiente objetivo se apaga cuando está cerca). */
   update(t: number, light: { cars: string; ped: string; left: number }, stage: number, main: Vec3): void;
 }
@@ -87,7 +99,7 @@ export function buildLevel(level: LevelDef): LevelView {
     if (b.kind === 'ramp') addRampStripes(g, b);
     if (b.kind === 'wall' && b.p[1] < 2.2) addSkirting(g, b);
   }
-  addTruck(g, fadeables, level.truck);
+  const truckParts = addTruck(g, fadeables, level.truck);
   if (sc.street) addCurbs(g, sc.street);
   if (sc.stairs) addStairs(g, sc.stairs);
   if (sc.facade && nearDoor) addFacadeDetails(g, fadeables, sc.facade, nearDoor);
@@ -115,6 +127,7 @@ export function buildLevel(level: LevelDef): LevelView {
   return {
     group: g,
     fadeables,
+    truckParts,
     update(t, light, stage, main) {
       beacon.update(t, next[stage] ?? null, main);
       lights.set(light.cars, light.ped);
@@ -535,8 +548,9 @@ function truckSideTex() {
  * dentro. Encima, solo pintura a ras de sus caras: rótulo, ruedas, cristales de la cabina y franja de peligro en el borde
  * del suelo de carga.
  */
-function addTruck(g: THREE.Group, fadeables: THREE.Mesh[], pose: TruckPose) {
+function addTruck(g: THREE.Group, fadeables: THREE.Mesh[], pose: TruckPose): TruckPart[] {
   const boxes = truckBoxes(pose);
+  const parts: TruckPart[] = [];
   const { length: L, width: W, floor: F, wall: t, cab } = TRUCK;
   const sideFace = (dz: number) => {
     // Cara de la caja (orden de `BoxGeometry`: +x, −x, +y, −y, +z, −z) que mira hacia el lado local `dz` del camión
@@ -560,6 +574,16 @@ function addTruck(g: THREE.Group, fadeables: THREE.Mesh[], pose: TruckPose) {
       m = boxMesh(b)!;
     }
     g.add(m);
+    // Esquinas de lo dibujado, en el mundo (el escenario se construye en el origen)
+    m.updateMatrixWorld(true);
+    m.geometry.computeBoundingBox();
+    const bb = m.geometry.boundingBox!;
+    const corners: Vec3[] = [];
+    for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) {
+      const v = new THREE.Vector3(x, y, z).applyMatrix4(m.matrixWorld);
+      corners.push({ x: v.x, y: v.y, z: v.z });
+    }
+    parts.push({ kind: b.kind, corners });
     if (b.fade) makeFade(m, b, fadeables);
     if (b.kind === 'truckRamp') addRampStripes(g, b);
   });
@@ -601,4 +625,5 @@ function addTruck(g: THREE.Group, fadeables: THREE.Mesh[], pose: TruckPose) {
     seg.rotation.y = Math.atan2(-along.z, along.x);
     g.add(seg);
   }
+  return parts;
 }

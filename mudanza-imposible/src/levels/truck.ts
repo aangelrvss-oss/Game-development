@@ -52,6 +52,12 @@ export function truckToWorld(pose: TruckPose, l: Vec3): Vec3 {
   return { x: pose.x + l.x * c - l.z * s, y: l.y, z: pose.z + l.x * s + l.z * c };
 }
 
+/** Punto del mundo en coordenadas locales del camión (en planta: `x` hacia la cabina, `z` a lo ancho). */
+export function worldToTruck(pose: TruckPose, p: { x: number; z: number }) {
+  const { c, s } = axes(pose), dx = p.x - pose.x, dz = p.z - pose.z;
+  return { x: dx * c + dz * s, z: -dx * s + dz * c };
+}
+
 /** Dirección local (horizontal) del camión en el mundo. */
 export function truckDir(pose: TruckPose, l: { x: number; z: number }) {
   const { c, s } = axes(pose);

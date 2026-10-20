@@ -24,10 +24,11 @@ const boxes: Box[] = [
 ];
 
 const props: Prop[] = [
-  // Conos a los lados del pie de la rampa y un mástil con banderines
-  { type: 'cone', x: 1.4, z: -2.5, hit: [0.2, 0.3, 0.2] },
-  { type: 'cone', x: 1.4, z: 2.5, hit: [0.2, 0.3, 0.2] },
-  { type: 'flagPole', x: 1.4, z: -3.4, hit: [0.08, 1.6, 0.08] },
+  // Conos a los lados del pie de la rampa, apartados de los carriles por los que se llega a ella, y un mástil con
+  // banderines (con los conos a 0,6 m del borde de la rampa, las cajas y la lámpara chocaban con ellos al subir)
+  { type: 'cone', x: 1.2, z: -3.9, hit: [0.2, 0.3, 0.2] },
+  { type: 'cone', x: 1.2, z: 3.9, hit: [0.2, 0.3, 0.2] },
+  { type: 'flagPole', x: 1.2, z: -4.8, hit: [0.08, 1.6, 0.08] },
   { type: 'bench', x: -10, z: -8.8 },
   { type: 'flowerPot', x: -14.8, z: -8.8 },
   { type: 'flowerPot', x: -14.8, z: 8.8 },
@@ -35,29 +36,38 @@ const props: Prop[] = [
 for (const o of props) if (o.hit) boxes.push({ p: [o.x, (o.y ?? 0) + o.hit[1], o.z], h: o.hit, kind: 'prop', solid: true });
 
 /**
- * Un objeto en (x, z) que se lleva hasta (sx, sz) dentro del camión: primero al eje del camión antes de la rampa y
- * después a su sitio, donde se suelta. `yaw`: giro al llevarlo (null si da igual).
+ * Un objeto en (x, z), girado `turn`, que se lleva a su sitio dentro del camión, en el carril `lane` (z) y a `depth` (x):
+ * primero a su carril, 3,5 m antes de la rampa (para entrar en ella ya en línea: llegando en diagonal al pie de la
+ * rampa, se desviaba y había que volver atrás), después al pie de la rampa y de ahí, en línea recta, a su sitio, donde se
+ * suelta. `yaw`: giro al llevarlo (null si da igual).
  */
-function place(id: ItemId, x: number, z: number, required: boolean, sx: number, sz: number, yaw: number | null = 0): ItemPlacement {
+function place(id: ItemId, x: number, z: number, required: boolean, lane: number, depth: number, yaw: number | null = 0, turn = 0): ItemPlacement {
   return {
-    id, pos: { x, z }, yaw: 0, required,
+    id, pos: { x, z }, yaw: turn, required,
     route: [
-      { x: 0, z: z * 0.5, yaw, label: 'Patio' },
-      { x: 2.4, z: sz * 0.5, yaw, label: 'Rampa del camión' },
-      { x: sx, z: sz, yaw, label: 'Camión', release: true },
+      { x: -1.5, z: lane, yaw, label: 'Patio' },
+      { x: 1.2, z: lane, yaw, label: 'Rampa del camión' },
+      { x: depth, z: lane, yaw, label: 'Camión', release: true },
     ],
   };
 }
 
-// Sitios dentro de la caja de carga (x de 6 a 11,7; z de −1,9 a 1,9): lo grande al fondo, lo pequeño junto a la abertura
+// Los objetos, separados al menos 1,5 m (se llega a todas sus asas) y repartidos para que el camino recto de cada uno
+// hasta su carril no pase por otro. La lámpara mira al oeste: su única asa queda del lado de quien llega del patio.
+// Dentro de la caja de carga (x de 6 a 11,7; z de −1,9 a 1,9) hay dos carriles separados 0,7 m (con tres, quien lleva
+// una caja a su lado rozaba la mesa del carril central y la volcaba sobre la lámpara): el norte (z < 0), para la mesa y
+// la caja del norte del patio; el sur (z > 0), para la lámpara, la silla y la otra caja, que salen del sur. En cada
+// carril, primero lo del fondo (el piloto espera a que esté cargado para meter lo de delante), con 1 m libre entre uno y
+// otro para quien va delante del objeto que lleva. La mesa, la más lenta de llevar, comparte carril con un solo objeto.
+const N = -0.95, S = 0.95;
 const items: ItemPlacement[] = [
-  place('mesa', -3, 0, true, 9.3, -1.0),
-  place('caja', -6.5, -4.5, true, 9.3, 0.5, null),
-  place('caja', -7.5, -4.5, true, 8.5, 0.5, null),
-  place('lampara', -6.5, 4.5, true, 7.3, -1.2, null),
-  place('silla', -8, 4.5, true, 7.3, 1.2, null),
-  place('nevera', -11, -2.5, false, 11.2, -1.4),
-  place('piano', -11, 2.5, false, 10.8, 1.25),
+  place('mesa', -3, 0, true, N, 9.8),
+  place('caja', -5.5, -3.5, true, N, 7.9, null),
+  place('caja', -3.5, 5.5, true, S, 7.0, null),
+  place('lampara', -5.5, 3.5, true, S, 10.3, null, Math.PI),
+  place('silla', -5.5, 5.5, true, S, 8.6, null),
+  place('nevera', -8.5, -2.5, false, N, 6.45),
+  place('piano', -8.5, 2.5, false, 0, 6.9),
 ];
 
 /** Salidas: en el oeste del patio, mirando a los objetos. */
@@ -81,7 +91,7 @@ export const PATIO: LevelDef = {
       { x: -19, z: -13, s: 1.1, hue: 0 }, { x: -20, z: 6, s: 1, hue: 1 }, { x: 4, z: -14, s: 1.2, hue: 1 },
       { x: 21, z: 4, s: 1, hue: 0 }, { x: 14, z: -13, s: 0.9, hue: 0 },
     ],
-    bunting: [{ from: { x: 1.4, y: 3.1, z: -3.4 }, to: { x: 6.05, y: 3.2, z: -2.02 }, n: 6 }],
+    bunting: [{ from: { x: 1.2, y: 3.1, z: -4.8 }, to: { x: 6.05, y: 3.2, z: -2.02 }, n: 7 }],
     labels: [{ text: 'PATIO DE PRUEBAS', x: -4, y: 3.2, z: -9.6 }],
   },
   spawns,

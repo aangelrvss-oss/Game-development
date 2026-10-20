@@ -117,7 +117,7 @@ export class WorldView {
     }
     this.dynamic.clear();
     this.fx.clear();
-    this.items = game.items.map((it) => (it.def.draw === 'sofa' ? new SofaView() : new ItemView(it.def)));
+    this.items = game.items.map((it) => (it.def.draw === 'sofa' ? new SofaView(it.def) : new ItemView(it.def)));
     for (const v of this.items) this.dynamic.add(v.group, ...(v instanceof SofaView ? [v.warning] : []));
     this.carriers = game.carriers.map((c) => (c.human !== null ? new DollView(c, c.human, game.world, this.camera, this.fx) : new CarrierView(c, c.human, this.fx, game.world)));
     for (const v of this.carriers) { this.dynamic.add(v.group, ...v.worldObjects()); }
@@ -134,7 +134,7 @@ export class WorldView {
     game.items.forEach((it, i) => {
       const v = this.items[i];
       if (v instanceof SofaView) v.sync(it.body, it.integrity, sofaUp(it.body), t, dt);
-      else v?.sync(it.body, dt);
+      else v?.sync(it.body, it.integrity, dt);
     });
     for (const v of this.carriers) {
       const g = v.carrier.grabWorld();

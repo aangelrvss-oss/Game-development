@@ -197,7 +197,9 @@ function start(auto: boolean, fromGesture = true) {
   game?.dispose();
   const humans = auto ? 1 : opts.humans;
   game = new Game(RAPIER, { level: opts.level, humans, carriers: Math.max(opts.carriers, humans), botStyle: opts.botStyle, seed: Math.floor(Math.random() * 1e9) });
-  autopilot = auto ? new Autopilot(0) : null;
+  // Demostración: el piloto lleva a J1. Con varios objetos que cargar, con el reparto (va de uno en uno y los ayudantes
+  // ponen las manos que faltan); con uno solo, el piloto de siempre, con su objeto
+  autopilot = !auto ? null : game.requiredCount > 1 ? Autopilot.team(game)[0] : new Autopilot(0);
   view.attach(game);
   // Mandos repartidos para este número de jugadores; lo pulsado en el menú (Intro, A…) no cuenta en la partida
   input.setPlayers(humans);
@@ -292,7 +294,7 @@ function handle(e: GameEvent, g: Game) {
       break;
     }
     case 'stage': sfx.play('checkpoint'); if (e.index > 0) hud.toast(`¡${e.label}!`, 'good'); break;
-    case 'righted': sfx.play('hop'); view.fx.dust(e.pos, 8, 1); hud.toast(`Sofá enderezado (−${RULES.rightCost}%)`); break;
+    case 'righted': sfx.play('hop'); view.fx.dust(e.pos, 8, 1); hud.toast(`${g.items[e.item].def.name}: de pie otra vez (−${RULES.rightCost}%)`); break;
     case 'respawnItem': {
       const it = g.items[e.item];
       hud.toast(`${it === g.sofaItem && it.def.id === 'sofa' ? 'El sofá vuelve al último punto' : `${it.def.name}: vuelve a su sitio`} (−${RULES.respawnCost}% y +5 s)`, 'bad');

@@ -2,13 +2,13 @@
 // se puede ejecutar en Node para las pruebas.
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { inRegion } from '../levels/geometry';
-import { cargoHold, truckBoxes } from '../levels/truck';
+import { TRUCK, cargoHold, truckBoxes, truckToWorld, worldToTruck } from '../levels/truck';
 import type { Kind, LevelDef, Waypoint } from '../levels/types';
 import { BotBrain, BOT, type BotStyle } from './bots';
 import { CAST, CARRIER, CENTER_Y, Carrier, type Grabbable } from './carrier';
 import { HAND, solveHands } from './hand';
 import { ITEMS, createItem, restHeight, shapeBounds, type Item, type ItemDef } from './items';
-import { rotate, sofaUp, sofaYaw, yawQuat } from './sofa';
+import { localToWorld, rotate, sofaUp, sofaYaw, yawQuat } from './sofa';
 import { Car, CAR_COLORS, lightAt, stepTraffic } from './traffic';
 import { NO_INPUT, type GameEvent, type PlayerInput, type Vec3 } from './types';
 
@@ -25,6 +25,8 @@ export const RULES = {
   /** Daño de un atropello a un objeto que se puede dañar. */
   carDamage: 12,
   rightCost: 3,
+  /** Tiempo tras enderezar un objeto en el que su caída no cuenta como golpe (s): el salto dura unos 0,6 s. */
+  rightLand: 0.8,
   respawnCost: 15,
   /** Tiempo que un objeto pasa dentro del camión, suelto y quieto, hasta quedar cargado (s). */
   winHold: 1.0,
@@ -63,6 +65,9 @@ export interface GameOptions {
 }
 
 export type Phase = 'countdown' | 'playing' | 'won' | 'lost';
+
+/** Lo que imitan los ayudantes de un objeto: velocidad media pedida por los humanos que lo llevan y giro pedido. */
+export interface Lead { x: number; z: number; w: number; active: boolean }
 
 /**
  * Rozamiento de las cajas fijas según su tipo (las demás, 0,6). La rampa de la terraza es de chapa: resbala, y si se
@@ -122,10 +127,18 @@ export class Game {
   private lastPed: 'green' | 'red' = 'red';
   private rng: () => number;
   private handleOwner = new Map<number, { kind: 'item'; i: number } | { kind: 'carrier'; i: number } | { kind: 'car'; i: number }>();
-  /** Velocidad media pedida por los humanos que cargan (la usan los ayudantes). */
-  lead = { x: 0, z: 0, w: 0, active: false };
-  /** Tiempo que llevan parados los humanos que cargan (para que los ayudantes dejen el objeto en el camión). */
-  private leadStill = 0;
+  /**
+   * Velocidad media pedida por los humanos que cargan el objeto principal (la imitan sus ayudantes; cada objeto tiene
+   * la suya, `leads`).
+   */
+  lead: Lead = { x: 0, z: 0, w: 0, active: false };
+  /** Lo que imitan los ayudantes de cada objeto (índice en `items`), recalculado en cada paso. */
+  private leads: Lead[] = [];
+  /**
+   * Tiempo que llevan parados los humanos que cargan cada objeto (índice en `items`), para que los ayudantes lo dejen en
+   * el camión.
+   */
+  private leadStill: number[] = [];
   private loads = new Set<number>();
 
   constructor(private R: R, readonly opts: GameOptions) {
@@ -168,6 +181,73 @@ export class Game {
 
   /** ¿Le queda alguna mano libre (asas sin ocupar) a este objeto? */
   private freeHand = (g: Grabbable) => g.maxHands === undefined || this.holdersOf(g.body).length < g.maxHands;
+
+  /** Objeto de la mudanza al que pertenece un cuerpo (o nada: otro agarrable, o ningún cuerpo). */
+  itemOf(body: RAPIER.RigidBody | null): Item | null {
+    if (!body) return null;
+    for (const it of this.items) if (it.body === body) return it;
+    return null;
+  }
+
+  /**
+   * Objeto al que va cada ayudante que no agarra nada: el que necesita manos. Por orden:
+   * 1. uno que lleva un jugador y al que le faltan manos para ir en el aire (`minCarriers`);
+   * 2. uno de varias personas que lleva un jugador y tiene asas libres (más manos lo llevan mejor; uno ligero lo lleva
+   *    mejor quien lo lleva solo: un ayudante, con su retraso, solo le tira de un lado);
+   * 3. uno obligatorio de varias personas que nadie lleva y al que le faltan manos (lo esperan agarrado).
+   * Entre iguales, el más cercano (el que ya tenía, con medio metro de ventaja, para no dudar). Los que van de camino
+   * cuentan como manos. Si no hay ninguno, sigue con el que tenía. Ni los cargados, ni los rotos, ni los que se dejan en
+   * el camión (`stow`). Sin código por objeto: todo sale de `minCarriers`, de las asas y de quién lo agarra. Con un solo
+   * objeto («La calle»), todos van a él, como antes.
+   */
+  private chooseItems(stow: boolean[]) {
+    const holders = this.items.map((it) => this.holdersOf(it.body).length);
+    const humanHeld = this.items.map((it) => this.carriers.some((c) => c.human !== null && c.heldBody === it.body));
+    const heading = this.items.map(() => 0);
+    for (const [i, b] of this.bots) {
+      const c = this.carriers[i];
+      if (c.heldBody) continue;
+      let best: Item | null = null, bt = Infinity, bd = Infinity;
+      for (const it of this.items) {
+        if (it.state === 'broken' || it.state === 'loaded' || stow[it.index]) continue;
+        const hands = holders[it.index] + heading[it.index];
+        if (hands >= it.def.handles.length) continue;
+        const short = hands < it.def.minCarriers;
+        const heavy = it.def.minCarriers >= 2;
+        const tier = humanHeld[it.index] ? (short ? 0 : heavy ? 1 : -1) : it.required && heavy && short ? 2 : -1;
+        if (tier < 0) continue;
+        const p = it.body.translation(), d = Math.hypot(p.x - c.pos.x, p.z - c.pos.z) - (it.index === b.item ? 0.5 : 0);
+        if (tier < bt || (tier === bt && d < bd)) { best = it; bt = tier; bd = d; }
+      }
+      if (best && best.index !== b.item) {
+        // Objeto nuevo: va al asa libre más cercana
+        const taken = new Set<number>();
+        for (const o of this.bots.values()) if (o !== b && o.item === best.index) taken.add(o.slot);
+        let slot = 0, sd = Infinity;
+        best.def.handles.forEach((h, k) => {
+          const a = localToWorld(best!.body, h.p), d = Math.hypot(a.x - c.pos.x, a.z - c.pos.z) + (taken.has(k) ? 10 : 0);
+          if (d < sd) { sd = d; slot = k; }
+        });
+        b.item = best.index;
+        b.slot = slot;
+      }
+      heading[b.item]++;
+    }
+  }
+
+  /**
+   * Sitio al que va un ayudante sin nada que llevar (su objeto ya está cargado y ninguno necesita manos): fuera del
+   * camión, a un lado del pie de la rampa, para no quedarse en el carril de los que llegan. Desde el camión o la rampa,
+   * primero baja por la rampa (en línea recta hacia el lado se caería por su borde o chocaría con la pared).
+   */
+  private parkSpot(c: Carrier) {
+    const pose = this.level.truck, l = worldToTruck(pose, c.pos), side = l.z < 0 ? -1 : 1;
+    const foot = -TRUCK.ramp - BOT.park.foot;
+    const goal = l.x > foot + 0.3
+      ? { x: foot - 0.5, y: 0, z: Math.max(-BOT.park.down, Math.min(BOT.park.down, l.z)) }
+      : { x: foot, y: 0, z: side * (TRUCK.width / 2 + TRUCK.wall + BOT.park.aside) };
+    return truckToWorld(pose, goal);
+  }
 
   /** Daño total de la partida: la suma de lo que ha perdido cada objeto. */
   get damageTotal() {
@@ -221,7 +301,18 @@ export class Game {
       c.facing = { x: s.facing.x, z: s.facing.z };
       this.carriers.push(c);
       this.handleOwner.set(c.collider.handle, { kind: 'carrier', i });
-      if (c.human === null) this.bots.set(i, new BotBrain(i % handles.length, this.opts.botStyle, this.rng));
+      if (c.human === null) {
+        // Empieza yendo al asa libre más cercana del objeto principal (en «La calle», cada uno sale frente a la suya)
+        const p = c.pos, mine = new Set([...this.bots.values()].map((b) => b.slot));
+        let slot = 0, best = Infinity;
+        handles.forEach((h, k) => {
+          const a = localToWorld(this.sofa, h.p), d = Math.hypot(a.x + h.out.x * 0.6 - p.x, a.z + h.out.z * 0.6 - p.z) + (mine.has(k) ? 100 : 0);
+          if (d < best) { best = d; slot = k; }
+        });
+        const brain = new BotBrain(slot, this.opts.botStyle, this.rng);
+        brain.item = this.sofaItem.index;
+        this.bots.set(i, brain);
+      }
     }
     // Tráfico del nivel (si tiene calle)
     const tr = this.level.traffic;
@@ -256,37 +347,54 @@ export class Game {
     } else if (playing) {
       this.time += dt;
     }
-    // Los ayudantes van a por el objeto principal (con sus asas, las de su definición)
-    const target = this.sofaItem;
-
-    // Mando de los humanos y lo que deben imitar los ayudantes
-    let lx = 0, lz = 0, lw = 0, nl = 0;
+    // Mando de los humanos y lo que deben imitar los ayudantes de cada objeto: la velocidad media que piden los humanos
+    // que lo llevan y el giro que piden ellos y los que no llevan ningún objeto (pedir giro sin llevar nada se lo pide a
+    // todos los ayudantes). Los ayudantes de un objeto no imitan a quien lleva otro objeto de la mudanza
+    const n = this.items.length;
+    const lx = new Array<number>(n).fill(0), lz = new Array<number>(n).fill(0), lw = new Array<number>(n).fill(0), nl = new Array<number>(n).fill(0);
+    let freeTurn = 0, ex = 0, ez = 0, ne = 0;
     const humanInputs = new Map<number, PlayerInput>();
     for (const c of this.carriers) {
       if (c.human === null) continue;
       const inp = playing ? inputs[c.human] ?? NO_INPUT : NO_INPUT;
       humanInputs.set(c.id, inp);
-      if (inp.turn !== 0) lw += inp.turn * BOT.turnRate;
-      if (c.holding) { lx += inp.mx * CARRIER.carrySpeed; lz += inp.mz * CARRIER.carrySpeed; nl++; }
-      if (inp.right) this.tryRight();
+      const held = this.itemOf(c.heldBody);
+      if (inp.turn !== 0) { if (held) lw[held.index] += inp.turn * BOT.turnRate; else freeTurn += inp.turn * BOT.turnRate; }
+      if (held) { lx[held.index] += inp.mx * CARRIER.carrySpeed; lz[held.index] += inp.mz * CARRIER.carrySpeed; nl[held.index]++; }
+      // Lo que lleva y no es un objeto de la mudanza (un agarrable más): lo imitan los ayudantes de un objeto que no lleva
+      // ningún humano, como antes (con un solo objeto, los ayudantes imitaban a cualquier humano que llevase algo)
+      else if (c.heldBody) { ex += inp.mx * CARRIER.carrySpeed; ez += inp.mz * CARRIER.carrySpeed; ne++; }
+      if (inp.right) this.tryRight(c);
     }
-    this.lead = { x: nl ? lx / nl : 0, z: nl ? lz / nl : 0, w: lw, active: nl > 0 };
+    this.leads = this.items.map((_it, i) => nl[i]
+      ? { x: lx[i] / nl[i], z: lz[i] / nl[i], w: lw[i] + freeTurn, active: true }
+      : { x: ne ? ex / ne : 0, z: ne ? ez / ne : 0, w: lw[i] + freeTurn, active: ne > 0 });
+    this.lead = this.leads[this.sofaItem.index];
     // Dentro del camión, los ayudantes dejan el objeto cuando ningún jugador lo lleva o cuando los que lo llevan llevan
     // un momento parados (`stowAfter`), y no lo vuelven a agarrar (`stow`). Que suelten antes que los jugadores evita
     // que uno se quede solo con todo el peso, se tambalee al soltar y empuje el objeto hacia la abertura
-    const humanHolds = this.carriers.some((c) => c.human !== null && c.heldBody === target.body);
-    const still = this.lead.active && Math.hypot(this.lead.x, this.lead.z) < 0.05 && this.lead.w === 0;
-    this.leadStill = still ? this.leadStill + dt : 0;
-    const stow = target.inHold && (!humanHolds || this.leadStill > BOT.stowAfter);
+    const stow = this.items.map((it, i) => {
+      const l = this.leads[i], still = l.active && Math.hypot(l.x, l.z) < 0.05 && l.w === 0;
+      this.leadStill[i] = still ? (this.leadStill[i] ?? 0) + dt : 0;
+      const humanHolds = this.carriers.some((c) => c.human !== null && c.heldBody === it.body);
+      return it.inHold && (!humanHolds || this.leadStill[i] > BOT.stowAfter);
+    });
+    // Cada ayudante va al objeto que necesita manos
+    this.chooseItems(stow);
 
-    // Asas ocupadas: las de los ayudantes que cargan y las que tienen al lado los humanos que agarran el objeto
-    const taken = new Set<number>();
-    for (const [i, b] of this.bots) if (this.carriers[i].heldBody === target.body) taken.add(b.slot);
-    for (const c of this.carriers) {
-      if (c.human === null || c.heldBody !== target.body || !c.grabLocal) continue;
-      const gl = c.grabLocal;
-      target.def.handles.forEach((s, i) => { if (Math.hypot(s.p.x - gl.x, s.p.z - gl.z) < 0.6) taken.add(i); });
-    }
+    // Asas ocupadas de cada objeto, antes de que nadie agarre en este paso: las de los ayudantes que lo cargan y las que
+    // tienen al lado los humanos que lo agarran
+    const takenOf = this.items.map((target) => {
+      const t = new Set<number>();
+      for (const [i, b] of this.bots) if (this.carriers[i].heldBody === target.body) t.add(b.slot);
+      for (const c of this.carriers) {
+        if (c.human === null || c.heldBody !== target.body || !c.grabLocal) continue;
+        const gl = c.grabLocal;
+        target.def.handles.forEach((s, i) => { if (Math.hypot(s.p.x - gl.x, s.p.z - gl.z) < 0.6) t.add(i); });
+      }
+      return t;
+    });
+    const taken = (target: Item) => takenOf[target.index];
 
     for (const c of this.carriers) {
       let inp: PlayerInput;
@@ -294,21 +402,25 @@ export class Game {
       if (brain) {
         const wasHolding = c.holding;
         const others = this.carriers.filter((o) => o !== c).map((o) => o.pos);
-        inp = playing ? brain.think(c, target, this.lead, taken, dt, others, stow) : NO_INPUT;
+        const target = this.items[brain.item], i = target.index;
+        const idle = !c.heldBody && (target.state === 'loaded' || target.state === 'broken');
+        inp = !playing ? NO_INPUT
+          : idle ? brain.park(c, this.parkSpot(c), others)
+          : brain.think(c, target, this.leads[i], taken(target), dt, others, stow[i]);
         if (inp.grab && wasHolding) {
           c.release();
           this.emit({ type: 'release', carrier: c.id, pos: c.handWorld() });
         } else if (inp.grab && this.freeHand(target)) {
           if (c.tryGrab(target.body, target.colliders, target.def.handles[brain.slot].p)) {
-            taken.add(brain.slot);
+            taken(target).add(brain.slot);
             this.emit({ type: 'grab', carrier: c.id, pos: c.handWorld() });
           }
         }
       } else {
         inp = humanInputs.get(c.id) ?? NO_INPUT;
-        if (c.holding && inp.turn !== 0) {
-          // Quien pide el giro también lo acompaña: se mueve alrededor del centro del sofá.
-          const w = inp.turn * BOT.turnRate, sp = this.sofaPos, p = c.pos;
+        if (c.heldBody && inp.turn !== 0) {
+          // Quien pide el giro también lo acompaña: se mueve alrededor del centro de lo que lleva.
+          const w = inp.turn * BOT.turnRate, sp = c.heldBody.translation(), p = c.pos;
           inp = { ...inp, mx: inp.mx + (w * (p.z - sp.z)) / CARRIER.carrySpeed, mz: inp.mz - (w * (p.x - sp.x)) / CARRIER.carrySpeed };
         }
         if (inp.grab) {
@@ -558,18 +670,31 @@ export class Game {
     return wall;
   }
 
-  /** Enderezar el sofá cuando está volcado. Suelta a todos y lo deja de pie con un pequeño salto. */
-  tryRight(): boolean {
-    if (this.sofaUp > 0.55 || this.phase !== 'playing') return false;
-    for (const c of this.carriers) if (c.heldBody === this.sofa) c.release(true);
-    const p = this.sofaPos;
-    this.sofa.setTranslation({ x: p.x, y: p.y + 0.6, z: p.z }, true);
-    this.sofa.setRotation(yawQuat(this.sofaYaw), true);
-    this.sofa.setLinvel({ x: 0, y: 2, z: 0 }, true);
-    this.sofa.setAngvel({ x: 0, y: 0, z: 0 }, true);
-    this.sofaItem.prevVel = { x: 0, y: 2, z: 0 };
-    this.damage(this.sofaItem, RULES.rightCost);
-    this.emit({ type: 'righted', pos: this.sofaPos });
+  /**
+   * Enderezar un objeto volcado: el más cercano a quien lo pide (`by`; sin nadie, el principal). Suelta a todos los que
+   * lo agarran y lo deja de pie con un pequeño salto. Con un solo objeto («La calle»), el sofá, como antes.
+   */
+  tryRight(by?: Carrier): boolean {
+    if (this.phase !== 'playing') return false;
+    let it: Item | null = null, best = Infinity;
+    for (const o of by ? this.items : [this.sofaItem]) {
+      if (sofaUp(o.body) > 0.55) continue;
+      const p = o.body.translation(), d = by ? Math.hypot(p.x - by.pos.x, p.z - by.pos.z) : 0;
+      if (d < best) { best = d; it = o; }
+    }
+    if (!it) return false;
+    const body = it.body;
+    for (const c of this.carriers) if (c.heldBody === body) c.release(true);
+    const p = body.translation();
+    body.setTranslation({ x: p.x, y: p.y + 0.6, z: p.z }, true);
+    body.setRotation(yawQuat(sofaYaw(body)), true);
+    body.setLinvel({ x: 0, y: 2, z: 0 }, true);
+    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    it.prevVel = { x: 0, y: 2, z: 0 };
+    // El salto no cuenta como golpe al caer (ya cuesta `rightCost`): desde 0,8 m, la lámpara se rompería al enderezarla
+    it.impactCooldown = RULES.rightLand;
+    this.damage(it, RULES.rightCost);
+    this.emit({ type: 'righted', item: it.index, pos: body.translation() });
     return true;
   }
 
