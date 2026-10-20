@@ -199,3 +199,9 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
       - teletransportes sin comprobar el sitio;
       - coste por paso duplicado.
 - **Ciclo 2** (20-10-2026, en curso): ver [`cycles/ciclo-2.md`](cycles/ciclo-2.md).
+  - Flujo de agentes `wf_a0c2d6f7-d64` lanzado sobre `5505243`, en este orden:
+    1. segunda ronda de revisión del ciclo 1 (2 revisores, worktree `Game-development-r1b`); si encuentra un crítico, el flujo se detiene;
+    2. implementación en 3 pasos (worktree `Game-development-c2`, rama local `rebirth/ciclo-2`);
+    3. revisión independiente con 3 revisores;
+    4. corrección.
+  - Si el contenedor se reinicia, se reanuda con `resumeFromRunId`.
