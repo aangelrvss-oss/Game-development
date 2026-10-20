@@ -1,0 +1,92 @@
+{
+ "score": 4,
+ "justification": "Nota 4/10 como revisor A+G (director de juego y producto/streaming). Lo que pide el ciclo en controles y en cooperación está bien resuelto y se ve. No hay tecla de alzar (grep sin lift ni Mayús en src y en el HUD). Al agarrar, la mano sube sola (1,18–1,35 m). Uno solo levanta un extremo (centro del sofá de 0,20 a 0,40 m) y entre dos va en el aire (0,59 m; en vista lateral se ve hueco bajo el sofá). El aviso «Pesa mucho: falta alguien en el otro extremo (J2 con INTRO…)» sale a los 0,6 s, nombra la tecla o el botón de cada jugador libre y se va cuando llega el compañero. Cooperar es imprescindible: con un solo jugador activo, a los 180 s se pierde en Calle o Portal. Las entradas del ciclo funcionan en navegador: 4 jugadores en teclado, mandos por índice, el botón que descubre el mando no cuenta, Start pausa y el menú se maneja con flechas o cruceta. Pruebas de entrada: 18/18.\n\nPero el producto visible tiene una regresión crítica del paso 3. Brazos, mangas, manos y piernas de los muñecos de los jugadores se dibujan separados del cuerpo. La separación crece con la distancia al origen del mundo (pendiente 0,109 = 1 − DOLL_SCALE, correlación 1,000 en 134 muestras): unos 1,1 m en el patio y 4,2–4,4 m en el camión, justo en el momento de la entrega. En la línea base 837dca7, en el mismo punto, son 0,03–0,04 m. En una partida retransmitida es lo primero que se ve: muñecos sin brazos ni piernas y palos de varios metros cruzando la pantalla de resultados.\n\nHay más problemas de producto:\n- El esfuerzo del muñeco no se aprecia desde la cámara de juego (requisito T-auto-lift).\n- Con 4 humanos, el 3.º y el 4.º no aportan nada a la partida (31,9 s con 4 frente a 32,7 s con 2).\n- Retroceso, justo encima de Intro (la tecla de J2), reinicia la partida sin confirmar.\n- Fallos menores de menú, avisos, pausa con mando, HUD a 4 jugadores y README desfasado.\n\nCon un núcleo jugable claro pero el avatar roto en todo el recorrido, no se puede aprobar.\n\nCapturas y registros en /tmp/claude-0/review-c1/ag/. Scripts en /home/user/Game-development-c1/mudanza-imposible/scripts/audit/review-c1/rol-ag-producto/. Los servidores de vista previa (4175, y 4185 para la línea base) están detenidos.",
+ "defects": [
+  {
+   "severity": "critical",
+   "title": "Brazos, mangas, manos y piernas del muñeco se dibujan separados del cuerpo: hasta 4,4 m en el camión (regresión del paso 3)",
+   "evidence": "Causa: el grupo del muñeco está escalado (src/view/doll/dollView.ts:70 `this.group.scale.setScalar(S)`, con S = 0,891). Hombros y caderas se calculan con `toWorld = o.localToWorld(...)` (src/view/doll/dollRig.ts:391-393), que ya incluye esa escala. Ese resultado se usa como posición local de mallas hijas de `this.group` (dollRig.ts:236-263: piernas, brazos, mangas, manos), así que acaban dibujadas en S × posición real.\n\nMedida en partida a dos con el piloto: `NODE_PATH=$(npm root -g) node scripts/audit/review-c1/rol-ag-producto/mangas-despegadas.cjs http://localhost:4175/`. Separación entre cada manga y su hombro:\n- Patio: 1,11 m\n- Portal: 1,9 m\n- Escalera: 3,38 m\n- Rampa: 4,17 m\n- Máximo: 4,43 m\n- Correlación con la distancia al origen: 1,000; pendiente: 0,109 m/m (= 1 − 0,32/0,359)\n\nComparación con la línea base: `entrega.cjs` junto al camión da en c1 off [4,15, 4,17] y [3,94, 3,91] m; en 837dca7 (compilada fuera del repositorio) da [0,04, 0,03] m.\n\nCapturas en /tmp/claude-0/review-c1/ag/:\n- comparativa-quieto.png: arriba la base, con brazos y piernas; abajo c1, sin piernas y con brazos flotando.\n- entrega-c1-juego.png y entrega-c1-resultados.png: brazos de varios metros cruzando la pantalla.\n- esfuerzo-camara-juego.png\n\nLas pruebas no lo detectan: tests/coherence.test.ts:36 mide solo «tronco y cabeza: sin brazos, manos, piernas ni botas».",
+   "suggestion": "Pasar los puntos al espacio del grupo: `this.group.worldToLocal(o.localToWorld(v))`, o calcularlos con la cadena root→torso sin la escala del grupo. Añadir una prueba que coloque el muñeco lejos del origen, por ejemplo en (25, −30), y compruebe que mangas, caderas y manos sueltas quedan a menos de 5 cm de sus puntos en el tronco. Repetir la revisión visual en el camión, no solo en el patio."
+  },
+  {
+   "severity": "major",
+   "title": "El esfuerzo del muñeco no se ve desde la cámara de juego (T-auto-lift pide «esfuerzo visible en el muñeco»)",
+   "evidence": "`partida-guiada.cjs` (2 jugadores) registra esfuerzo 0 en reposo, 0,35 al agarrar y 0,78–0,89 arrastrando solo. La captura /tmp/claude-0/review-c1/ag/esfuerzo-camara-juego.png pone esos tres momentos de J1 lado a lado, vistos con la cámara de juego. Solo se ve la gorra desde arriba y los brazos despegados. Cejas, boca y temblor de 0,012 m (dollRig.ts:482, 525-539) no se aprecian. La inclinación hacia atrás (dollView.ts:153, 0,16 × esfuerzo) tampoco se distingue. El único aviso legible es el cartel rojo del HUD.",
+   "suggestion": "Primero corregir los miembros. Después, añadir señales que se lean desde arriba: gotas o rayas de esfuerzo en sprite, la bola de agarre que palpite o cambie a rojo con `strain`, el aro del jugador que se tense, y una inclinación más marcada."
+  },
+  {
+   "severity": "major",
+   "title": "Con 4 humanos, el 3.º y el 4.º no aportan nada: el juego está equilibrado para 2",
+   "evidence": "`npx vite-node scripts/audit/review-c1/rol-ag-producto/cuatro-utiles.ts`, partida de 4 humanos con el piloto (semillas 1–3), siempre 100 % y 0 caídas:\n- 2 activos (los otros 2 quietos): entrega en 32,7–33,1 s\n- 3 activos: 32,1–32,4 s\n- 4 activos: 31,9 s\n\nNinguna parte del recorrido necesita más de dos personas. Además el aviso `heavyAlone` solo salta con 1 agarrando, así que no orienta a los demás.",
+   "suggestion": "Darle un papel a los jugadores 3 y 4. Opciones: carga escalada al número de jugadores, objetos que pidan 3–4 manos, tareas paralelas (abrir y sujetar la puerta, parar el tráfico, guiar en la escalera), o una segunda carga en el mismo nivel."
+  },
+  {
+   "severity": "major",
+   "title": "Retroceso reinicia la partida al instante, sin confirmar, y está justo encima de Intro (agarrar de J2)",
+   "evidence": "src/main.ts, `input.onGlobal`: `else if (screen === 'play' && code === 'Backspace') start(!!autopilot);`. Funciona también en pausa, porque `screen` sigue siendo 'play'. e2e:duo lo confirma («Retroceso reinicia la partida»). En el teclado ISO español Retroceso está pegado encima de Intro, la tecla con la que J2 agarra y suelta. Un manotazo de J2 tira hasta 3 minutos de partida de todos.",
+   "suggestion": "Reiniciar solo desde la pausa, o manteniendo la tecla 1 s con indicador de progreso, o pidiendo confirmación."
+  },
+  {
+   "severity": "minor",
+   "title": "Dos en el mismo extremo arrastran el sofá a medias y el juego no avisa",
+   "evidence": "`npx vite-node scripts/audit/review-c1/rol-ag-producto/cooperar.ts`, 3 s en llano:\n- Dos en el MISMO extremo: 3,14 m, con el extremo libre en el suelo (−0,01 m) y aviso «Pesa mucho» 0,0 s de 3.\n- Dos en extremos opuestos: 6,90 m, con el extremo contrario a 0,25–0,34 m del suelo.\n\nCausa: src/sim/game.ts:377-381 solo avisa con `hs.length === 1`. Con 3–4 jugadores es justo cuando más falta «falta alguien en el otro extremo».",
+   "suggestion": "Decidir el aviso por el estado del objeto (un extremo arrastrando por el suelo mientras se tira de él) y no por el número de manos."
+  },
+  {
+   "severity": "minor",
+   "title": "Si uno agarra y se queda quieto, desaparece el aviso para los demás",
+   "evidence": "`partida-guiada.cjs` (2 y 4 jugadores): «J1 agarrado y quieto 1,5 s: aviso «»». En src/ui/hud.ts:128 el aviso de agarrar se apaga en cuanto cualquier humano agarra, y «Pesa mucho» solo sale si ese jugador arrastra durante más de 0,6 s. El resto de jugadores nuevos se queda sin indicación.",
+   "suggestion": "Mientras haya alguien agarrando solo un objeto pesado, mostrar a los libres «J2: agarra el otro extremo (INTRO)», aunque el que agarra esté quieto."
+  },
+  {
+   "severity": "minor",
+   "title": "«Ver demo automática (X)»: la X del teclado no hace nada",
+   "evidence": "`menu-y-hud.cjs`: tras `keyboard.press('KeyX')` en el menú, la pantalla sigue en 'menu'. En main.ts `onGlobal` no trata KeyX; la X solo funciona como 'alt' del mando. La etiqueta se añadió en este ciclo (index.html; en la base ponía «Ver demo automática»).",
+   "suggestion": "Tratar KeyX en el menú o poner en la etiqueta «X en el mando»."
+  },
+  {
+   "severity": "minor",
+   "title": "Intro o R en la pantalla de resultados la saltan al instante (los mandos sí tienen una espera de 800 ms)",
+   "evidence": "`entrega.cjs`: «Intro (agarrar de J2) 131 ms después de aparecer los resultados → screen 'play', phase 'countdown'». En main.ts:148 `padAction` ignora pulsaciones durante 800 ms («un A machacado al ganar no la salta»), pero `onGlobal` reinicia con Enter o KeyR sin esa espera. Intro es soltar para J2 y R es enderezar para J1.",
+   "suggestion": "Aplicar la misma espera de `resultsShownAt` a las teclas."
+  },
+  {
+   "severity": "minor",
+   "title": "Con mando no se puede ir al menú ni reiniciar desde la pausa",
+   "evidence": "`mando.cjs` (mando simulado): Start pausa; cruceta abajo/derecha y A solo reanudan (paused=false, screen 'play'); B reanuda; Back/Select no hace nada. Los botones «Reiniciar» y «Menú» de la pausa solo responden al ratón (main.ts `padAction`, rama 'play').",
+   "suggestion": "Foco con cruceta en los botones de la pausa (como en el menú principal), o asignar X = reiniciar y Back = menú, indicándolo en las etiquetas."
+  },
+  {
+   "severity": "minor",
+   "title": "A 4 jugadores, el panel de J4 queda tapado por la ayuda de abajo a la derecha (1280×720)",
+   "evidence": "/tmp/claude-0/review-c1/ag/p4-f-entre-todos.png: con « · agarrando», la pastilla de J4 («Num 8 4 5 6 · agarrar Num 0 · enderez…») se mete bajo #h-hint («Esc o Start pausa…»). En reposo apenas quedan 10 px entre ambas (p4-b-empieza.png).",
+   "suggestion": "Poner el panel de jugadores en dos filas, o reservar el ancho de #h-hint (o esconderlo tras los primeros segundos) con 3–4 jugadores."
+  },
+  {
+   "severity": "minor",
+   "title": "Menú: la fila de ayudantes sigue activa sin ayudantes y a 720p hay que desplazar",
+   "evidence": "`menu-y-hud.cjs`: con 2 humanos y 2 porteadores, ↓↓↓ → cambia «Ayudantes de la máquina» a «Despistados» aunque no haya ningún ayudante. A 1280×720 la tarjeta tiene 841 px de contenido y se ven 688 px: las notas de mandos y la condición de victoria quedan bajo el pliegue (menu-720p.png).",
+   "suggestion": "Desactivar o ocultar la fila de ayudantes cuando porteadores = humanos. Compactar las notas: mover la tabla de controles a una pestaña o reducir el texto."
+  },
+  {
+   "severity": "minor",
+   "title": "El README contradice el ciclo 1 (documentación de entrada para jugar)",
+   "evidence": "README.md:37-50, «Partida a dos: física cooperativa»:\n- habla de `isCoop` (grep: no existe en src);\n- 90 kg / 45 con ayudantes, 200 N `CARRIER.pullForce`, 2,7 m solo en 3 s;\n- el aviso «¡Uno solo apenas puede con él! Agarradlo los dos»;\n- «Con ayudantes de la máquina se mantiene la física original».\n\nTodo esto es falso desde T-phys-unify. Además: README.md:333 dice «zona amarilla» y el menú dice «zona verde»; README.md:436-444 dice «29 de 29» y habla de regresiones con Mayús.",
+   "suggestion": "Reescribir esas secciones con la física única, el aviso «Pesa mucho» y las cifras actuales, o marcarlas como historial."
+  },
+  {
+   "severity": "minor",
+   "title": "T-grip-2 de lado: uno solo arrastra el sofá 1,63 m en 3 s (límite 1,5 m)",
+   "evidence": "`cooperar.ts`, uno solo y 3 s en llano:\n- a lo largo: 1,12 m\n- de lado: 1,63 m\n- en diagonal: 1,23 m\n\nEstá documentado en el commit (1,73 m a 120°) y excluido de la prueba (tests/sim.test.ts:434-436). La especificación no restringe la dirección. Impacto en producto bajo: solo no se pasa de Calle o Portal en 180 s.",
+   "suggestion": "Más rozamiento en el giro del extremo apoyado, o limitar el par que una sola mano aplica sobre el sofá."
+  }
+ ],
+ "strengths": [
+  "El alzado automático funciona sin tecla: al agarrar, la mano sube sola (1,18–1,35 m). Uno solo levanta un extremo (centro del sofá de 0,20 a 0,40 m) y entre dos va en el aire (0,59 m, con hueco visible en pp-2-entre-dos.png). No quedan lift ni Mayús en src ni en el HUD.",
+  "El aviso contextual es bueno: «Pesa mucho: falta alguien en el otro extremo (J2 con INTRO, J3 con U, J4 con NUM 0)» sale a los 0,6 s y usa el dispositivo de cada uno («J2 con A» con mando). Se va cuando el compañero agarra.",
+  "Cooperar es necesario y se nota. Entre dos: 6,90 m en 3 s; uno solo: 1,12 m. Un único jugador activo pierde a los 180 s en Calle o Portal, con el aviso visible unos 176 s.",
+  "Controles claros sin manual: la tabla del menú cubre J1–J4 y el mando. Cada jugador tiene su panel en el HUD con sus teclas, y colores, nombres, aros y etiquetas J1–J4 diferenciados.",
+  "Mandos bien resueltos: el botón que descubre el mando no empieza la partida, la segunda A sí. La nota del menú muestra el reparto (mando 1 → J2). Start pausa. Las pruebas de entrada pasan (18/18).",
+  "Las pulsaciones se guardan hasta el paso de física y los menús se manejan con flechas o cruceta. La pausa y el reinicio limpian lo pulsado."
+ ]
+}

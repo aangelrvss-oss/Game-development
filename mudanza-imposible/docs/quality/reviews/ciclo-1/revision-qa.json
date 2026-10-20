@@ -1,0 +1,95 @@
+{
+ "score": 6.5,
+ "justification": "Lo que se ejecuta funciona y es estable:\n- `tsc` sale limpio.\n- Vitest pasa 62/62 en cuatro ejecuciones (dos con `--sequence.shuffle`).\n- `e2e:teclado` da TODO OK y `e2e:duo` 20/20; ningún script de navegador registra errores de consola.\n- `sim-run` gana 112/112 partidas (7 configuraciones × 16 semillas), frente a 94/112 de la línea base. Despistados con semillas 1–8: 8/8.\n\nMedí el bucle real de `main.ts` en Chromium con el reloj falseado a 144 Hz. El 58 % de los fotogramas no ejecuta ningún paso de física y aun así 40/40 pulsaciones de Espacio, Intro y R llegan exactamente una vez. El Start de un mando mantenido pausa una sola vez, y el menú y el juego con mandos simulados funcionan.\n\nLa robustez fuera de los casos de prueba es buena:\n- T-coop: 0 fallos en 30 posiciones × 8 modos.\n- Escalera: 15/15 variantes de desplazamiento y giro.\n- Partidas con pulsaciones al azar y 4 humanos: sin NaN, sin porteadores despedidos y sin llegar al límite de velocidad del sofá. La línea base, con las mismas partidas, rompe el sofá dos veces y lanza a un porteador a 22,9 m/s.\n\nEn las pruebas de Vitest no hay ningún umbral numérico rebajado. Las dos pruebas quitadas comprobaban mecánicas eliminadas, y la de recorrido además comprueba ahora el tiempo.\n\nLa nota baja por la calidad de las pruebas. Con pruebas de mutación reintroduje cuatro regresiones que la suite no detecta (62/62 o 6/6 en verde):\n- el fallo original de pulsaciones perdidas en `main.ts`;\n- ayudantes con el triple de fuerza (T-phys-unify);\n- una mano que nunca se escapa (gripBreak);\n- un desplazamiento visual oculto del muñeco (visOff, prohibido por T-coh-1).\n\nAdemás, la comprobación «J2 se levanta solo» de `duo-e2e` amplía su margen en función de un contador privado del propio juego. Y T-grip-2 sigue sin cumplirse tirando de lado (1,62–1,76 m frente al máximo de 1,5 m): está documentado, pero la prueba solo mide la dirección que pasa. El rendimiento empeora unas dos veces por paso, aunque sigue muy por debajo del presupuesto.",
+ "defects": [
+  {
+   "severity": "major",
+   "title": "`duo-e2e`: la comprobación «J2 se levanta solo» amplía el margen con un contador privado del juego (relajación condicionada)",
+   "evidence": "En la línea base (git show 837dca7:mudanza-imposible/scripts/duo-e2e.cjs, l. ~205-208) se comprobaba `stun === 0` unos 3 s después de soltar.\n\nAhora (scripts/duo-e2e.cjs, l. 216-246) se espera hasta base + MAX_WAIT_ROOM(4) + RISE_TIME + 0,5 s y se da por buena la condición `riseOk = onFloor <= base+0.05 || (up.w > 0 && up.w <= 4.05 && onFloor <= base + up.w + 0.05)`. El valor `up.w` es `c.waitRoom`, un campo `private` de Carrier, así que el propio juego decide si la espera estaba justificada. Si fuera así, J2 puede pasar hasta unos 5,35 s en el suelo y la comprobación sigue en verde.\n\nEl cambio responde a una mecánica nueva (esperar sitio para levantarse) y está documentado en el commit e0a1711, pero el oráculo no es independiente. En mi ejecución, J2 pasó 1,29 s en el suelo.",
+   "suggestion": "Mantener el límite estricto (fallTime + 0,05 s) y aceptar la espera solo si la prueba confirma por su cuenta que no había sitio (consulta de forma con la cápsula de pie en la posición de J2), o fijar la posición para que siempre haya sitio. No usar campos privados del juego como oráculo."
+  },
+  {
+   "severity": "major",
+   "title": "T-grip-2 sin cumplir tirando de lado; la prueba solo mide la dirección que pasa",
+   "evidence": "`npx vite-node scripts/audit/review-c1/rol-f-qa-b/grip-dirs.ts`: uno solo arrastra el sofá en 3 s desde parado:\n- a lo largo (0°): 1,12 m;\n- 60°: 1,37 m;\n- 90°: 1,62–1,64 m;\n- 120°: 1,72–1,76 m;\n- empujando (180°): 0,73 m.\n\nEl resultado es igual en 2 sitios llanos × 3 giros del sofá. La especificación pide entre 0,3 y 1,5 m sin precisar dirección. tests/sim.test.ts (comentario sobre `it('T-grip-2/3 en llano…')`) solo mide `mx: -1`, a lo largo. Está documentado en los commits d328602 y eadedff («No cumple»), pero la suite queda en verde con el objetivo incumplido.",
+   "suggestion": "Dejar visible el incumplimiento con `it.fails` o `it.todo`, o con una prueba por dirección marcada como pendiente. Y corregir la física (por ejemplo, el rozamiento al pivotar sobre el extremo apoyado) hasta que 60–120° quede por debajo de 1,5 m."
+  },
+  {
+   "severity": "major",
+   "title": "El bucle de `main.ts` no está probado: si vuelve el fallo de pulsaciones perdidas (C3), las 62 pruebas pasan",
+   "evidence": "Las pruebas de T-input-1 (tests/input.test.ts:26) usan su propia copia del bucle (`function frame`) y nunca ejecutan `main.ts`.\n\nMutación M13 en una copia en /tmp: en `main.ts` se lee `input.step()` una vez por fotograma, antes de los pasos, y en los demás pasos se quitan grab y right. Es decir, la pulsación se pierde cuando el fotograma no ejecuta ningún paso. Resultado: «Tests 62 passed (62)» (`/tmp/claude-0/review-c1/rol-f-qa-b/mutate.sh`).\n\nEl código actual sí funciona: `scripts/audit/review-c1/rol-f-qa-b/presses-144hz.cjs` en Chromium, con 58 % de fotogramas sin paso, entrega 40/40 pulsaciones por tecla, cada una una sola vez.",
+   "suggestion": "Extraer el bucle de un fotograma a una función sin DOM (por ejemplo `runFrame(core, stepper, dt, step)`) que usen tanto `main.ts` como las pruebas, o añadir una prueba de navegador como `presses-144hz.cjs` a los scripts e2e."
+  },
+  {
+   "severity": "major",
+   "title": "T-phys-unify no comprueba que los ayudantes tengan la misma fuerza: ayudantes con el triple de fuerza pasan las 62 pruebas",
+   "evidence": "La prueba (tests/sim.test.ts, l. 646 y 667) hace `g.bots.clear()` antes de medir, así que nunca mide a un ayudante cargando.\n\nMutación M8 en src/sim/hand.ts, dentro de `HandRow.solve`: `boost = owner.human === null ? 3 : 1` aplicado a maxH y maxV. Resultado: «Tests 62 passed (62)».\n\nEn cambio, quitar el equilibrio a los ayudantes (M9) sí lo detecta T-phys-unify.",
+   "suggestion": "Medir la fuerza con ayudantes de verdad: por ejemplo, un ayudante solo agarrando un extremo, con su IA, debe arrastrar el sofá lo mismo que un humano; o comprobar `handForce` y la saturación al límite en los dos casos."
+  },
+  {
+   "severity": "major",
+   "title": "«¡Se escapa!» (gripBreak de T-grip-1) sin ninguna prueba positiva",
+   "evidence": "Mutación M4 en src/sim/carrier.ts, en `handResult`: la condición de soltar `if (this.gripStrain > CARRIER.gripHold || … )` se sustituye por `if (false)`. Resultado: «Tests 62 passed (62)». Ninguna prueba ni script e2e exige que el agarre se suelte al superar `gripBreak` durante `gripHold`. Solo se comprueba que no se suelta (T-grip-2 solo, T-coop).",
+   "suggestion": "Añadir una prueba en Node: dos porteadores tiran en sentidos opuestos de una caja ligera, o uno tira de algo anclado, y se comprueba que aparece un suceso gripBreak en un tiempo acotado y que la separación superaba `gripBreak`."
+  },
+  {
+   "severity": "major",
+   "title": "Un desplazamiento visual oculto (lo que T-coh-1 prohíbe) no se detecta",
+   "evidence": "Mutación M14 en src/view/doll/dollView.ts (rama de pie de `sync`): `s.pos = p - facing*0.15`, es decir, el muñeco se dibuja 15 cm por detrás de su cápsula. Resultado de tests/coherence.test.ts: «Tests 6 passed (6)». Las pruebas solo miden que el dibujo no se mete en nada (`drawnDepth`); no miden que coincida con la cápsula, así que alejar el muñeco ayuda a pasarlas.",
+   "suggestion": "En T-coh-1, comprobar con el muñeco de pie que su eje (pelvis o tronco) coincide en xz con el collider, por ejemplo a menos de 1 cm, en todos los escenarios; o añadir un grep contra visOff y pushOut como en T-input-3."
+  },
+  {
+   "severity": "minor",
+   "title": "T-coh-2 mide el campo `c.tilt` y no la pose real del collider",
+   "evidence": "tests/coherence.test.ts:191 y :314 usan `maxTilt = Math.max(maxTilt, c.tilt)`.\n\nMutación M7 en src/sim/carrier.ts: `applyTilt` vacío, de modo que el collider nunca se tumba. Solo falla 1 de las 6 pruebas de coherencia (la de la celda y la balda). Las de 6 direcciones junto al sofá, la pared y otro porteador, y la del coche, pasan porque un collider de pie no se solapa con nada.",
+   "suggestion": "Calcular la inclinación con `c.collider.rotation()` (ángulo del eje con la vertical) en lugar de con `c.tilt`."
+  },
+  {
+   "severity": "minor",
+   "title": "Al levantarse no se vuelve a comprobar el sitio: se mete 3–7,6 cm en el sofá si este se mueve; y tras 4 s se levanta aunque no quepa",
+   "evidence": "Partidas con pulsaciones al azar (`npx vite-node scripts/audit/review-c1/rol-f-qa-b/monkey-diag.ts 4 10 40`): 21 muestras en fase `rising` con solape mayor de 3 cm. Por ejemplo, t=29,27 J3 down=rising, solape con el sofá de -7,6 cm. `roomToRise()` solo se consulta al empezar a levantarse.\n\nAdemás, carrier.ts:530 (`|| this.waitRoom > CARRIER.maxWaitRoom`): con una losa fija a 1 m (`forced-rise.ts`) se levanta a los 4,6 s con 21 cm de solape y acaba con y = 0,50, es decir, 19 cm hundido en el suelo. La geometría es artificial.",
+   "suggestion": "Durante la fase `rising`, si deja de caber, volver a `lying` o reducir la inclinación con `freeTilt`. Al agotar `maxWaitRoom`, teletransportarse a un hueco libre en vez de levantarse dentro del obstáculo."
+  },
+  {
+   "severity": "minor",
+   "title": "Teletransportes sin comprobar el sitio (anteriores al ciclo): enderezar el sofá y devolver junto al sofá a un porteador perdido",
+   "evidence": "Partidas al azar con 4 humanos (monkey-diag.ts):\n- `tryRight` (game.ts:411, `setTranslation(p.y + 0.6)`) mete el sofá 14,9–18,9 cm en porteadores de pie (t=19,17: sofá y=1,08, solape -18,6 cm).\n- El regreso de un porteador perdido (game.ts:361, `teleport` a `sofá + (±1, +1,2, +1,5)`) lo deja 84,3 cm dentro de la fachada de la casa (t=13,53 J2, collider fijo en (0, 2, 19)).\n\nLa línea base da solapes iguales (base monkey: hasta 18,8 cm con el sofá y 28,2 cm con lo fijo).",
+   "suggestion": "Reutilizar `fits` o `intersectionsWithShape`, ya presentes desde este ciclo, para elegir un sitio libre al enderezar el sofá y al reaparecer junto a él."
+  },
+  {
+   "severity": "minor",
+   "title": "`duo-e2e`: la prueba de la pared admite cualquier objeto fijo según `touchesWall` del propio juego",
+   "evidence": "En scripts/duo-e2e.cjs (l. 277-290) el criterio deja de ser la posición de la valla (x ±7,8) o del límite de la calle (x ±18) y pasa a ser `g.touchesWall(c)`, que se hizo público para esto. En mi ejecución, J1 se paró en x=-5,58, z=5,32, «contra lo fijo de (-6,30, 5,30)»: la carretilla. Con el criterio anterior habría sido FALLA. Lo que se afirma (que no se cae) no cambia, pero la condición previa la valida el propio juego.",
+   "suggestion": "Validar el contacto con una consulta independiente en el script (`contactPairsWith` con su propio filtro) o buscar una dirección de carrera sin decoración hasta la valla."
+  },
+  {
+   "severity": "minor",
+   "title": "El coste por paso de simulación se duplica y `npm run perf` solo mide la media en modo ayudantes",
+   "evidence": "`npm run perf`, dos ejecuciones: HEAD da 0,246–0,398 ms por paso; la línea base (git archive 837dca7), 0,166–0,224 ms. `step-times.ts`, en la misma máquina y con la misma carga: medias de 0,18–0,35 ms frente a 0,10–0,15 ms.\n\nLos pasos lentos (`step-profile.ts`) son el arranque del JIT y ruido; el peor caso (5 pasos por fotograma) queda por debajo de unos 2 ms. `perf.ts` no cubre 2–4 humanos con `Autopilot.team` ni caídas, y solo da la media.",
+   "suggestion": "Ampliar `perf.ts` con p99 y máximo y con los modos de 2–4 humanos y caídas simultáneas, con un umbral que falle (por ejemplo, p99 menor de 2 ms)."
+  },
+  {
+   "severity": "minor",
+   "title": "Las pulsaciones durante la cuenta atrás se consumen y se descartan",
+   "evidence": "`main.ts:316` consume las pulsaciones con `input.step()` en cada paso. En game.ts:194, `const inp = playing ? inputs[c.human] ?? NO_INPUT : NO_INPUT`, así que en la cuenta atrás se ignoran. Un Espacio pulsado una fracción de segundo antes de «¡YA!» se pierde sin aviso.",
+   "suggestion": "No consumir las pulsaciones mientras `phase === 'countdown'` (o volver a guardarlas hasta el primer paso en juego), o mostrar una señal visual."
+  },
+  {
+   "severity": "minor",
+   "title": "Con física única, los ayudantes se caen a menudo en grupos grandes",
+   "evidence": "`sim-run.ts`, 16 semillas: 6 atentos, 52 caídas (3,3 por partida); 6 despistados, 64 (4 por partida); 5 despistados, 23. En la línea base, 0 en esos modos (no había equilibrio). Todas las partidas se ganan, pero hay ruido visual y sonoro continuo de «¡PATAPLOF!». Está reconocido en el commit eadedff.",
+   "suggestion": "En la IA de los ayudantes, evitar el contacto con otros porteadores al acercarse a su asa, o bajar su velocidad cuando hay gente cerca, sin tocar la física común."
+  }
+ ],
+ "strengths": [
+  "`tsc` sale limpio y Vitest pasa 62/62, estable en cuatro ejecuciones, dos de ellas en orden aleatorio, en unos 17 s.",
+  "No se ha rebajado ningún umbral numérico en tests/*.test.ts. Las dos pruebas quitadas (isCoop y alzar con Mayús) comprobaban mecánicas eliminadas y su sustitución está documentada; T-route añade además `g.time < RULES.timeLimit`.",
+  "T-input-1 comprobado en el `main.ts` real (Chromium, reloj falso a 144 Hz, `presses-144hz.cjs`): con el 58 % de fotogramas sin paso, 40/40 pulsaciones de Espacio, Intro y R llegan una sola vez; Start mantenido 10 fotogramas pausa una vez; 0 errores de consola.",
+  "Mandos simulados (`menu-pad.cjs`): el botón que despierta al mando no empieza la partida; con 4 jugadores, la nota del menú muestra mando 1 → J3 y mando 2 → J4; A empieza; A de cada mando agarra solo a su jugador ([0,0,1,1]); Start pausa y quita la pausa desde mandos distintos.",
+  "T-help muy por encima de lo pedido: `sim-run` gana 112/112 partidas (2–6 porteadores, atentos y despistados, semillas 1–16) frente a 94/112 de la línea base; 4 despistados con semillas 1–8: 8/8.",
+  "Física robusta fuera de los casos de prueba: T-coop sin fallos en 30 posiciones × 8 modos; escalera 15/15 con desplazamientos de ±0,4 m y giros de ±0,2 rad (entre dos, 3,7–3,8 s; uno solo nunca la sube); en partidas al azar con 4 humanos, sin NaN ni porteadores despedidos, mientras la línea base rompe el sofá y lanza porteadores a 22,9 m/s.",
+  "`e2e:teclado` da TODO OK y `e2e:duo` 20/20, con victoria en 33,3 s, sofá al 100 % y sin errores de consola.",
+  "Varias pruebas detectan regresiones reales al mutar el código: pulsaciones no consumidas (M1, 4 fallos), fuerza horizontal ×10 (M3, 4 fallos), caída sin buscar dirección libre (M5, 3 fallos), levantarse sin comprobar sitio (M6), ayudantes sin equilibrio (M9) y sin choque cuerpo-sofá al agarrar (M15, T-pen y T-coop).",
+  "Los commits informan con mediciones de lo que no se cumple (T-grip-2 de lado, más caídas con 6 ayudantes) en lugar de esconderlo."
+ ]
+}
