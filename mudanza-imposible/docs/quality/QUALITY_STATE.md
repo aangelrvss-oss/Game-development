@@ -96,7 +96,7 @@ Matices de la verificación sobre los críticos:
 |---|---|---|
 | 0 | Diagnóstico: auditoría protegida, línea base, dirección artística, checkpoint, estado persistente | **Cerrado** el 19-10-2026, ~21:05 UTC |
 | 1 | **Núcleo fiable**: entradas sin pérdidas (incluidos mandos y 4 jugadores); mano blanda con fuerza limitada y física única; alzado automático; cápsula a la anchura del muñeco y caída física sin `visOff`; pruebas de partida completa con 2, 3 y 4 jugadores. Especificación: [`cycles/ciclo-1.md`](cycles/ciclo-1.md) | **Implementado, revisado y corregido** (`7b67f61`: tsc OK, Vitest 71/71, `e2e:duo` 21/21, `e2e:teclado` OK). Crítico cerrado. Falta la segunda ronda de revisión (verificación de la corrección), que abre el ciclo 2. Un mayor (3.º y 4.º jugador sin papel) pasa al ciclo 2. |
-| 2 | Sistema de objetos (`ItemDef`) con objetos de varias manos y entrega en el camión con progreso; nivel como datos (`LevelDef`) con el recorrido actual como nivel de referencia; papel real para el 3.º y el 4.º jugador. Especificación: [`cycles/ciclo-2.md`](cycles/ciclo-2.md) | **En curso** (20-10-2026) |
+| 2 | Sistema de objetos (`ItemDef`) con objetos de varias manos y entrega en el camión con progreso; nivel como datos (`LevelDef`) con el recorrido actual como nivel de referencia; papel real para el 3.º y el 4.º jugador. Especificación: [`cycles/ciclo-2.md`](cycles/ciclo-2.md) | **En pausa por revisión humana** (20-10-2026, ~09:10 UTC). Los 3 pasos de implementación están hechos (`a84984f`, `ec1d620`, `23b8c66`, rama local `rebirth/ciclo-2`), pero **sin revisión independiente ni corrección**. |
 | 3 | Nivel 1 completo («Una casa imposible»), con aprendizaje integrado | Pendiente |
 | 4 | Personajes y assets con Blender (muebles, camión) siguiendo la dirección artística | Pendiente |
 | 5 | Niveles 2–4 (escaleras, calle, almacén) | Pendiente |
@@ -126,7 +126,12 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
   - Cada iteración ejecuta o integra un único ciclo y programa la siguiente con `ScheduleWakeup`, como latido de respaldo de 30 minutos.
   - La señal principal es el aviso de fin del flujo de agentes del ciclo.
 - **Estado:** reactivado el 19-10-2026 a las ~21:00 UTC, después de cerrar y proteger el ciclo 0.
-- **Ciclo actual:** 2, en curso (empieza con la segunda ronda de revisión del ciclo 1).
+- **Ciclo actual:** 2, en pausa.
+- **DETENIDO el 20-10-2026 a las ~08:15 UTC por petición del usuario (revisión humana).**
+  - `ScheduleWakeup` se paró y canceló el despertar pendiente; no queda ninguno programado.
+  - Se esperó a que el agente del paso 3 hiciera su commit (`23b8c66`, árbol limpio, sin bloqueos de Git) y después se detuvo el flujo `wf_a0c2d6f7-d64`. En ese momento solo corrían dos revisores de solo lectura.
+  - No ha empezado ningún ciclo nuevo.
+  - Para retomar el ciclo 2 en su revisión: `Workflow({scriptPath: <script rebirth-ciclo-2>, resumeFromRunId: "wf_a0c2d6f7-d64"})`. Las 5 llamadas terminadas (2 de re-revisión y 3 de implementación) vuelven de caché, y los revisores y la corrección se ejecutan de nuevo.
 - **Límite:** 8 ciclos completos.
 - **Se detiene:**
   - cuando se cumple el criterio de la sección 6;
