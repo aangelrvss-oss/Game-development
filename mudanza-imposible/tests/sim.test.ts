@@ -431,9 +431,7 @@ describe('Mano blanda y física única (ciclo 1)', () => {
     return r;
   }
 
-  // Arrastre a lo largo del sofá, alejándose de él. Tirando de lado, el sofá pivota sobre el extremo que queda en el
-  // suelo, que cuesta mucho menos: el centro avanza hasta 1,74 m en 3 s (ver scripts/grip-measure.ts); esa
-  // dirección no cumple el límite de 1,5 m de T-grip-2 y no se comprueba aquí.
+  // Arrastre a lo largo del sofá, alejándose de él (las demás direcciones, en la prueba siguiente)
   it('T-grip-2/3 en llano: uno solo levanta un extremo y lo arrastra despacio; entre dos lo llevan en el aire', () => {
     const solo = flat(false), duo = flat(true);
     // Uno solo: un extremo en alto, el otro por el suelo, y avanza despacio sin soltarse
@@ -447,6 +445,87 @@ describe('Mano blanda y física única (ciclo 1)', () => {
     expect(duo.minBase).toBeGreaterThan(0.1);
     expect(duo.d).toBeGreaterThan(2.5 * solo.d);
     expect(duo.holding).toEqual([true, true]);
+  });
+
+  /**
+   * Uno solo agarra el extremo -x y anda 3 s en la dirección `deg` respecto al eje del sofá: 0° alejándose a lo largo,
+   * 90° de lado (el sofá pivota sobre el extremo que queda en el suelo) y 180° empujándolo.
+   */
+  function soloToward(deg: number) {
+    const g = setup(2);
+    atEnd(g, 0, -1);
+    play(g, 0.3);
+    g.step(DT, [inp({ grab: true }), NO_INPUT]);
+    play(g, 0.5, () => [NO_INPUT, NO_INPUT]);
+    const s0 = g.sofaPos, a = (deg * Math.PI) / 180;
+    const ev = play(g, 3, () => [inp({ mx: -Math.cos(a), mz: -Math.sin(a) }), NO_INPUT]);
+    const r = { d: Math.hypot(g.sofaPos.x - s0.x, g.sofaPos.z - s0.z), holding: g.carriers[0].holding, breaks: count(ev, 'gripBreak') };
+    g.dispose();
+    return r;
+  }
+
+  // Antes solo se medía a lo largo: tirando de lado, el sofá pivotaba sobre el extremo apoyado y el centro avanzaba
+  // 1,63–1,76 m en 3 s a 90–120°. Ahora la mano tira de lado con menos fuerza (`HAND.lateral`).
+  it('T-grip-2 en todas las direcciones (0–180°, cada 15°): uno solo lo arrastra despacio, sin soltarse', () => {
+    for (let deg = 0; deg <= 180; deg += 15) {
+      const r = soloToward(deg);
+      expect(r.d, `${deg}°`).toBeGreaterThan(0.3);
+      expect(r.d, `${deg}°`).toBeLessThan(1.5);
+      expect(r.holding, `${deg}°`).toBe(true);
+      expect(r.breaks, `${deg}°`).toBe(0);
+    }
+  });
+
+  /** Pone al porteador i a 0,75 m de un punto local (lx, lz) del sofá, hacia fuera en la dirección local (ox, oz), mirándolo. */
+  function near(g: Game, i: number, lx: number, lz: number, ox: number, oz: number) {
+    const a = localToWorld(g.sofa, { x: lx, y: 0, z: lz }), o = localToWorld(g.sofa, { x: lx + ox * 0.75, y: 0, z: lz + oz * 0.75 });
+    const c = g.carriers[i], l = Math.hypot(a.x - o.x, a.z - o.z);
+    c.teleport({ x: o.x, y: standY, z: o.z });
+    c.facing = { x: (a.x - o.x) / l, z: (a.z - o.z) / l };
+  }
+
+  it('T-grip-1, tira y afloja: tres contra uno, al que pierde se le escapa el sofá («¡Se escapa!») en vez de arrastrarle contra lo que pide; dos contra dos, nadie arrastra a nadie', () => {
+    const h = SOFA.half;
+    // Tres tiran hacia -x (un extremo y los dos costados) y uno, en el otro extremo, hacia +x
+    const g = setup(4);
+    near(g, 0, -h.x, 0, -1, 0); near(g, 1, -0.5, h.z, 0, 1); near(g, 2, -0.5, -h.z, 0, -1); near(g, 3, h.x, 0, 1, 0);
+    play(g, 0.3);
+    g.step(DT, g.carriers.map(() => inp({ grab: true })));
+    play(g, 0.5, () => g.carriers.map(() => NO_INPUT));
+    expect(g.carriers.every((c) => c.holding)).toBe(true);
+    const loner = g.carriers[3], x0 = loner.pos.x;
+    let dragged = 0, broke = -1, sepBefore = 0;
+    for (let t = 0; t < 4 && broke < 0; t += DT) {
+      // Separación entre su mano y el punto agarrado antes del paso en que se suelta
+      const gw = loner.grabWorld(), hw = loner.handWorld();
+      const sep = gw ? Math.hypot(gw.x - hw.x, gw.y - hw.y, gw.z - hw.z) : 0;
+      g.step(DT, [inp({ mx: -1 }), inp({ mx: -1 }), inp({ mx: -1 }), inp({ mx: 1 })]);
+      dragged = Math.min(dragged, loner.pos.x - x0);
+      if (g.out.some((e) => e.type === 'gripBreak' && e.carrier === loner.id)) { broke = t; sepBefore = sep; }
+    }
+    // Se suelta pronto, por la regla de T-grip-1 (la mano, separada más que `gripBreak`), y casi sin ser arrastrado
+    expect(broke).toBeGreaterThan(0);
+    expect(broke).toBeLessThan(2);
+    expect(sepBefore).toBeGreaterThan(CARRIER.gripBreak);
+    expect(dragged).toBeGreaterThan(-0.3);
+    expect(loner.holding).toBe(false);
+    expect(g.carriers.slice(0, 3).every((c) => c.holding)).toBe(true);
+    g.dispose();
+
+    // Dos contra dos (extremo y costado en cada lado), 4 s: tablas; nadie se ve arrastrado hacia el otro lado
+    const g2 = setup(4);
+    near(g2, 0, -h.x, 0, -1, 0); near(g2, 1, -0.5, h.z, 0, 1); near(g2, 2, h.x, 0, 1, 0); near(g2, 3, 0.5, -h.z, 0, -1);
+    play(g2, 0.3);
+    g2.step(DT, g2.carriers.map(() => inp({ grab: true })));
+    play(g2, 0.5, () => g2.carriers.map(() => NO_INPUT));
+    expect(g2.carriers.every((c) => c.holding)).toBe(true);
+    const sign = [-1, -1, 1, 1], xs = g2.carriers.map((c) => c.pos.x), worst = [0, 0, 0, 0];
+    play(g2, 4, (g) => {
+      g.carriers.forEach((c, i) => { worst[i] = Math.min(worst[i], (c.pos.x - xs[i]) * sign[i]); });
+      return sign.map((s) => inp({ mx: s }));
+    });
+    for (const w of worst) expect(w).toBeGreaterThan(-0.3);
+    g2.dispose();
   });
 
   /** Sofá a lo largo al pie de la escalera; agarran uno (delante o detrás) o los dos y empujan hacia arriba. */
@@ -639,6 +718,32 @@ describe('Mano blanda y física única (ciclo 1)', () => {
     expect(HAND.maxV).toBeLessThan(SOFA.mass * 9.81); // el sofá pesa más de lo que sostiene una persona
   });
 
+  it('T-auto-lift: tras arrastrar solo 20 s, el aviso «Pesa mucho» se va en cuanto agarra el compañero, y poco después de dejar de arrastrar', () => {
+    const g = setup(2);
+    atEnd(g, 0, -1);
+    play(g, 0.3);
+    g.step(DT, [inp({ grab: true }), NO_INPUT]);
+    // 20 s arrastrándolo solo, a un lado y a otro para no salir del descampado
+    let t = 0;
+    play(g, 20, () => { t += DT; return [inp({ mx: Math.sin(t * 0.6) >= 0 ? -1 : 1 }), NO_INPUT]; });
+    expect(g.heavyAlone).toBe(g.carriers[0]);
+    // Llega el compañero al otro extremo y agarra: el aviso se va en menos de 0,3 s
+    atEnd(g, 1, 1);
+    g.step(DT, [inp({ mx: -1 }), inp({ grab: true })]);
+    expect(g.carriers[1].holding).toBe(true);
+    let linger = 0;
+    for (let i = 0; i < 120 && g.heavyAlone; i++) { g.step(DT, [inp({ mx: -1 }), inp({ mx: -1 })]); linger += DT; }
+    expect(linger).toBeLessThan(0.3);
+    // Si suelta el compañero y vuelve a arrastrar solo, vuelve el aviso; al parar, se va en menos de 0,3 s
+    g.step(DT, [NO_INPUT, inp({ grab: true })]);
+    play(g, 3, () => [inp({ mx: -1 }), NO_INPUT]);
+    expect(g.heavyAlone).toBe(g.carriers[0]);
+    linger = 0;
+    for (let i = 0; i < 120 && g.heavyAlone; i++) { g.step(DT, [NO_INPUT, NO_INPUT]); linger += DT; }
+    expect(linger).toBeLessThan(0.3);
+    g.dispose();
+  });
+
   it('T-phys-unify: con ayudantes la física es la misma (mismo sofá, misma fuerza y mismo equilibrio)', () => {
     // Uno solo arrastrando el sofá: igual en una partida con ayudantes que en una solo de humanos
     const drag = (humans: number, carriers: number) => {
@@ -662,6 +767,38 @@ describe('Mano blanda y física única (ciclo 1)', () => {
     expect(helperDrag.mass).toBeCloseTo(coopDrag.mass, 3);
     expect(helperDrag.friction).toBe(coopDrag.friction);
     expect(helperDrag.d).toBeCloseTo(coopDrag.d, 2);
+    // Un ayudante de verdad (con su cerebro) arrastra el sofá solo como un humano: mismo asa (el extremo -x), misma
+    // dirección (imita al humano, que lleva una caja ligera aparte) y la misma fuerza máxima por persona. Antes la
+    // prueba quitaba los cerebros y nunca medía a un ayudante cargando: con el triple de fuerza también pasaba.
+    const pull = (helper: boolean) => {
+      const g = new Game(RAPIER, { humans: 1, carriers: 2, botStyle: 'atentos', seed: 1 });
+      if (!helper) g.bots.clear();
+      g.phase = 'playing'; g.countdown = 0;
+      g.sofa.setTranslation({ x: OPEN.x, y: 0.25, z: OPEN.z }, true);
+      const { body } = box(g, 10, { x: OPEN.x + 3, z: OPEN.z - 8 });
+      g.carriers.forEach((c, i) => c.teleport({ x: OPEN.x + 5 + i * 1.5, y: standY, z: OPEN.z + 6 }));
+      play(g, 0.5);
+      const me = g.carriers[0], who = g.carriers[helper ? 1 : 0], a = localToWorld(g.sofa, SLOTS[1].p);
+      who.teleport({ x: a.x - 0.6, y: standY, z: a.z }); who.facing = { x: 1, z: 0 };
+      if (helper) { me.teleport({ x: OPEN.x + 3.95, y: standY, z: OPEN.z - 8 }); me.facing = { x: -1, z: 0 }; }
+      play(g, 0.3);
+      if (helper) g.step(DT, [inp({ grab: true })]); // el humano agarra la caja; el ayudante, su asa
+      else { me.grab(g.sofa, a); g.step(DT, [NO_INPUT]); }
+      play(g, 0.5, () => [NO_INPUT]);
+      const ok = who.heldBody === g.sofa && (!helper || me.heldBody === body);
+      const s0 = g.sofaPos;
+      let maxF = 0;
+      play(g, 3, () => { maxF = Math.max(maxF, Math.hypot(who.handForce.x, who.handForce.z)); return [inp({ mx: -1 })]; });
+      const r = { ok, d: Math.hypot(g.sofaPos.x - s0.x, g.sofaPos.z - s0.z), maxF, holding: who.heldBody === g.sofa };
+      g.dispose();
+      return r;
+    };
+    const byHuman = pull(false), byHelper = pull(true);
+    expect(byHuman.ok && byHelper.ok).toBe(true);
+    expect(byHuman.holding && byHelper.holding).toBe(true);
+    // El ayudante empieza 10 pasos tarde (su retraso de reacción): algo menos de distancia, nunca más de un 25 % de diferencia
+    expect(Math.abs(byHelper.d / byHuman.d - 1)).toBeLessThan(0.25);
+    for (const r of [byHuman, byHelper]) expect(r.maxF).toBeLessThanOrEqual(HAND.maxH + 1);
     // Un ayudante también pierde el equilibrio si le arrollan a la carrera
     const g = new Game(RAPIER, { humans: 1, carriers: 2, botStyle: 'atentos', seed: 1 });
     g.bots.clear();

@@ -13,7 +13,11 @@
 //
 // La fuerza horizontal baja con la velocidad a la que el objeto ya avanza en el sentido del tirón (ley de Hill,
 // como un músculo): una caja ligera se lleva casi a la velocidad de carga, y algo que roza mucho a rastras (el
-// sofá con un solo porteador) avanza despacio. El porteador no se aleja de su mano (`Carrier.control`).
+// sofá con un solo porteador) avanza despacio. También depende de la dirección respecto a hacia dónde mira quien
+// agarra (`HAND.lateral`): de lado, con los brazos, se tira con menos fuerza que hacia atrás o empujando de frente.
+// Sin eso, uno solo tirando de lado hacía pivotar el sofá sobre el extremo apoyado y lo movía más deprisa que a lo
+// largo (el centro, 1,63–1,76 m en 3 s a 90–120°; ver `scripts/grip-measure.ts`). El porteador no se aleja de su
+// mano (`Carrier.control`).
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { localToWorld } from './sofa';
 import type { Vec3 } from './types';
@@ -38,6 +42,12 @@ export const HAND = {
   hillKnee: 0.3,
   /** Iteraciones del reparto entre varias manos sobre el mismo objeto. */
   iterations: 4,
+  /**
+   * Fuerza horizontal de lado, como fracción de `maxH`: tirar hacia atrás (echando el peso del cuerpo) o empujar de
+   * frente rinde más que tirar de lado con los brazos. Lo que puede la mano forma una elipse alrededor de hacia
+   * dónde mira el porteador: `maxH` de frente y de espaldas, `lateral`·`maxH` de lado.
+   */
+  lateral: 0.45,
 };
 
 type M3 = number[]; // 3×3 por filas
@@ -62,6 +72,8 @@ export interface HandOwner {
   grabLocal: Vec3 | null;
   /** Mano (objetivo del muelle) en el mundo. */
   handWorld(): Vec3;
+  /** Hacia dónde mira, en horizontal (unitario): agarrando, hacia lo que agarra. */
+  readonly facing: { x: number; z: number };
 }
 
 /** Resultado de la mano en un paso, para el porteador (aviso, esfuerzo, soltar). */
@@ -167,7 +179,10 @@ class HandRow {
     let nx = a.x + d.x, ny = a.y + d.y, nz = a.z + d.z;
     const hz = Math.hypot(nx, nz);
     const along = hz > 1e-9 ? (this.vGrab.x * nx + this.vGrab.z * nz) / hz : 0;
-    const maxH = HAND.maxH * hill(along / HAND.hillSpeed) * this.dt, maxV = HAND.maxV * this.dt;
+    // Elipse de fuerza: de frente o de espaldas, `maxH`; de lado, `lateral`·`maxH`
+    const f = this.owner.facing, fwd = hz > 1e-9 ? (f.x * nx + f.z * nz) / hz : 1, side = Math.sqrt(Math.max(0, 1 - fwd * fwd));
+    const reach = 1 / Math.hypot(fwd, side / HAND.lateral);
+    const maxH = HAND.maxH * reach * hill(along / HAND.hillSpeed) * this.dt, maxV = HAND.maxV * this.dt;
     this.satH = hz > maxH;
     if (this.satH) { nx *= maxH / hz; nz *= maxH / hz; }
     this.satV = Math.abs(ny) > maxV;

@@ -1,7 +1,9 @@
 import * as THREE from 'three';
-import { CARRIER, CENTER_Y, type Carrier } from '../sim/carrier';
+import type RAPIER from '@dimforge/rapier3d-compat';
+import { CARRIER, CENTER_Y, DOLL_HEIGHT, type Carrier } from '../sim/carrier';
 import { mat, PALETTE } from './materials';
 import { textSprite } from './text';
+import { TiltFit } from './tiltFit';
 import type { Fx } from './fx';
 
 export const PLAYER_COLORS = ['#facc15', '#22d3ee', '#f472b6', '#a3e635'];
@@ -42,8 +44,6 @@ interface Rig {
   legs: THREE.Group[];
   /** Hombros en coordenadas del torso. */
   shoulders: THREE.Vector3[];
-  /** Boca del perro (agarra con los dientes), en coordenadas de la cabeza. */
-  snout?: THREE.Vector3;
   armColor: string;
   handColor: string;
   armR: number;
@@ -54,7 +54,6 @@ interface Rig {
   shout: THREE.Mesh;
   wobbly: THREE.Object3D[];
   tail?: THREE.Object3D;
-  quadruped: boolean;
   headR: number;
 }
 
@@ -76,7 +75,7 @@ function face(head: THREE.Group, R: number, rig: Pick<Rig, 'pupils' | 'eyes' | '
       rig.brows.push(brow);
     }
     if (o.glasses) {
-      const ring = mesh(new THREE.TorusGeometry(r * 1.35, 0.012, 6, 16), '#111827', head, p.x, p.y, p.z - 0.03, 0);
+      const ring = mesh(new THREE.TorusGeometry(r * 1.35, 0.012, 6, 16), '#111827', head, p.x, p.y, p.z, 0);
       void ring;
     }
   }
@@ -95,14 +94,22 @@ function mouth(head: THREE.Group, R: number, y = -0.38) {
 function leg(parent: THREE.Object3D, x: number, hipY: number, len: number, r: number, pants: string, shoe: string, shoeSize = 1) {
   const hip = new THREE.Group();
   hip.position.set(x, hipY, 0);
+  // Piernas y pies no cuentan para caber en la cápsula (como en el muñeco): apoyados en el suelo a un lado del eje,
+  // siempre quedan fuera de su media esfera de abajo
+  hip.userData.limb = true;
   parent.add(hip);
   mesh(new THREE.CapsuleGeometry(r, Math.max(0.01, len - r * 2), 4, 8), pants, hip, 0, -len / 2, 0, 0.022);
-  const s = mesh(new THREE.SphereGeometry(0.1 * shoeSize, 10, 8), shoe, hip, 0, -len + 0.03, -0.05, 0);
+  // El zapato apoya en el suelo (todas las piernas acaban a 2 cm de él): antes se metía hasta 3 cm
+  const s = mesh(new THREE.SphereGeometry(0.1 * shoeSize, 10, 8), shoe, hip, 0, -len - 0.02 + 0.06 * shoeSize, -0.05, 0);
   s.scale.set(0.85, 0.6, 1.35);
   return hip;
 }
 
-/** Personaje de caricatura con primitivas. Coordenadas: y = 0 en los pies, mira hacia -z. */
+/**
+ * Personaje de caricatura con primitivas. Coordenadas: y = 0 en los pies, mira hacia -z. Cada uno cabe en la cápsula
+ * física de pie (radio `CARRIER.radius`, alto `DOLL_HEIGHT`): lo comprueba `tests/coherence.test.ts` y, por si algún
+ * adorno se pasa, `CarrierView` lo reduce a escala (`fitScale`).
+ */
 function buildRig(cast: Carrier['cast']['cast']): Rig {
   const pivot = new THREE.Group();
   const body = new THREE.Group();
@@ -111,71 +118,37 @@ function buildRig(cast: Carrier['cast']['cast']): Rig {
   const head = new THREE.Group();
   const rig: Rig = {
     pivot, body, torso, head, legs: [], shoulders: [], armColor: SKIN, handColor: SKIN, armR: 0.055,
-    pupils: [], eyes: [], brows: [], smile: null!, shout: null!, wobbly: [], quadruped: false, headR: 0.27,
+    pupils: [], eyes: [], brows: [], smile: null!, shout: null!, wobbly: [], headR: 0.27,
   };
-
-  if (cast === 'perro') {
-    // Salchicha: cuerpo largo, cuatro patas, orejas que bailan y rabo que se agita
-    rig.quadruped = true;
-    const brown = '#a1582b', dark = '#6b3416';
-    torso.position.set(0, 0.36, 0);
-    body.add(torso);
-    const trunk = mesh(new THREE.CapsuleGeometry(0.2, 0.62, 6, 14), brown, torso, 0, 0, 0, 0.03);
-    trunk.rotation.x = Math.PI / 2;
-    mesh(new THREE.SphereGeometry(0.17, 12, 8), '#e9b886', torso, 0, -0.08, -0.05, 0).scale.set(1, 0.6, 2.2);
-    head.position.set(0, 0.24, -0.5);
-    torso.add(head);
-    rig.headR = 0.2;
-    mesh(new THREE.SphereGeometry(0.2, 14, 10), brown, head, 0, 0, 0, 0.03);
-    const muzzle = mesh(new THREE.CapsuleGeometry(0.1, 0.16, 4, 10), brown, head, 0, -0.06, -0.2, 0.02);
-    muzzle.rotation.x = Math.PI / 2;
-    mesh(new THREE.SphereGeometry(0.06, 8, 6), '#1f1a2e', head, 0, -0.03, -0.38, 0);
-    rig.snout = new THREE.Vector3(0, -0.1, -0.36);
-    for (const s of [-1, 1]) {
-      const ear = new THREE.Group();
-      ear.position.set(s * 0.16, 0.08, 0.02);
-      head.add(ear);
-      const e = mesh(new THREE.CapsuleGeometry(0.07, 0.2, 4, 8), dark, ear, 0, -0.14, 0, 0.02);
-      e.scale.z = 0.45;
-      ear.rotation.z = s * 0.25;
-      rig.wobbly.push(ear);
-    }
-    face(head, 0.2, rig, { eyeY: 0.3 });
-    const m = mouth(head, 0.2, -0.55);
-    rig.smile = m.smile; rig.shout = m.shout;
-    mesh(new THREE.TorusGeometry(0.17, 0.04, 6, 14), '#ef4444', torso, 0, 0.06, -0.36, 0).rotation.x = Math.PI / 2.3;
-    for (const z of [-0.3, 0.3]) for (const s of [-1, 1]) {
-      const l = leg(torso, s * 0.12, -0.08, 0.26, 0.05, brown, dark, 0.7);
-      l.position.z = z;
-      rig.legs.push(l);
-    }
-    const tail = new THREE.Group();
-    tail.position.set(0, 0.06, 0.48);
-    torso.add(tail);
-    mesh(new THREE.CapsuleGeometry(0.035, 0.26, 4, 6), brown, tail, 0, 0.12, 0.06, 0.015).rotation.x = -0.6;
-    rig.tail = tail;
-    return rig;
-  }
 
   type Spec = { hipY: number; legLen: number; legR: number; hipX: number; tr: number; tl: number; tY: number; tScale: [number, number, number]; headR: number; headY: number; sh: [number, number]; shirt: string; pants: string; shoe: string; skin: string };
   const S: Record<string, Spec> = {
-    mono: { hipY: 0.38, legLen: 0.36, legR: 0.045, hipX: 0.1, tr: 0.23, tl: 0.2, tY: 0.3, tScale: [1, 1, 0.9], headR: 0.27, headY: 0.86, sh: [0.25, 0.52], shirt: '#8b5cf6', pants: SKIN, shoe: '#1f2937', skin: SKIN },
-    rulos: { hipY: 0.36, legLen: 0.34, legR: 0.05, hipX: 0.11, tr: 0.26, tl: 0.16, tY: 0.3, tScale: [1, 1, 0.95], headR: 0.27, headY: 0.84, sh: [0.27, 0.5], shirt: '#ec4899', pants: SKIN, shoe: '#f9a8d4', skin: SKIN },
-    gordo: { hipY: 0.3, legLen: 0.28, legR: 0.075, hipX: 0.17, tr: 0.36, tl: 0.1, tY: 0.32, tScale: [1.18, 1, 1.12], headR: 0.25, headY: 0.82, sh: [0.42, 0.52], shirt: '#f8fafc', pants: '#2563eb', shoe: '#1f2937', skin: '#eea27c' },
-    alien: { hipY: 0.3, legLen: 0.28, legR: 0.05, hipX: 0.1, tr: 0.21, tl: 0.16, tY: 0.26, tScale: [1, 1, 0.9], headR: 0.34, headY: 0.86, sh: [0.22, 0.42], shirt: '#c7d2fe', pants: '#4ade80', shoe: '#64748b', skin: '#4ade80' },
-    enano: { hipY: 0.24, legLen: 0.22, legR: 0.06, hipX: 0.12, tr: 0.25, tl: 0.1, tY: 0.26, tScale: [1.05, 1, 1], headR: 0.28, headY: 0.72, sh: [0.27, 0.42], shirt: '#2563eb', pants: '#1e40af', shoe: '#78350f', skin: SKIN },
+    // Todos caben de pie en la cápsula física (1,38 m de alto y 0,32 m de radio, con la parte de arriba redonda):
+    // cabezas un poco más bajas y faldas que no se abren por debajo de la cadera
+    mono: { hipY: 0.38, legLen: 0.36, legR: 0.045, hipX: 0.1, tr: 0.23, tl: 0.2, tY: 0.3, tScale: [1, 1, 0.9], headR: 0.26, headY: 0.7, sh: [0.25, 0.52], shirt: '#8b5cf6', pants: SKIN, shoe: '#1f2937', skin: SKIN },
+    rulos: { hipY: 0.36, legLen: 0.34, legR: 0.05, hipX: 0.11, tr: 0.26, tl: 0.16, tY: 0.3, tScale: [1, 1, 0.95], headR: 0.25, headY: 0.7, sh: [0.27, 0.5], shirt: '#ec4899', pants: SKIN, shoe: '#f9a8d4', skin: SKIN },
+    // El más ancho del reparto, pero dentro de la cápsula (antes salía 19,5 cm por los lados: barriga y pantalón)
+    gordo: { hipY: 0.3, legLen: 0.28, legR: 0.075, hipX: 0.15, tr: 0.29, tl: 0.1, tY: 0.32, tScale: [1, 1, 0.93], headR: 0.25, headY: 0.78, sh: [0.33, 0.52], shirt: '#f8fafc', pants: '#2563eb', shoe: '#1f2937', skin: '#eea27c' },
+    // Cabeza grande y ojo de cíclope, con las antenas dentro de la cápsula (antes salían 47 cm por arriba)
+    alien: { hipY: 0.3, legLen: 0.28, legR: 0.05, hipX: 0.1, tr: 0.21, tl: 0.16, tY: 0.26, tScale: [1, 1, 0.9], headR: 0.26, headY: 0.62, sh: [0.22, 0.42], shirt: '#c7d2fe', pants: '#4ade80', shoe: '#64748b', skin: '#4ade80' },
+    // Salchicha de pie sobre las patas de atrás: el cuerpo largo va en vertical, a lo largo de la cápsula. A cuatro
+    // patas medía 1,8 m de largo y salía 67 cm por delante y por detrás de su cápsula (y tumbado, 61 cm bajo el suelo)
+    perro: { hipY: 0.26, legLen: 0.24, legR: 0.07, hipX: 0.11, tr: 0.2, tl: 0.42, tY: 0.4, tScale: [1, 1, 1.05], headR: 0.21, headY: 0.87, sh: [0.19, 0.62], shirt: '#a1582b', pants: '#a1582b', shoe: '#6b3416', skin: '#a1582b' },
+    enano: { hipY: 0.24, legLen: 0.22, legR: 0.06, hipX: 0.12, tr: 0.25, tl: 0.1, tY: 0.26, tScale: [1.05, 1, 1], headR: 0.26, headY: 0.72, sh: [0.27, 0.42], shirt: '#2563eb', pants: '#1e40af', shoe: '#78350f', skin: SKIN },
   };
   const s = S[cast];
   rig.headR = s.headR;
   rig.armColor = cast === 'gordo' || cast === 'alien' ? s.skin : s.shirt;
-  rig.handColor = s.skin;
-  rig.armR = cast === 'gordo' ? 0.075 : 0.055;
+  rig.handColor = cast === 'perro' ? s.shoe : s.skin;
+  rig.armR = cast === 'gordo' ? 0.075 : cast === 'perro' ? 0.05 : 0.055;
   for (const sx of [-1, 1]) rig.legs.push(leg(body, sx * s.hipX, s.hipY, s.legLen, s.legR, s.pants, s.shoe, cast === 'rulos' ? 1.25 : 1));
   torso.position.set(0, s.hipY, 0);
   body.add(torso);
   const t = mesh(new THREE.CapsuleGeometry(s.tr, s.tl, 6, 16), s.shirt, torso, 0, s.tY, 0, 0.032);
   t.scale.set(...s.tScale);
-  head.position.set(0, s.headY, 0);
+  // Perro, alien y enano llevan la cabeza un poco atrás para que el hocico, el ojo o la nariz no salgan de la cápsula
+  // (la abuela del moño, más: va encorvada y la cabeza se le adelanta)
+  head.position.set(0, s.headY, ({ perro: 0.04, alien: 0.045, enano: 0.01, mono: 0.085 } as Record<string, number>)[cast] ?? 0);
   torso.add(head);
   mesh(new THREE.SphereGeometry(s.headR, 16, 12), s.skin, head, 0, 0, 0, 0.032);
   rig.shoulders = [new THREE.Vector3(-s.sh[0], s.sh[1], 0), new THREE.Vector3(s.sh[0], s.sh[1], 0)];
@@ -185,64 +158,89 @@ function buildRig(cast: Carrier['cast']['cast']): Rig {
   if (cast === 'mono') {
     // Abuela con moño, gafas y falda; algo encorvada
     torso.rotation.x = -0.12;
-    const skirt = mesh(new THREE.CylinderGeometry(0.22, 0.34, 0.4, 16), '#6d28d9', torso, 0, 0.02, 0, 0.03);
+    const skirt = mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.34, 16), '#6d28d9', torso, 0, 0.07, 0, 0.03);
     void skirt;
     const hair = cap('#f1f5f9', Math.PI / 1.7);
     hair.rotation.x = 0.35;
-    const bun = mesh(new THREE.SphereGeometry(0.15, 14, 10), '#f8fafc', head, 0, R + 0.06, 0.1, 0.025);
+    // Moño pequeño en la coronilla, un poco hacia atrás (más grande o más alto, no cabría en la cápsula)
+    const bun = mesh(new THREE.SphereGeometry(0.09, 14, 10), '#f8fafc', head, 0, R - 0.02, 0.1, 0.025);
     rig.wobbly.push(bun);
     face(head, R, rig, { glasses: true });
-    mesh(new THREE.SphereGeometry(0.05, 8, 6), '#f0a98a', head, 0, -0.03, -R - 0.01, 0);
+    mesh(new THREE.SphereGeometry(0.05, 8, 6), '#f0a98a', head, 0, -0.03, -R + 0.01, 0);
   } else if (cast === 'rulos') {
     // Abuela en bata con rulos y zapatillas de borla
-    mesh(new THREE.CylinderGeometry(0.25, 0.33, 0.42, 16), '#f472b6', torso, 0, 0.02, 0, 0.03);
+    mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.34, 16), '#f472b6', torso, 0, 0.07, 0, 0.03);
     const hair = cap('#c084fc', Math.PI / 1.8);
     hair.rotation.x = 0.25;
     // Rulos: cilindros pequeños siguiendo la curva del cráneo
     [[-0.5, 0.75, 0.2], [0, 0.85, 0.15], [0.5, 0.75, 0.2], [-0.35, 0.55, 0.6], [0.35, 0.55, 0.6]].forEach(([x, y, z], i) => {
-      const p = onSphere(R + 0.03, x, y, z);
+      const p = onSphere(R + 0.02, x, y, z);
       const c = mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.13, 10), ['#60a5fa', '#facc15', '#34d399'][i % 3], head, p.x, p.y, p.z, 0.012);
       c.rotation.z = Math.PI / 2;
     });
     face(head, R, rig);
-    mesh(new THREE.SphereGeometry(0.05, 8, 6), '#f0a98a', head, 0, -0.03, -R - 0.01, 0);
+    mesh(new THREE.SphereGeometry(0.05, 8, 6), '#f0a98a', head, 0, -0.03, -R + 0.01, 0);
   } else if (cast === 'gordo') {
     // Grandullón en camiseta de tirantes, barriga, calvo con bigote
-    mesh(new THREE.SphereGeometry(0.3, 16, 12), s.shirt, torso, 0, 0.26, -0.16, 0.03);
-    mesh(new THREE.CylinderGeometry(0.42, 0.4, 0.2, 18), s.pants, torso, 0, 0.02, 0, 0.03);
-    const ring = mesh(new THREE.TorusGeometry(R * 0.86, 0.09, 6, 18, Math.PI * 1.2), '#4a2c12', head, 0, 0.02, 0.02, 0);
+    mesh(new THREE.SphereGeometry(0.22, 16, 12), s.shirt, torso, 0, 0.26, -0.07, 0.03);
+    mesh(new THREE.CylinderGeometry(0.3, 0.29, 0.2, 18), s.pants, torso, 0, 0.02, 0, 0.03);
+    const ring = mesh(new THREE.TorusGeometry(R * 0.84, 0.07, 6, 18, Math.PI * 1.2), '#4a2c12', head, 0, 0.02, 0.02, 0);
     ring.rotation.set(Math.PI / 2, 0, -Math.PI * 0.1 - Math.PI / 2 + Math.PI);
     face(head, R, rig);
     const ms = onSphere(R, 0, -0.22, -0.97);
     mesh(new THREE.CapsuleGeometry(0.035, 0.14, 4, 8), '#4a2c12', head, ms.x, ms.y, ms.z - 0.02, 0).rotation.z = Math.PI / 2;
-    mesh(new THREE.SphereGeometry(0.06, 8, 6), '#f0a98a', head, 0, -0.04, -R - 0.01, 0);
+    mesh(new THREE.SphereGeometry(0.06, 8, 6), '#f0a98a', head, 0, -0.04, -R + 0.01, 0);
   } else if (cast === 'alien') {
-    // Un solo ojo enorme, dos antenas que se bambolean; pie en el suelo
+    // Un solo ojo enorme, dos antenas cortas que se bambolean; pie en el suelo
     mesh(new THREE.TorusGeometry(0.2, 0.035, 6, 18), '#94a3b8', torso, 0, 0.12, 0, 0).rotation.x = Math.PI / 2;
     face(head, R, rig, { cyclops: true, eyeY: 0.05 });
     for (const sx of [-1, 1]) {
       const ant = new THREE.Group();
-      ant.position.set(sx * 0.12, R * 0.85, 0);
+      ant.position.set(sx * 0.07, R * 0.85, 0);
       head.add(ant);
-      mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.3, 6), '#166534', ant, 0, 0.15, 0, 0);
-      mesh(new THREE.SphereGeometry(0.06, 10, 8), '#bef264', ant, 0, 0.32, 0, 0.015);
-      ant.rotation.z = -sx * 0.35;
-      ant.userData.base = -sx * 0.35;
+      mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.1, 6), '#166534', ant, 0, 0.05, 0, 0);
+      mesh(new THREE.SphereGeometry(0.04, 10, 8), '#bef264', ant, 0, 0.11, 0, 0.015);
+      ant.rotation.z = -sx * 0.25;
+      ant.userData.base = -sx * 0.25;
       rig.wobbly.push(ant);
     }
   } else if (cast === 'enano') {
     // Bajito con casco de obra, barba naranja enorme y peto
     mesh(new THREE.BoxGeometry(0.34, 0.22, 0.04), s.pants, torso, 0, 0.3, -s.tr * 0.98, 0);
-    const helmet = cap('#facc15', Math.PI / 2, 0.035);
-    mesh(new THREE.CylinderGeometry(R + 0.08, R + 0.08, 0.03, 20), '#eab308', head, 0, 0.02, -0.03, 0.01);
+    const helmet = cap('#facc15', Math.PI / 2, 0.02);
+    mesh(new THREE.CylinderGeometry(R + 0.03, R + 0.03, 0.03, 20), '#eab308', head, 0, 0.02, -0.01, 0.01);
     void helmet;
-    const beard = mesh(new THREE.ConeGeometry(0.24, 0.5, 12), '#f97316', head, 0, -0.32, -0.13, 0.025);
+    const beard = mesh(new THREE.ConeGeometry(0.2, 0.46, 12), '#f97316', head, 0, -0.3, -0.08, 0.025);
     beard.rotation.x = Math.PI + 0.25;
     rig.wobbly.push(beard);
     face(head, R, rig, { eyeY: 0.18 });
-    mesh(new THREE.SphereGeometry(0.07, 8, 6), '#f0a98a', head, 0, 0.0, -R - 0.02, 0);
+    mesh(new THREE.SphereGeometry(0.05, 8, 6), '#f0a98a', head, 0, 0.0, -R + 0.02, 0);
+  } else if (cast === 'perro') {
+    // Salchicha de pie: tripa clara, hocico, orejas largas que bailan, collar rojo y rabo que se agita. Agarra con
+    // las patas de delante (los brazos)
+    const dark = s.shoe;
+    mesh(new THREE.SphereGeometry(0.16, 12, 10), '#e9b886', torso, 0, 0.36, -0.12, 0).scale.set(1, 1.9, 0.6);
+    const muzzle = mesh(new THREE.CapsuleGeometry(0.085, 0.08, 4, 10), s.skin, head, 0, -0.07, -0.17, 0.02);
+    muzzle.rotation.x = Math.PI / 2;
+    mesh(new THREE.SphereGeometry(0.045, 8, 6), '#1f1a2e', head, 0, -0.04, -0.29, 0);
+    for (const sx of [-1, 1]) {
+      const ear = new THREE.Group();
+      ear.position.set(sx * 0.16, 0.08, 0.02);
+      head.add(ear);
+      const e = mesh(new THREE.CapsuleGeometry(0.065, 0.18, 4, 8), dark, ear, 0, -0.13, 0, 0.02);
+      e.scale.z = 0.45;
+      ear.rotation.z = sx * 0.2;
+      rig.wobbly.push(ear);
+    }
+    face(head, R, rig, { eyeY: 0.3 });
+    mesh(new THREE.TorusGeometry(0.16, 0.035, 6, 16), '#ef4444', torso, 0, 0.8, 0, 0).rotation.x = Math.PI / 2;
+    const tail = new THREE.Group();
+    tail.position.set(0, 0.06, 0.16);
+    torso.add(tail);
+    mesh(new THREE.CapsuleGeometry(0.035, 0.2, 4, 6), s.skin, tail, 0, 0.11, 0.03, 0.015).rotation.x = -0.3;
+    rig.tail = tail;
   }
-  const m = mouth(head, R, cast === 'enano' ? -0.1 : cast === 'gordo' ? -0.45 : -0.38);
+  const m = mouth(head, R, cast === 'enano' ? -0.1 : cast === 'gordo' ? -0.45 : cast === 'perro' ? -0.55 : -0.38);
   rig.smile = m.smile; rig.shout = m.shout;
   if (cast === 'enano') { rig.smile.visible = false; rig.shout.scale.multiplyScalar(0.8); }
   return rig;
@@ -268,9 +266,62 @@ function blob() {
 const damp = THREE.MathUtils.damp;
 const UP = new THREE.Vector3(0, 1, 0);
 
+/** Margen (m) con el que el dibujo de un ayudante queda dentro de su cápsula: lo que se bambolean los adornos. */
+const FIT_MARGIN = 0.015;
+
+/** Mallas del cuerpo de un ayudante (tronco, cabeza y adornos): sin contornos (la línea de dibujo) ni piernas. */
+export function helperBodyMeshes(pivot: THREE.Object3D): THREE.Mesh[] {
+  const out: THREE.Mesh[] = [];
+  const walk = (o: THREE.Object3D) => {
+    if (o.userData.limb || o.userData.outline) return;
+    if ((o as THREE.Mesh).isMesh) out.push(o as THREE.Mesh);
+    for (const ch of o.children) walk(ch);
+  };
+  walk(pivot);
+  return out;
+}
+
+/**
+ * Escala (≤ 1) a la que el ayudante, de pie y en reposo, cabe en su cápsula física con `FIT_MARGIN` de margen, y
+ * altura de lo más alto del dibujo (en el espacio del pivote, sin escalar). Se mide sobre los vértices del tronco, la
+ * cabeza y sus adornos (`helperBodyMeshes`); los brazos van aparte y no cuentan: tocar algo con ellos es agarrarlo.
+ */
+export function fitScale(pivot: THREE.Object3D): { scale: number; top: number } {
+  pivot.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(pivot.matrixWorld).invert(), m = new THREE.Matrix4(), v = new THREE.Vector3();
+  const pts: THREE.Vector3[] = [];
+  helperBodyMeshes(pivot).forEach((mm) => {
+    m.multiplyMatrices(inv, mm.matrixWorld);
+    const pos = mm.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) pts.push(v.fromBufferAttribute(pos, i).applyMatrix4(m).clone());
+  });
+  const r = CARRIER.radius, y0 = r, y1 = DOLL_HEIGHT - r;
+  // Distancia de un punto (escalado) al eje de la cápsula, menos su radio
+  const out = (k: number) => Math.max(...pts.map((p) => Math.hypot(p.x * k, p.z * k, p.y * k - Math.max(y0, Math.min(y1, p.y * k))) - r));
+  let scale = 1;
+  if (out(1) > -FIT_MARGIN) {
+    let lo = 0.3, hi = 1;
+    for (let i = 0; i < 20; i++) { const mid = (lo + hi) / 2; if (out(mid) <= -FIT_MARGIN) lo = mid; else hi = mid; }
+    scale = lo;
+  }
+  return { scale, top: Math.max(...pts.map((p) => p.y)) };
+}
+
+/**
+ * Vista de un ayudante. Lo dibujado es el cuerpo físico, como con el muñeco de los jugadores:
+ * - De pie y en reposo cabe en su cápsula (`fitScale`); al aplastarse se acorta sin ensancharse, y estirarse o botar
+ *   no lo saca por arriba.
+ * - Su inclinación (andar, tirar del sofá, trastabillar) gira alrededor de los pies y se limita a lo que cabe sin
+ *   meterse en nada (`TiltFit`, la misma consulta que el muñeco). Antes llegaba a 0,5–0,7 rad sin mirar.
+ * - En el suelo se dibuja con la pose del collider tumbado.
+ */
 export class CarrierView {
   group = new THREE.Group();
   private rig: Rig;
+  /** Escala a la que cabe en su cápsula, y altura de lo más alto del dibujo sin escalar. */
+  readonly fit: number;
+  private top: number;
+  private tilt: TiltFit | null;
   private arms: THREE.Mesh[] = [];
   private hands: THREE.Mesh[] = [];
   private stars: THREE.Group;
@@ -302,22 +353,24 @@ export class CarrierView {
   private stumbleDir = 1;
   label?: THREE.Sprite;
 
-  constructor(readonly carrier: Carrier, playerIndex: number | null, private fx?: Fx) {
+  /** `world`: para limitar la inclinación a lo que cabe (sin él, como en las pruebas de dibujo, no se limita). */
+  constructor(readonly carrier: Carrier, playerIndex: number | null, private fx?: Fx, world?: RAPIER.World) {
     this.rig = buildRig(carrier.cast.cast);
+    const f = fitScale(this.rig.pivot);
+    this.fit = f.scale;
+    this.top = f.top;
+    this.rig.pivot.scale.setScalar(this.fit);
+    this.tilt = world ? new TiltFit(world, carrier) : null;
     this.group.add(this.rig.pivot);
     this.rig.pivot.position.y = -CENTER_Y;
-    const nArms = this.rig.quadruped ? 1 : 2;
-    for (let i = 0; i < nArms; i++) {
-      // El perro no tiene brazos: muerde una cuerda atada al sofá
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(this.rig.quadruped ? 0.02 : this.rig.armR, this.rig.quadruped ? 0.02 : this.rig.armR, 1, 8), mat(this.rig.quadruped ? '#d6b98c' : this.rig.armColor));
+    for (let i = 0; i < 2; i++) {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(this.rig.armR, this.rig.armR, 1, 8), mat(this.rig.armColor));
       arm.castShadow = true;
       this.arms.push(arm);
       this.group.add(arm);
-      if (!this.rig.quadruped) {
-        const hand = new THREE.Mesh(new THREE.SphereGeometry(this.rig.armR * 1.6, 8, 6), mat(this.rig.handColor));
-        this.hands.push(hand);
-        this.group.add(hand);
-      }
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(this.rig.armR * 1.6, 8, 6), mat(this.rig.handColor));
+      this.hands.push(hand);
+      this.group.add(hand);
     }
     const color = playerIndex !== null ? PLAYER_COLORS[playerIndex] : '#ffffff';
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.52, 32), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, depthWrite: false }));
@@ -422,7 +475,7 @@ export class CarrierView {
     const want = Math.hypot(c.wantVel.x, c.wantVel.z);
     const scrabble = c.grounded && !stunned && want > 1 && speed < 0.6;
     const prevWalk = this.walk;
-    this.walk += (scrabble ? want * 2.2 : speed) * dt * (rig.quadruped ? 5 : 3.6);
+    this.walk += (scrabble ? want * 2.2 : speed) * dt * 3.6;
     // De lado: los que agarran por los costados avanzan en paso lateral
     const vSide = speed > 0.3 ? (v.x * right.x + v.z * right.z) / speed : 0;
     const side = Math.abs(vSide);
@@ -477,27 +530,36 @@ export class CarrierView {
       rig.pivot.quaternion.copy(qt).multiply(new THREE.Quaternion().setFromAxisAngle(UP, this.yaw + spin));
       this.pitch = 0;
       this.roll = 0;
-    } else rig.pivot.rotation.set(this.pitch, this.yaw + spin, this.roll, 'YXZ');
-    const bob = c.grounded && !stunned ? Math.abs(Math.sin(this.walk)) * 0.07 * sp : 0;
-    const breathe = Math.sin(t * 2.2 + c.id) * 0.015;
-    rig.body.position.y = bob + (airborne ? 0.1 : 0);
-    rig.body.scale.set(1 - sq * 0.5, 1 + sq + breathe, 1 - sq * 0.5);
+    } else {
+      // Inclinación alrededor de los pies, solo la que cabe: hacia dónde va lo alto del cuerpo (YXZ: el cabeceo lo
+      // echa hacia atrás, el balanceo hacia la izquierda)
+      const lx = -right.x * Math.sin(this.roll) - fwd.x * Math.cos(this.roll) * Math.sin(this.pitch);
+      const lz = -right.z * Math.sin(this.roll) - fwd.z * Math.cos(this.roll) * Math.sin(this.pitch);
+      const k = this.tilt ? this.tilt.fraction(lx, lz, dt) : 1;
+      rig.pivot.rotation.set(this.pitch * k, this.yaw + spin, this.roll * k, 'YXZ');
+    }
+    // Botar, saltar y estirarse no lo sacan de la cápsula por arriba; aplastado se acorta sin ensancharse
+    const room = Math.max(0, (DOLL_HEIGHT - FIT_MARGIN) / this.fit - this.top);
+    const tall = Math.min(1 + sq + Math.sin(t * 2.2 + c.id) * 0.015, 1 + room / this.top);
+    const lift = Math.min(room - this.top * Math.max(0, tall - 1), (c.grounded && !stunned ? Math.abs(Math.sin(this.walk)) * 0.07 * sp : 0) + (airborne ? 0.1 : 0));
+    rig.body.position.y = Math.max(0, lift);
+    const wide = Math.min(1, 1 - sq * 0.5);
+    rig.body.scale.set(wide, tall, wide);
 
     // Piernas
-    const legAmp = (rig.quadruped ? 0.7 : 0.75) * (scrabble ? 0.5 : sp);
+    const legAmp = 0.75 * (scrabble ? 0.5 : sp);
     rig.legs.forEach((l, i) => {
       let a: number, z = 0;
       const ph = this.walk + i * Math.PI;
       if (stunned) a = Math.sin(t * 20 + i * 2) * 0.6 * (this.stunAge > 0.5 ? 1 : 0);
       else if (airborne) a = Math.sin(t * 16 + i * Math.PI) * 0.5;
-      else if (rig.quadruped) a = Math.sin(this.walk + (i === 0 || i === 3 ? 0 : Math.PI)) * legAmp;
       else if (sofaGrab && strain > 0.3 && speed < 0.8 && !scrabble) a = (i ? -1 : 1) * 0.35 * strain - 0.25 * strain; // pies clavados, abiertos
       else {
         // Paso hacia delante o lateral según hacia dónde se mueve respecto a donde mira
         a = Math.sin(ph) * legAmp * (1 - side);
         z = side * Math.sin(ph) * 0.35 * sp * Math.sign(vSide);
       }
-      if (sofaGrab && !rig.quadruped) z += (i ? -1 : 1) * -0.12 * strain;
+      if (sofaGrab) z += (i ? -1 : 1) * -0.12 * strain;
       l.rotation.x = damp(l.rotation.x, a, 18, dt);
       l.rotation.z = damp(l.rotation.z, z, 14, dt);
     });
@@ -544,17 +606,10 @@ export class CarrierView {
       else pu.position.set(THREE.MathUtils.clamp(lagLocalX * -0.8, -0.02, 0.02), 0, pu.position.z);
     });
 
-    // Brazos (o cuerda del perro): hacia el agarre, colgando, agitándose o tirados en el suelo
+    // Brazos (las patas de delante, en el perro): hacia el agarre, colgando, agitándose o tirados en el suelo
     this.group.updateMatrixWorld(true);
     const toLocal = (o: THREE.Object3D, v3: THREE.Vector3) => this.group.worldToLocal(o.localToWorld(v3.clone()));
-    if (rig.quadruped) {
-      const arm = this.arms[0];
-      arm.visible = !!sofaGrab;
-      if (sofaGrab) {
-        const a = toLocal(rig.head, rig.snout!);
-        this.stretch(arm, a, sofaGrab.clone().sub(this.group.position));
-      }
-    } else {
+    {
       for (let i = 0; i < 2; i++) {
         const s = i === 0 ? -1 : 1;
         const shoulder = toLocal(rig.torso, rig.shoulders[i]);
@@ -581,7 +636,7 @@ export class CarrierView {
     const under = c.down ? c.collider.translation() : p;
     this.shadow.position.set(under.x, footY + 0.03 - Math.min(0.5, this.airT), under.z);
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = airborne ? 0.4 : 1;
-    this.shadow.scale.setScalar(rig.quadruped ? 1.1 : 1);
+    this.shadow.scale.setScalar(1);
     this.ring.position.set(under.x, footY + 0.04, under.z);
     this.grip.visible = !!sofaGrab;
     if (sofaGrab) this.grip.position.copy(sofaGrab);

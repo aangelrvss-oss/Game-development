@@ -30,6 +30,13 @@ export const RULES = {
    * tirones estén descompensados (dos de un lado y uno del otro), aunque sí deja girarlo cuando el grupo lo gira.
    */
   wristYawDamp: 30,
+  /**
+   * Aviso «Pesa mucho»: sale tras `heavyHintAfter` s de uno solo arrastrando algo pesado. Lo acumulado no pasa de
+   * `heavyHintMax` s: al dejar de arrastrar se va en (máx − después)/2 = 0,2 s, y al llegar ayuda, en el acto. Sin
+   * tope, tras 20 s arrastrando solo seguía 9,7 s en pantalla con los dos agarrando.
+   */
+  heavyHintAfter: 0.6,
+  heavyHintMax: 1.0,
 };
 
 export interface GameOptions {
@@ -168,7 +175,7 @@ export class Game {
 
   /** Uno solo lleva un rato arrastrando algo que pesa demasiado para una persona: hay que avisar. */
   get heavyAlone(): Carrier | null {
-    return this.soloDrag > 0.6 && this.soloDragCarrier !== null ? this.carriers[this.soloDragCarrier] : null;
+    return this.soloDrag > RULES.heavyHintAfter && this.soloDragCarrier !== null ? this.carriers[this.soloDragCarrier] : null;
   }
 
   private emit(e: GameEvent) { this.out.push(e); }
@@ -373,13 +380,16 @@ export class Game {
     const pushing = this.lead.active && Math.hypot(this.lead.x, this.lead.z) > 1;
     this.stuckTime = pushing && speed < 0.25 ? this.stuckTime + dt : Math.max(0, this.stuckTime - dt * 2);
     // Uno solo arrastra (o intenta mover) algo que pesa más de lo que una persona sostiene
-    let solo: Carrier | null = null;
+    let solo: Carrier | null = null, helped = false;
     for (const it of this.grabbables) {
       const hs = this.carriers.filter((c) => c.heldBody === it.body);
       const heavy = it.body.mass() * 9.81 > HAND.maxV;
       if (hs.length === 1 && heavy && Math.hypot(hs[0].wantVel.x, hs[0].wantVel.z) > 0.3) solo = hs[0];
+      // Ya no está solo: alguien más agarra lo que arrastraba
+      if (hs.length > 1 && hs.some((c) => c.id === this.soloDragCarrier)) helped = true;
     }
-    this.soloDrag = solo ? this.soloDrag + dt : Math.max(0, this.soloDrag - dt * 2);
+    if (helped && !solo) { this.soloDrag = 0; this.soloDragCarrier = null; }
+    this.soloDrag = solo ? Math.min(RULES.heavyHintMax, this.soloDrag + dt) : Math.max(0, this.soloDrag - dt * 2);
     if (solo) this.soloDragCarrier = solo.id;
     else if (this.soloDrag === 0) this.soloDragCarrier = null;
     if (this.phase !== 'playing') return;

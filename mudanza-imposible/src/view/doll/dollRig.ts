@@ -72,14 +72,15 @@ export const LOOK = {
 
 export type Look = typeof LOOK;
 
-const DIM = {
+/** Medidas del modelo (sus unidades): caderas, piernas, hombros, brazos, cuello, cabeza y gorra. */
+export const DIM = {
   hipY: 0.41, hipX: 0.13,
   thigh: 0.165, shin: 0.165, ankleH: 0.09,
   shoulderY: 0.83, shoulderX: 0.325,
   upperArm: 0.2, foreArm: 0.2,
   neckY: 0.93, headC: 0.17, capY: 0.33,
 };
-const LEG = DIM.thigh + DIM.shin;
+export const LEG = DIM.thigh + DIM.shin;
 /** Altura del centro del cuerpo sobre los pies (la mitad del muñeco: el centro de su cápsula física). */
 const CENTER = DOLL_MODEL.height / 2;
 
@@ -148,6 +149,8 @@ export class CharacterRig {
   private lastKnees: THREE.Vector3[] = [];
   private lastHips: THREE.Vector3[] = [];
   private lastAnkles: THREE.Vector3[] = [];
+  /** Inversa de la matriz del grupo (ver `local`). */
+  private groupInv = new THREE.Matrix4();
   /** Diagnóstico del último fotograma (pruebas de apoyo de los pies). */
   debug: { upright: boolean; yaw: number; root: number[]; feet: { swinging: boolean; sole: number[][]; knee: number[]; hip: number[]; ankle?: number[] }[] } | null = null;
 
@@ -388,9 +391,10 @@ export class CharacterRig {
     this.torso.rotation.y = damp(this.torso.rotation.y, THREE.MathUtils.clamp((fo[0] - fo[1]) * 0.5, -0.25, 0.25), 8, dt);
 
     this.group.updateMatrixWorld(true);
-    const toWorld = (o: THREE.Object3D, x: number, y: number, z: number) => o.localToWorld(new THREE.Vector3(x, y, z));
-    const hips = [toWorld(this.torso, -DIM.hipX, DIM.hipY - 0.03, 0), toWorld(this.torso, DIM.hipX, DIM.hipY - 0.03, 0)];
-    const shoulders = [toWorld(this.torso, -DIM.shoulderX, DIM.shoulderY, 0), toWorld(this.torso, DIM.shoulderX, DIM.shoulderY, 0)];
+    this.groupInv.copy(this.group.matrixWorld).invert();
+    const toLocal = (o: THREE.Object3D, x: number, y: number, z: number) => this.local(o, x, y, z);
+    const hips = [toLocal(this.torso, -DIM.hipX, DIM.hipY - 0.03, 0), toLocal(this.torso, DIM.hipX, DIM.hipY - 0.03, 0)];
+    const shoulders = [toLocal(this.torso, -DIM.shoulderX, DIM.shoulderY, 0), toLocal(this.torso, DIM.shoulderX, DIM.shoulderY, 0)];
 
     // --- En el suelo: tobillos y manos son partículas (gravedad, inercia, suelo) ---
     const down = !upright;
@@ -423,11 +427,11 @@ export class CharacterRig {
         b.updateMatrixWorld(true);
         let dig = 0;
         for (const [sx, sz] of SOLE) {
-          const q = b.localToWorld(new THREE.Vector3(sx, 0, sz));
+          const q = toLocal(b, sx, 0, sz);
           dig = Math.max(dig, src.heightAt(q.x, q.z) - q.y);
         }
         if (dig > 0) { b.position.y += dig; b.updateMatrixWorld(true); }
-        ankle = b.localToWorld(new THREE.Vector3(0, DIM.ankleH, 0.02));
+        ankle = toLocal(b, 0, DIM.ankleH, 0.02);
         // Recién levantado: el tobillo llega desde donde estaba (sin saltos de un fotograma)
         if (this.standBlend > 0 && this.lastAnkles[i]) {
           const off = this.lastAnkles[i].clone().sub(ankle).multiplyScalar(this.standBlend * 0.8);
@@ -441,7 +445,9 @@ export class CharacterRig {
         const toeDir = fwd.clone().sub(shinUp.clone().multiplyScalar(fwd.dot(shinUp)));
         if (toeDir.lengthSq() < 1e-4) toeDir.copy(new THREE.Vector3(0, 1, 0).cross(shinUp));
         toeDir.normalize();
-        const m = new THREE.Matrix4().makeBasis(toeDir.clone().cross(shinUp).negate().normalize(), shinUp, toeDir.clone().negate());
+        // Base de la bota: la puntera (−z) hacia `toeDir` y la caña (+y) por la espinilla; x = y × z para que sea un giro
+        // (con el signo cambiado era una simetría, y la bota no quedaba al final de la pierna)
+        const m = new THREE.Matrix4().makeBasis(toeDir.clone().cross(shinUp).normalize(), shinUp, toeDir.clone().negate());
         b.quaternion.setFromRotationMatrix(m);
         b.position.copy(ankle).addScaledVector(shinUp, -DIM.ankleH);
         b.updateMatrixWorld(true);
@@ -483,13 +489,13 @@ export class CharacterRig {
       } else if (stumbling) {
         // Molinillo: brazos en círculo, más grandes cuanto mayor el desequilibrio
         const a = this.t * 13 + i * Math.PI, amp = 0.25 + Math.min(0.35, dev);
-        hand = toWorld(this.torso, s * (DIM.shoulderX + 0.3), DIM.shoulderY + 0.1 + Math.sin(a) * amp, Math.cos(a) * amp);
+        hand = toLocal(this.torso, s * (DIM.shoulderX + 0.3), DIM.shoulderY + 0.1 + Math.sin(a) * amp, Math.cos(a) * amp);
       } else {
         // Andando: cada brazo va con la pierna contraria; quieto, cuelgan con un leve balanceo
         const swing = THREE.MathUtils.clamp(fo[i ? 0 : 1] * 0.7, -0.22, 0.22);
-        hand = toWorld(this.torso, s * (DIM.shoulderX + 0.15), DIM.shoulderY - 0.38 + Math.abs(swing) * 0.25, -swing + Math.sin(this.t * 1.7 + i) * 0.012);
+        hand = toLocal(this.torso, s * (DIM.shoulderX + 0.15), DIM.shoulderY - 0.38 + Math.abs(swing) * 0.25, -swing + Math.sin(this.t * 1.7 + i) * 0.012);
       }
-      const pole = toWorld(this.torso, s * 0.7, DIM.shoulderY - 0.3, 0.5).sub(shoulders[i]);
+      const pole = toLocal(this.torso, s * 0.7, DIM.shoulderY - 0.3, 0.5).sub(shoulders[i]);
       const elbow = twoBone(shoulders[i], hand, DIM.upperArm, DIM.foreArm, pole);
       this.arms[i].update(shoulders[i], elbow, hand);
       const dir = elbow.clone().sub(shoulders[i]).normalize();
@@ -539,13 +545,14 @@ export class CharacterRig {
     this.mouth.visible = surprised || (c.holding && c.effort > 0.7);
     this.mouth.scale.set(surprised ? 0.035 : 0.06, surprised ? 0.035 + dev * 0.05 : 0.012, 0.015);
 
-    // Diagnóstico (solo lectura): esquinas de la suela, rodillas y fase de cada pie
+    // Diagnóstico (solo lectura), en el mundo: esquinas de la suela, rodillas y fase de cada pie
+    const world = (v: THREE.Vector3) => v.clone().applyMatrix4(this.group.matrixWorld).toArray();
     this.debug = {
-      upright, yaw: this.yaw, root: rootPos.toArray(),
+      upright, yaw: this.yaw, root: world(rootPos),
       feet: this.boots.map((bt, i) => ({
         swinging: this.feet[i].swinging,
         sole: SOLE.slice(0, 4).map(([x, z]) => bt.localToWorld(new THREE.Vector3(x, 0, z)).toArray()),
-        knee: this.lastKnees[i].toArray(), hip: this.lastHips[i].toArray(), ankle: this.lastAnkles[i].toArray(),
+        knee: world(this.lastKnees[i]), hip: world(this.lastHips[i]), ankle: world(this.lastAnkles[i]),
       })),
     };
     const gy = src.heightAt(p.x, p.z);
@@ -644,9 +651,19 @@ export class CharacterRig {
     if (scrabble) for (const f of this.feet) if (!f.swinging) f.pos.addScaledVector(fwd, -0.03 * dt);
   }
 
-  /** Al caer: los tobillos y las manos sueltan su postura y heredan la velocidad del cuerpo. */
+  /**
+   * Punto (x, y, z) de una pieza del muñeco en el espacio del grupo: las unidades del modelo, donde se colocan los
+   * miembros, las mangas, las manos y las botas (hijos del grupo). El grupo va escalado (`DOLL_SCALE`): `localToWorld`
+   * da el mundo, ya escalado, y usado como posición de un hijo del grupo se escalaría dos veces (los miembros
+   * quedaban a (1 − escala) × distancia al origen del cuerpo: más de 4 m en el camión).
+   */
+  private local(o: THREE.Object3D, x: number, y: number, z: number) {
+    return o.localToWorld(new THREE.Vector3(x, y, z)).applyMatrix4(this.groupInv);
+  }
+
+  /** Al caer: los tobillos y las manos sueltan su postura y heredan la velocidad del cuerpo (todo en el espacio del grupo). */
   private startLimbs(vel: THREE.Vector3, dt: number) {
-    const pts = [...this.boots.map((b) => b.localToWorld(new THREE.Vector3(0, DIM.ankleH, 0.02))), ...this.hands.map((h) => h.position.clone())];
+    const pts = [...this.boots.map((b) => this.local(b, 0, DIM.ankleH, 0.02)), ...this.hands.map((h) => h.position.clone())];
     this.limbs.forEach((l, i) => { l.p.copy(pts[i]); l.prev.copy(pts[i]).addScaledVector(vel, -dt); });
   }
 

@@ -19,8 +19,9 @@ const ctx2d = new Proxy({}, {
   set: () => true,
 });
 (globalThis as { document?: unknown }).document ??= { createElement: () => ({ width: 0, height: 0, getContext: () => ctx2d }) };
-const { CharacterRig } = await import('../src/view/doll/dollRig');
+const { CharacterRig, DIM, LEG } = await import('../src/view/doll/dollRig');
 const { DollView } = await import('../src/view/doll/dollView');
+const { CarrierView, helperBodyMeshes } = await import('../src/view/carrierView');
 
 const DT = 1 / 60;
 const TOL = 0.03; // el margen de la prueba de penetración
@@ -106,6 +107,59 @@ function besides(c: Carrier, at: { x: number; z: number }, out: V2, gap: number)
 const camera = new THREE.PerspectiveCamera(42, 16 / 9, 0.1, 400);
 const views = (g: Game) => g.carriers.map((c) => new DollView(c, c.human ?? 0, g.world, camera));
 
+/** Piezas del muñeco que se colocan cada fotograma (privadas de `CharacterRig`). */
+type RigParts = {
+  group: THREE.Object3D; root: THREE.Object3D; torso: THREE.Object3D;
+  legs: { geometry: THREE.BufferGeometry }[]; arms: { geometry: THREE.BufferGeometry }[];
+  boots: THREE.Object3D[]; hands: THREE.Object3D[]; sleeves: THREE.Object3D[];
+};
+const parts = (v: InstanceType<typeof DollView>) => (v as unknown as { rig: RigParts }).rig;
+
+/** Extremos (en el mundo) del eje de un miembro de manguera: los centros de sus dos tapas (los dos últimos vértices). */
+function tubeEnds(group: THREE.Object3D, tube: { geometry: THREE.BufferGeometry }): [THREE.Vector3, THREE.Vector3] {
+  const mesh = group.children.find((o) => (o as THREE.Mesh).geometry === tube.geometry)!;
+  const pos = tube.geometry.attributes.position, n = pos.count;
+  return [new THREE.Vector3().fromBufferAttribute(pos, n - 2).applyMatrix4(mesh.matrixWorld), new THREE.Vector3().fromBufferAttribute(pos, n - 1).applyMatrix4(mesh.matrixWorld)];
+}
+
+/**
+ * Cuánto se separan (m, en el mundo) los miembros dibujados de donde nacen en el cuerpo: cada pierna de su cadera y
+ * de su bota, cada brazo de su hombro, la manga de su hombro y la manopla del final del brazo (las dos van un poco
+ * desplazadas a lo largo del miembro: 0,035 y 0,06 del modelo). En el suelo (`down`), además, los miembros sueltos
+ * no pasan de su largo (de pie, el brazo de goma sí se estira hasta el asa).
+ */
+function limbGap(v: InstanceType<typeof DollView>, down: Carrier['down']): number {
+  const r = parts(v), S = DOLL_SCALE;
+  r.group.updateMatrixWorld(true);
+  const at = (o: THREE.Object3D, x: number, y: number, z: number) => o.localToWorld(new THREE.Vector3(x, y, z));
+  const pos = (o: THREE.Object3D) => o.getWorldPosition(new THREE.Vector3());
+  let worst = 0;
+  for (let i = 0; i < 2; i++) {
+    const s = i ? 1 : -1;
+    const hip = at(r.torso, s * DIM.hipX, DIM.hipY - 0.03, 0), shoulder = at(r.torso, s * DIM.shoulderX, DIM.shoulderY, 0);
+    const ankle = at(r.boots[i], 0, DIM.ankleH, 0.02);
+    const [l0, l1] = tubeEnds(r.group, r.legs[i]), [a0, a1] = tubeEnds(r.group, r.arms[i]);
+    worst = Math.max(worst, l0.distanceTo(hip), l1.distanceTo(ankle), a0.distanceTo(shoulder));
+    worst = Math.max(worst, Math.abs(pos(r.sleeves[i]).distanceTo(shoulder) - 0.035 * S), Math.abs(pos(r.hands[i]).distanceTo(a1) - 0.06 * S));
+    // En el suelo, tobillos y manos son partículas atadas a la cadera y al hombro (`stepLimbs`): nunca más lejos que eso.
+    // Al levantarse, la mano se apoya en el suelo mientras el hombro sube y el brazo de goma se estira: ahí solo el pie.
+    if (down) worst = Math.max(worst, ankle.distanceTo(hip) - (LEG + DIM.ankleH + 0.06) * S);
+    if (down && down !== 'rising') worst = Math.max(worst, a1.distanceTo(shoulder) - (DIM.upperArm + DIM.foreArm + 0.08) * S);
+  }
+  return worst;
+}
+
+/**
+ * Cuánto se aparta (m) el eje del muñeco dibujado del de su cápsula: los pies del muñeco (`root`, de donde se
+ * inclina) en el extremo de abajo del eje del collider, de pie o tumbado. Un desplazamiento del dibujo lo delata.
+ */
+function axisOffset(c: Carrier, v: InstanceType<typeof DollView>): number {
+  const r = parts(v);
+  r.group.updateMatrixWorld(true);
+  const k = c.collider.translation(), feet = new THREE.Vector3(k.x, k.y, k.z).addScaledVector(axis(c), -CENTER_Y);
+  return r.root.getWorldPosition(new THREE.Vector3()).distanceTo(feet);
+}
+
 describe('T-coh-1: lo dibujado es el cuerpo físico', () => {
   it('el muñeco tiene las medidas de su cápsula: tronco del radio de la cápsula, misma altura y nada fuera más de 3 cm', () => {
     const rig = new CharacterRig();
@@ -158,7 +212,7 @@ describe('T-coh-1: lo dibujado es el cuerpo físico', () => {
       const vs = views(g);
       place(g);
       for (let i = 0; i < 10; i++) g.step(DT, []);
-      let worst = 0;
+      let worst = 0, off = 0;
       for (let i = 0; i < 150; i++) {
         g.step(DT, input(g, i));
         for (const [k, v] of vs.entries()) {
@@ -168,9 +222,183 @@ describe('T-coh-1: lo dibujado es el cuerpo físico', () => {
           v.sync(gw ? new THREE.Vector3(gw.x, gw.y, gw.z) : null, i * DT, DT);
           c.lean = keep.lean; c.wobbling = keep.wob;
           if (i % 2 === 0) worst = Math.max(worst, drawnDepth(g, c, v));
+          // Sin trampa: alejar el dibujo de lo que toca también lo sacaría de dentro, pero el muñeco va con su cápsula
+          off = Math.max(off, axisOffset(c, v));
         }
       }
       expect(worst, name).toBeLessThan(TOL);
+      expect(off, `${name}: el muñeco se aparta de su cápsula`).toBeLessThan(0.01);
+      g.dispose();
+    }
+  });
+
+  it('lejos del origen, piernas, brazos, mangas y manos salen del cuerpo y el muñeco va con su cápsula: quieto, llevando el sofá, cayendo y levantándose', () => {
+    // En el descampado, a 43 m del origen: si los miembros se escalaran dos veces quedarían a (1 − escala) × 43 ≈ 4,7 m.
+    // Los dos agarran los extremos, lo llevan a lo largo y el 0 cae (sigue el 1 agarrando); se mide hasta que se levanta.
+    const g = setup(2);
+    const vs = views(g);
+    besides(g.carriers[0], { x: OPEN.x + SOFA.half.x, z: OPEN.z }, { x: 1, z: 0 }, 0.35);
+    besides(g.carriers[1], { x: OPEN.x - SOFA.half.x, z: OPEN.z }, { x: -1, z: 0 }, 0.35);
+    const res = { up: { gap: 0, off: 0 }, down: { gap: 0, off: 0 } };
+    let lying = 0, held = 0;
+    const fallAt = 150, end = fallAt + Math.round((CARRIER.fallTime + 1) / DT);
+    for (let i = 0; i < end; i++) {
+      if (i === fallAt) g.carriers[0].knockDown({ x: 0, z: 1 }, CARRIER.fallTime, 'balance');
+      const walk = i >= 30 && i < fallAt;
+      g.step(DT, [inp({ grab: i === 20 || (i > 20 && !g.carriers[0].holding && !g.carriers[0].down), mx: walk ? -1 : 0 }), inp({ grab: i === 20, mx: walk ? -1 : 0 })]);
+      for (const [k, v] of vs.entries()) {
+        const c = g.carriers[k], gw = c.grabWorld();
+        v.sync(gw ? new THREE.Vector3(gw.x, gw.y, gw.z) : null, i * DT, DT);
+        const r = c.down ? res.down : res.up;
+        r.gap = Math.max(r.gap, limbGap(v, c.down));
+        r.off = Math.max(r.off, axisOffset(c, v));
+        if (c.down === 'lying') lying++;
+        if (c.holding) held++;
+      }
+    }
+    // Ha pasado de verdad por cada pose: agarrando y tumbado
+    expect(held).toBeGreaterThan(100);
+    expect(lying).toBeGreaterThan(20);
+    expect(g.carriers[0].down).toBe(null);
+    // Los miembros salen de su sitio (2 cm) y el muñeco no se aparta de su cápsula (1 cm), de pie y en el suelo
+    expect(res.up.gap, 'de pie: miembros separados del cuerpo').toBeLessThan(0.02);
+    expect(res.down.gap, 'en el suelo: miembros separados del cuerpo').toBeLessThan(0.02);
+    expect(res.up.off, 'de pie: el muñeco se aparta de su cápsula').toBeLessThan(0.01);
+    expect(res.down.off, 'en el suelo: el muñeco se aparta de su cápsula').toBeLessThan(0.01);
+    g.dispose();
+  });
+});
+
+describe('T-auto-lift: el esfuerzo del muñeco se ve desde la cámara de juego', () => {
+  it('arrastrando solo el sofá salen rayas de esfuerzo sobre la cabeza, la bola de agarre crece y enrojece, y se cuelga hacia atrás; en reposo, nada', () => {
+    // Desde la cámara de juego (lejos y desde arriba) no se distinguían cejas, boca ni temblor
+    const g = setup(2);
+    const v = views(g)[0], c = g.carriers[0];
+    type Parts = { marks: THREE.Sprite; grip: THREE.Mesh; effort: number };
+    const pv = v as unknown as Parts;
+    besides(c, { x: OPEN.x + SOFA.half.x, z: OPEN.z }, { x: 1, z: 0 }, 0.35);
+    let t = 0;
+    const run = (n: number, i: PlayerInput) => { for (let k = 0; k < n; k++) { g.step(DT, [i, NO_INPUT]); t += DT; const gw = c.grabWorld(); v.sync(gw ? new THREE.Vector3(gw.x, gw.y, gw.z) : null, t, DT); } };
+    run(20, NO_INPUT);
+    expect(pv.marks.visible).toBe(false);
+    expect(pv.grip.visible).toBe(false);
+    g.step(DT, [inp({ grab: true }), NO_INPUT]);
+    expect(c.holding).toBe(true);
+    let marks = 0, lean = 0;
+    for (let k = 0; k < 90; k++) {
+      run(1, inp({ mx: 1 }));
+      if (pv.marks.visible) marks++;
+      // Inclinación del tronco hacia atrás (alejándose del sofá, +x)
+      const torso = (parts(v) as unknown as { torso: THREE.Object3D }).torso, up = new THREE.Vector3(0, 1, 0).transformDirection(torso.matrixWorld);
+      lean = Math.max(lean, up.x);
+    }
+    expect(pv.effort).toBeGreaterThan(0.8);
+    expect(marks).toBeGreaterThan(45);
+    expect((pv.marks.material as THREE.SpriteMaterial).opacity).toBeGreaterThan(0.6);
+    expect(pv.grip.scale.x).toBeGreaterThan(1.5);
+    const col = (pv.grip.material as THREE.MeshBasicMaterial).color;
+    expect(col.r).toBeGreaterThan(col.g * 1.5); // roja (el amarillo de J1 tiene r ≈ g)
+    expect(lean).toBeGreaterThan(Math.sin(0.15));
+    // Suelta y descansa: se va
+    g.step(DT, [inp({ grab: true }), NO_INPUT]);
+    run(90, NO_INPUT);
+    expect(pv.marks.visible).toBe(false);
+    expect(pv.grip.visible).toBe(false);
+    g.dispose();
+  });
+});
+
+describe('T-coh-1: los ayudantes, dentro de su cápsula', () => {
+  type HelperView = InstanceType<typeof CarrierView>;
+  /** Vértices (en el mundo) del cuerpo dibujado de un ayudante: tronco, cabeza y adornos (sin contornos ni piernas). */
+  function helperPoints(v: HelperView): THREE.Vector3[] {
+    v.group.updateMatrixWorld(true);
+    const pts: THREE.Vector3[] = [];
+    for (const m of helperBodyMeshes((v as unknown as { rig: { pivot: THREE.Object3D } }).rig.pivot)) {
+      const pos = m.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) pts.push(new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld));
+    }
+    return pts;
+  }
+  /** Cuánto sale (m) el cuerpo dibujado de la cápsula del collider (de pie o tumbada) y cuánto se mete bajo los pies. */
+  function outOfCapsule(c: Carrier, v: HelperView) {
+    const k = c.collider.translation(), ax = axis(c), hh = CARRIER.halfHeight, r = CARRIER.radius, feet = c.pos.y - CENTER_Y;
+    let out = 0, below = 0;
+    for (const w of helperPoints(v)) {
+      const dx = w.x - k.x, dy = w.y - k.y, dz = w.z - k.z;
+      const t = Math.max(-hh, Math.min(hh, dx * ax.x + dy * ax.y + dz * ax.z));
+      out = Math.max(out, Math.hypot(dx - ax.x * t, dy - ax.y * t, dz - ax.z * t) - r);
+      below = Math.max(below, feet - w.y);
+    }
+    return { out, below };
+  }
+
+  it('cada ayudante cabe en su cápsula casi a su tamaño: de pie, cayendo y tumbado hacia delante y hacia atrás, no sale ni se mete bajo el suelo más de 3 cm', () => {
+    // Todos los del reparto (sin humanos: también la abuela del moño, que sale en el fondo del menú), separados en el
+    // descampado y sin cerebro. Antes: perro 67 cm fuera de pie y 61 cm bajo el suelo tumbado, alien 47, gordo 20
+    const g = new Game(RAPIER, { humans: 0, carriers: 6, botStyle: 'atentos', seed: 1 });
+    g.bots.clear();
+    g.phase = 'playing'; g.countdown = 0;
+    g.sofa.setTranslation({ x: OPEN.x, y: 0.25, z: OPEN.z - 4 }, true);
+    const place = () => g.carriers.forEach((c, i) => { c.teleport({ x: OPEN.x - 7 + i * 3, y: standY, z: OPEN.z + 3 }); c.facing = { x: 1, z: 0 }; });
+    place();
+    const vs = g.carriers.map((c) => new CarrierView(c, null, undefined, g.world));
+    for (const v of vs) expect(v.fit, v.carrier.cast.cast).toBeGreaterThan(0.9);
+    let t = 0;
+    const worst = new Map<string, { out: number; below: number }>();
+    const run = (n: number, at: string) => {
+      for (let i = 0; i < n; i++) {
+        g.step(DT, []); t += DT;
+        vs.forEach((v) => {
+          v.sync(null, t, DT);
+          const r = outOfCapsule(v.carrier, v), key = `${v.carrier.cast.cast} ${at}`, w = worst.get(key) ?? { out: 0, below: 0 };
+          worst.set(key, { out: Math.max(w.out, r.out), below: Math.max(w.below, r.below) });
+        });
+      }
+    };
+    run(40, 'de pie');
+    for (const [at, sgn] of [['tumbado hacia delante', 1], ['tumbado hacia atrás', -1]] as const) {
+      g.carriers.forEach((c) => c.knockDown({ x: sgn * c.facing.x, z: sgn * c.facing.z }, CARRIER.fallTime, 'balance'));
+      run(Math.round((CARRIER.fallTime + 0.4) / DT), at);
+      expect(g.carriers.every((c) => !c.down), at).toBe(true);
+      place();
+      run(20, 'de pie');
+    }
+    expect(worst.size).toBe(6 * 3);
+    for (const [key, w] of worst) {
+      expect(w.out, `${key}: sale de la cápsula`).toBeLessThan(TOL);
+      expect(w.below, `${key}: bajo el suelo`).toBeLessThan(TOL);
+    }
+    g.dispose();
+  });
+
+  it('un ayudante que se tambalea hacia el sofá se inclina solo lo que cabe: su cuerpo dibujado no se mete en él', () => {
+    for (const k of [1, 2, 3, 4, 5]) {
+      const g = setup(6);
+      g.bots.clear();
+      const c = g.carriers[k], v = new CarrierView(c, null, undefined, g.world);
+      // A 15 cm del respaldo, mirándolo, con un desequilibrio de 0,7 rad hacia él (el dibujo se inclinaría 0,7 rad)
+      besides(c, { x: OPEN.x, z: OPEN.z - SOFA.half.z }, { x: 0, z: -1 }, 0.15);
+      for (let i = 0; i < 10; i++) g.step(DT, []);
+      let worst = 0, leaned = 0;
+      for (let i = 0; i < 90; i++) {
+        g.step(DT, []);
+        const keep = { lean: c.lean, wob: c.wobbling };
+        c.lean = { x: 0, z: 0.7 }; c.wobbling = true; // solo para el dibujo: se restaura antes del paso siguiente
+        v.sync(null, i * DT, DT);
+        c.lean = keep.lean; c.wobbling = keep.wob;
+        const pivot = (v as unknown as { rig: { pivot: THREE.Object3D } }).rig.pivot;
+        leaned = Math.max(leaned, Math.abs(pivot.rotation.x));
+        const pts = helperPoints(v), near: RAPIER.Collider[] = [];
+        g.world.intersectionsWithShape(c.collider.translation(), { x: 0, y: 0, z: 0, w: 1 }, new RAPIER.Ball(DOLL_HEIGHT), (o) => { near.push(o); return true; }, undefined, undefined, c.collider);
+        for (const col of near) for (const p of pts) {
+          const pr = col.projectPoint(p, false);
+          if (pr?.isInside) worst = Math.max(worst, Math.hypot(pr.point.x - p.x, pr.point.y - p.y, pr.point.z - p.z));
+        }
+      }
+      expect(worst, c.cast.cast).toBeLessThan(TOL);
+      // Sí se inclina algo (no se queda rígido): lo que cabe hasta tocar el sofá
+      expect(leaned, c.cast.cast).toBeGreaterThan(0.05);
       g.dispose();
     }
   });

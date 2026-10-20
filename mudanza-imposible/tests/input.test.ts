@@ -7,7 +7,7 @@ import inputCoreSrc from '../src/input/inputCore.ts?raw';
 import mainSrc from '../src/main.ts?raw';
 import typesSrc from '../src/sim/types.ts?raw';
 import hudSrc from '../src/ui/hud.ts?raw';
-import { FixedStep, InputCore, KEY_SCHEMES, PAD, planPads, playerControls, stickXY, type PadEvent, type PadSnapshot } from '../src/input/inputCore';
+import { FixedStep, globalKeyAction, InputCore, KEY_SCHEMES, PAD, planPads, playerControls, stepFrame, stickXY, type PadEvent, type PadSnapshot } from '../src/input/inputCore';
 import type { Game } from '../src/sim/game';
 import { NO_INPUT, type PlayerInput } from '../src/sim/types';
 import { controlHints, heavyAloneHint } from '../src/ui/hud';
@@ -21,14 +21,14 @@ function pad(index: number, pressed: number[] = [], axes: number[] = [0, 0], map
 
 /**
  * Un fotograma del bucle de `main.ts`: lo que pasó entre fotogramas (teclas), una lectura de todos los mandos y los
- * pasos de física que toquen, cada uno con sus entradas (las pulsaciones las consume el primero).
+ * pasos de física que toquen, cada uno con sus entradas (las pulsaciones las consume el primero). Los pasos los da
+ * `stepFrame`, la misma función que usa `main.ts` (antes las pruebas tenían su propia copia del bucle).
  */
 function frame(core: InputCore, stepper: FixedStep, dt: number, n: number, pads: PadSnapshot[] = [], between?: () => void) {
   between?.();
   const events = core.pollPads(pads);
-  const steps = stepper.frame(dt);
   const inputs: PlayerInput[][] = [];
-  for (let i = 0; i < steps; i++) inputs.push(core.step(n));
+  const steps = stepFrame(stepper, dt, () => core.step(n), (x) => inputs.push(x));
   return { events, steps, inputs };
 }
 
@@ -95,6 +95,20 @@ describe('Entradas: pulsaciones retenidas hasta el paso de física (T-input-1)',
     expect(r.steps).toBe(2);
     expect(r.inputs.map((i) => i[0].grab)).toEqual([true, false]);
     expect(r.inputs.map((i) => i[0].mz)).toEqual([-1, -1]);
+  });
+
+  it('main.ts da los pasos con stepFrame y lee las entradas dentro de cada paso, no una vez por fotograma', () => {
+    // Si el bucle volviera a leer `input.step` antes de los pasos (la pulsación se pierde en los fotogramas sin
+    // paso), las pruebas de arriba no lo verían: comprueban `stepFrame`. Esto comprueba que main.ts la usa así.
+    const loop = mainSrc.slice(mainSrc.indexOf('function frame('), mainSrc.indexOf('requestAnimationFrame(frame);\n}'));
+    expect(loop.length).toBeGreaterThan(200);
+    expect(loop).not.toMatch(/stepper\.frame\(/);
+    expect(loop).toMatch(/stepFrame\(stepper, dtReal, \(\) => \{\s*const keys: PlayerInput\[\] = input\.step\(/);
+    expect(loop.match(/input\.step\(/g)?.length).toBe(1);
+    // Y `stepFrame` lee en cada paso: con 3 pasos, 3 lecturas
+    let reads = 0;
+    const steps = stepFrame(new FixedStep(DT, 5), 3 / 60 + 1e-6, () => { reads++; return []; }, () => {});
+    expect([steps, reads]).toEqual([3, 3]);
   });
 
   it('el paso fijo no pierde tiempo a 144 Hz y, tras un parón, no ejecuta más de 5 pasos', () => {
@@ -291,6 +305,29 @@ describe('Entradas: cuatro jugadores en teclado y mandos (T-input-2)', () => {
     expect(controlHints(game).fix).toBe('¡Volcado! Enderezadlo: J1 con R, J2 con -, J3 con O, J4 con NUM +');
     carriers[0].holding = true;
     expect(heavyAloneHint(game, controls)).toBe('Pesa mucho: falta alguien en el otro extremo (J2 con INTRO, J3 con A, J4 con A)');
+  });
+});
+
+describe('Teclas globales: Retroceso solo reinicia desde la pausa', () => {
+  it('en juego, Retroceso no reinicia (solo recuerda cómo se hace); en la pausa, sí; Esc pausa y reanuda', () => {
+    // Retroceso está encima de Intro (agarrar de J2) en el teclado español: un manotazo no puede tirar la partida
+    expect(globalKeyAction('play', false, 'Backspace')).toEqual({ act: 'restartHint' });
+    expect(globalKeyAction('play', true, 'Backspace')).toEqual({ act: 'restart' });
+    expect(globalKeyAction('play', false, 'Escape')).toEqual({ act: 'pause' });
+    expect(globalKeyAction('play', true, 'Escape')).toEqual({ act: 'resume' });
+    // Las teclas de juego no son globales: Intro en juego es agarrar (J2), no empezar
+    for (const code of ['Enter', 'Space', 'KeyR', 'ArrowUp']) expect(globalKeyAction('play', false, code), code).toBe(null);
+    expect(globalKeyAction('menu', false, 'Enter')).toEqual({ act: 'start' });
+    expect(globalKeyAction('menu', false, 'ArrowDown')).toEqual({ act: 'nav', dx: 0, dy: 1 });
+    expect(globalKeyAction('menu', false, 'Backspace')).toBe(null);
+    expect(globalKeyAction('results', false, 'Enter')).toEqual({ act: 'again' });
+    expect(globalKeyAction('results', false, 'Escape')).toEqual({ act: 'menu' });
+    expect(globalKeyAction('results', false, 'Backspace')).toBe(null);
+    for (const sc of ['menu', 'play', 'results'] as const) expect(globalKeyAction(sc, false, 'KeyM')).toEqual({ act: 'mute' });
+    // main.ts decide con esta función, y la ayuda dice que Retroceso es de la pausa
+    expect(mainSrc).toMatch(/globalKeyAction\(screen, paused, code\)/);
+    expect(mainSrc).not.toMatch(/code === 'Backspace'/);
+    expect(indexHtml).toMatch(/en la pausa, <kbd>Retroceso<\/kbd> reinicia/);
   });
 });
 
