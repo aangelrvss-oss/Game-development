@@ -1,0 +1,25 @@
+== inicio 10:52:45
+c2-duo-b #1 exit=1 OK=20 FALLA=1 dur=531s load=4.87
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo true, caída false
+c2-duo-b #2 exit=1 OK=19 FALLA=2 dur=559s load=4.31
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo true, caída false
+    FALLA tras levantarse, J2 vuelve a agarrar 
+c2-duo-b #3 exit=1 OK=20 FALLA=1 dur=523s load=4.33
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo true, caída false
+c2-duo-b #4 exit=1 OK=16 FALLA=5 dur=624s load=4.22
+    FALLA los dos agarran el sofá (Espacio e Intro a la vez) 
+    FALLA tirando juntos hacia arriba, el sofá avanza 0.00 m en 2,5 s [tambaleos J1 0, J2 0; agarran no/no]
+    FALLA aviso en pantalla: «Pesa mucho: falta alguien en el otro extremo» (contador 0.00 s; sucesos: )
+    FALLA J2 vuelve a agarrar (sucesos: ; sofá [-3.8,0.2,11.05] yaw -0.28; estado [{"h":false,"x":-1.92,"z":10.86,"stun":0,"wob":false},{"h":false,"x":-5.65,"z":11.36,"stun":0,"wob":false}])
+    FALLA tirar en sentidos opuestos hace girar el sofá 0.00 rad con KeyS + ArrowUp [tambaleos J1 0, J2 0; agarran no/no]
+c2-teclado #1 exit=1 OK=11 FALLA=2 dur=43s load=4.45
+    FALLA Con W el grupo lleva el sofá hacia la calle Δz = -0.00 m en 2.57 s de juego
+    FALLAN 1
+c2-teclado #2 exit=0 OK=12 FALLA=0 dur=45s load=4.34
+c2-teclado #3 exit=0 OK=12 FALLA=0 dur=43s load=4.93
+c2-dos #1 exit=0 OK=4 FALLA=0 dur=28s load=4.90
+c2-smoke #1 exit=0 OK=0 FALLA=0 dur=107s load=4.35
+base-duo #1 exit=0 OK=21 FALLA=0 dur=503s load=4.52
+base-duo #2 exit=0 OK=21 FALLA=0 dur=516s load=4.19
+base-duo #3 exit=0 OK=21 FALLA=0 dur=530s load=4.22
+== fin 12:00:18

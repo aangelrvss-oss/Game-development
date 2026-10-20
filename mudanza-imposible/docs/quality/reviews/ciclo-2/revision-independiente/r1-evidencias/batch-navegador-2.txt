@@ -1,0 +1,14 @@
+== inicio 12:16:02
+base-teclado #1 exit=0 OK=12 FALLA=0 dur=45s load=3.09
+base-teclado #2 exit=0 OK=12 FALLA=0 dur=44s load=3.90
+base-teclado #3 exit=0 OK=12 FALLA=0 dur=43s load=4.23
+c2-smoke-patio #1 exit=0 OK=0 FALLA=0 dur=129s load=4.46
+base-duo-x1 #1 exit=0 OK=21 FALLA=0 dur=526s load=4.17
+c2-duo-x1 #1 exit=0 OK=21 FALLA=0 dur=530s load=4.20
+base-duo-x2 #1 exit=0 OK=21 FALLA=0 dur=521s load=4.39
+c2-duo-x2 #1 exit=1 OK=20 FALLA=1 dur=526s load=4.71
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo false, caída false
+base-duo-x3 #1 exit=0 OK=21 FALLA=0 dur=523s load=4.59
+c2-duo-x3 #1 exit=1 OK=20 FALLA=1 dur=550s load=4.41
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo false, caída false
+== fin 13:13:20

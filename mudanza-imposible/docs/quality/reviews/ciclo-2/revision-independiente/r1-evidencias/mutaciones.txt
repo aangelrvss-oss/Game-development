@@ -1,0 +1,74 @@
+== M1-entrega-centro (src/sim/game.ts): exit 1
+   - it.inHold = this.holdFraction(it) >= RULES.loadFraction;
+   + it.inHold = this.holdFraction(it) > 0;
+   Test Files  1 failed | 6 passed (7)
+   Tests  1 failed | 111 passed (112)
+   FALLA × tests/levels.test.ts > Entrega con progreso (T-deliver) > cuenta como cargado con el centro y al menos el 80 % de su caja envolvente dentro; con el centro dentro pero menos, no 67ms
+== M2-entrega-sin-quieto (src/sim/game.ts): exit 0
+   - const still = Math.hypot(v.x, v.y, v.z) < RULES.loadedSpeed && Math.hypot(w.x, w.y, w.z) < RULES.loadedSpin;
+   + const still = true;
+   Test Files  7 passed (7)
+   Tests  112 passed (112)
+   NO DETECTADA: ninguna prueba falla
+== M3-fragil-umbral-comun (src/sim/game.ts): exit 1
+   - const threshold = f ? f.impactDv : RULES.impactDv;
+   + const threshold = RULES.impactDv;
+   Test Files  2 failed | 5 passed (7)
+   Tests  4 failed | 108 passed (112)
+   FALLA × tests/items.test.ts > Fragilidad (T-item-3) > cada objeto tiene su integridad y el daño total es la suma; un opcional roto no hace perder y uno obligatorio sí 20ms
+   FALLA × tests/items.test.ts > Fragilidad (T-item-3) > se rompe (estado broken y suceso itemBroken, una sola vez) si cae desde la altura de carga 40ms
+   FALLA × tests/levels.test.ts > Entrega con progreso (T-deliver) > lista de estados por objeto: pendiente, en camino, cargado y roto; en la interfaz, «Cargados N/M» con nombre y estado 46ms
+   FALLA × tests/levels.test.ts > Entrega con progreso (T-deliver) > un obligatorio roto hace perder; uno opcional roto solo cuenta como daño 36ms
+== M3b-opcional-roto-pierde (src/sim/game.ts): exit 1
+   - if (this.items.some((it) => it.required && it.state === 'broken'))
+   + if (this.items.some((it) => it.state === 'broken'))
+   Test Files  2 failed | 5 passed (7)
+   Tests  2 failed | 110 passed (112)
+   FALLA × tests/items.test.ts > Fragilidad (T-item-3) > cada objeto tiene su integridad y el daño total es la suma; un opcional roto no hace perder y uno obligatorio sí 29ms
+   FALLA × tests/levels.test.ts > Entrega con progreso (T-deliver) > un obligatorio roto hace perder; uno opcional roto solo cuenta como daño 77ms
+== M4-reparto-una-menos (src/sim/autopilot.ts): exit 1
+   - const need = Math.max(1, it.def.minCarriers - g.bots.size);
+   + const need = Math.max(1, it.def.minCarriers - 1 - g.bots.size);
+   Test Files  1 failed | 6 passed (7)
+   Tests  2 failed | 110 passed (112)
+   FALLA × tests/roles.test.ts > El 3.º y el 4.º jugador aportan (T-roles) > el reparto forma equipos por objeto según minCarriers; con un solo objeto («La calle»), todos van al sofá 5ms
+   FALLA × tests/roles.test.ts > El 3.º y el 4.º jugador aportan (T-roles) > en el patio de pruebas, con 4 humanos se termina al menos un 25 % antes que con 2, y con 3, antes que con 2 (mediana de 3 salidas) 4239ms
+== M4b-ayudantes-sin-espera (src/sim/game.ts): exit 0
+   - : it.required && heavy && short ? 2 : -1;
+   + : -1;
+   Test Files  7 passed (7)
+   Tests  112 passed (112)
+   NO DETECTADA: ninguna prueba falla
+== M5-cuarto-parado (src/sim/autopilot.ts): exit 1
+   - let free = this.pilots.filter((i) => !this.crewOf.has(i));
+   + let free = this.pilots.filter((i) => !this.crewOf.has(i) && i !== 3);
+   Test Files  1 failed | 6 passed (7)
+   Tests  1 failed | 111 passed (112)
+   FALLA × tests/roles.test.ts > El 3.º y el 4.º jugador aportan (T-roles) > el reparto forma equipos por objeto según minCarriers; con un solo objeto («La calle»), todos van al sofá 9ms
+== M6-reparto-lejanos (src/sim/autopilot.ts): exit 0
+   - const pick = [...free].sort((a, b) => far(a) - far(b)).slice(0, need);
+   + const pick = [...free].sort((a, b) => far(b) - far(a)).slice(0, need);
+   Test Files  7 passed (7)
+   Tests  112 passed (112)
+   NO DETECTADA: ninguna prueba falla
+src restaurado: idéntico al original
+
+real	3m22.376s
+user	7m40.221s
+sys	0m13.140s
+== M5b-cuarto-en-equipo-quieto (src/sim/autopilot.ts): exit 1
+   -     if (g.phase !== 'playing') return inp;
+    const me = g.carriers[this.carrierIndex];
+   +     if (g.phase !== 'playing' || this.carrierIndex === 3) return inp;
+    const me = g.carriers[this.carrierIndex];
+   Test Files  1 failed | 6 passed (7)
+   Tests  1 failed | 111 passed (112)
+   FALLA × tests/roles.test.ts > El 3.º y el 4.º jugador aportan (T-roles) > en el patio de pruebas, con 4 humanos se termina al menos un 25 % antes que con 2, y con 3, antes que con 2 (mediana de 3 salidas) 6812ms
+src restaurado: idéntico al original
+== M7-sin-freehand (src/sim/game.ts): exit 1
+   - private freeHand = (g: Grabbable) => g.maxHands === undefined || this.holdersOf(g.body).length < g.maxHands;
+   + private freeHand = (g: Grabbable) => true;
+   Test Files  1 failed | 6 passed (7)
+   Tests  1 failed | 111 passed (112)
+   FALLA × tests/items.test.ts > Catálogo de objetos (T-item-1) > su número de asas es el máximo de manos: la lámpara (una asa) no la agarran dos a la vez 58ms
+src restaurado: idéntico al original

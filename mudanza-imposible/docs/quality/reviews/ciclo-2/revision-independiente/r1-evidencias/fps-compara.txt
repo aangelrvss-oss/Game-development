@@ -1,0 +1,8 @@
+base ronda 1 {"fps":10.45,"realFps":4.8,"pace":0.393,"calls":233,"tris":71621}
+c2 ronda 1 {"fps":10.56,"realFps":5.26,"pace":0.438,"calls":229,"tris":69785}
+base ronda 2 {"fps":10.62,"realFps":5.27,"pace":0.427,"calls":233,"tris":71621}
+c2 ronda 2 {"fps":10.5,"realFps":5.4,"pace":0.435,"calls":229,"tris":69785}
+base ronda 3 {"fps":10.39,"realFps":5.33,"pace":0.434,"calls":233,"tris":71621}
+c2 ronda 3 {"fps":10.71,"realFps":5.33,"pace":0.417,"calls":229,"tris":69785}
+MEDIA base: fps internos 10.487, fotogramas reales/s 5.133, ritmo 0.418 s/s, llamadas 233.000, triángulos 71621.000
+MEDIA c2: fps internos 10.590, fotogramas reales/s 5.330, ritmo 0.430 s/s, llamadas 229.000, triángulos 69785.000

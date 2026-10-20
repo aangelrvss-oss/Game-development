@@ -1,0 +1,52 @@
+using deprecated parameters for the initialization function; pass a single object instead
+{"cfg":"2h/2c atentos oeste","seed":1,"phase":"won","t":45.85,"integ":100,"falls":2,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"3h/3c atentos oeste","seed":1,"phase":"won","t":31.87,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"4h/4c atentos oeste","seed":1,"phase":"won","t":30.85,"integ":97,"falls":2,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"2h/2c atentos sur","seed":1,"phase":"won","t":48.73,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"3h/3c atentos sur","seed":1,"phase":"won","t":28.85,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"4h/4c atentos sur","seed":1,"phase":"won","t":30.1,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"2h/2c atentos rampa","seed":1,"phase":"won","t":44.08,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"3h/3c atentos rampa","seed":1,"phase":"won","t":31.68,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"4h/4c atentos rampa","seed":1,"phase":"won","t":32.2,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/3c atentos","seed":1,"phase":"won","t":62.37,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/3c atentos","seed":2,"phase":"won","t":62.37,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/3c atentos","seed":3,"phase":"won","t":62.37,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/3c atentos","seed":4,"phase":"won","t":62.37,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/3c atentos","seed":5,"phase":"won","t":62.37,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/3c atentos","seed":6,"phase":"won","t":62.37,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/4c atentos","seed":1,"phase":"won","t":62.85,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/4c atentos","seed":2,"phase":"won","t":62.85,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/4c atentos","seed":3,"phase":"won","t":62.85,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/4c atentos","seed":4,"phase":"won","t":62.85,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/4c atentos","seed":5,"phase":"won","t":62.85,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/4c atentos","seed":6,"phase":"won","t":62.85,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/4c despistados","seed":1,"phase":"won","t":169.33,"integ":97,"falls":6,"fallsTruck":0,"stuns":0,"breaks":9,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/4c despistados","seed":2,"phase":"won","t":63.62,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/4c despistados","seed":3,"phase":"won","t":63.3,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/4c despistados","seed":4,"phase":"won","t":62.37,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/4c despistados","seed":5,"phase":"won","t":63.22,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/4c despistados","seed":6,"phase":"won","t":62.6,"integ":100,"falls":2,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/6c despistados","seed":1,"phase":"won","t":66.45,"integ":100,"falls":3,"fallsTruck":0,"stuns":0,"breaks":1,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/6c despistados","seed":2,"phase":"won","t":64.37,"integ":100,"falls":2,"fallsTruck":0,"stuns":0,"breaks":1,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/6c despistados","seed":3,"phase":"won","t":63.58,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/6c despistados","seed":4,"phase":"won","t":63.05,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+{"cfg":"1h/6c despistados","seed":5,"phase":"lost","t":240,"integ":100,"falls":8,"fallsTruck":0,"stuns":0,"breaks":4,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"2/5"}
+{"cfg":"1h/6c despistados","seed":6,"phase":"won","t":214.35,"integ":97,"falls":69,"fallsTruck":0,"stuns":0,"breaks":11,"respawn":0,"unloads":0,"stage":"Patio de pruebas","loaded":"5/5"}
+--- resumen
+2h/2c atentos oeste: ganadas 1/1; tiempos 45.85–45.85 (mediana 45.85); integridad mín 100; caídas 2 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+3h/3c atentos oeste: ganadas 1/1; tiempos 31.87–31.87 (mediana 31.87); integridad mín 100; caídas 1 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+4h/4c atentos oeste: ganadas 1/1; tiempos 30.85–30.85 (mediana 30.85); integridad mín 97; caídas 2 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+2h/2c atentos sur: ganadas 1/1; tiempos 48.73–48.73 (mediana 48.73); integridad mín 100; caídas 0 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+3h/3c atentos sur: ganadas 1/1; tiempos 28.85–28.85 (mediana 28.85); integridad mín 100; caídas 0 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+4h/4c atentos sur: ganadas 1/1; tiempos 30.1–30.1 (mediana 30.1); integridad mín 100; caídas 0 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+2h/2c atentos rampa: ganadas 1/1; tiempos 44.08–44.08 (mediana 44.08); integridad mín 100; caídas 1 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+3h/3c atentos rampa: ganadas 1/1; tiempos 31.68–31.68 (mediana 31.68); integridad mín 100; caídas 1 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+4h/4c atentos rampa: ganadas 1/1; tiempos 32.2–32.2 (mediana 32.2); integridad mín 100; caídas 0 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+1h/3c atentos: ganadas 6/6; tiempos 62.37–62.37 (mediana 62.37); integridad mín 100; caídas 6 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+1h/4c atentos: ganadas 6/6; tiempos 62.85–62.85 (mediana 62.85); integridad mín 100; caídas 0 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+1h/4c despistados: ganadas 6/6; tiempos 62.37–169.33 (mediana 63.3); integridad mín 97; caídas 9 (camión 0); derribos 0; se escapa 9; reapariciones 0; perdidas: ninguna
+1h/6c despistados: ganadas 5/6; tiempos 63.05–214.35 (mediana 64.37); integridad mín 97; caídas 83 (camión 0); derribos 0; se escapa 17; reapariciones 0; perdidas: s5 lost@Patio de pruebas 240s
+
+real	0m35.068s
+user	0m40.173s
+sys	0m0.655s

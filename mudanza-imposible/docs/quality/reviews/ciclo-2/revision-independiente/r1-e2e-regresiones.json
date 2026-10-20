@@ -1,0 +1,249 @@
+{
+ "dimension": "Estabilidad de las pruebas E2E y ausencia de regresiones (rol QA), ciclo 2 (5cab122 frente a 657fd30)",
+ "score": 5,
+ "justification": "Las pruebas en Node están sólidas. tsc limpio y Vitest 112/112 en 3 ejecuciones, dos de ellas barajadas (semillas 1792497701866 y 1792497733762), con resultados deterministas (T-roles da siempre 45,85 / 31,68 / 30,85 s). Las 71 pruebas anteriores conservan sus nombres (comm vacío), no se ha rebajado ningún umbral y ninguna prueba está marcada como skip u only. En la parte A de duo-e2e, la física es idéntica bit a bit entre las dos versiones (diff de duo-traza vacío).\n\nEl criterio de T-level-2 («e2e:duo y e2e:teclado siguen pasando») no se cumple de forma fiable en el navegador:\n- e2e:duo: 2 de 8 ejecuciones en verde en 5cab122, frente a 6 de 6 en 657fd30, en la misma máquina y con tandas intercaladas (p≈0,009, Fisher unilateral).\n- e2e:teclado: 2 de 3 en 5cab122, frente a 3 de 3 en 657fd30.\n\nLa causa principal no está en la física. La prueba elige las teclas de «tirar en sentidos opuestos» según si el giro supera π/4, y el giro tras «uno solo» cae justo en ese filo: 0,762 rad con 2,6 s de arrastre y 0,787 con 2,7 s, igual en las dos versiones. Ni los FPS ni el coste de dibujo cambian (5,33 frente a 5,13 fotogramas reales por segundo; 229 frente a 233 llamadas de dibujo).\n\nEn comportamiento, no hay derrotas en 59 partidas de «La calle» por versión, pero sí hay regresiones que ninguna prueba detecta:\n- Con 4 humanos y 2 ayudantes atentos, la mediana pasa de 33,87 a 58,05 s, el máximo de 76,77 a 127,93 s y la integridad mínima de 97 a 86.\n- Las caídas pasan de 79 a 117 (de 9 a 61 en la zona del camión).\n- Las partidas con daño pasan de 1 a 7.\n\nEn las mutaciones, las pruebas nuevas detectan 6 de 10 (sumando M5, que solo detecta la comprobación estática del reparto, y M7, que comprueba una afirmación del paso 1). No detectan tres:\n- que el objeto cargado tenga que estar quieto (M2);\n- el reparto por lejanía (M6);\n- el nivel 3 del reparto de los ayudantes (M4b, que tampoco cambia ninguna partida medida).\nLa prueba de tiempos de T-roles pasa aunque el 4.º jugador no entre en ningún equipo (M5: mediana con 4 jugadores de 30,62 s, mejor que 30,85).\n\nCon un gate e2e que falla en el 75 % de las ejecuciones y regresiones con ayudantes sin vigilar, la dimensión queda lejos del 8,5.",
+ "subscores": [
+  {
+   "aspect": "Estabilidad e2e en Chromium (5cab122)",
+   "score": 3,
+   "why": "duo-e2e: 2 de 8 en verde (6 ejecuciones fallidas, 11 comprobaciones fallidas); keyboard-e2e: 2 de 3; two-players: 1 de 1; smoke de «La calle» (37,2 s, 100 %) y demo del patio (62,85 s, 100 %) ganan. En 657fd30: duo 6 de 6 y teclado 3 de 3."
+  },
+  {
+   "aspect": "Batería en Node y tipos",
+   "score": 9.5,
+   "why": "tsc con salida 0; Vitest 112/112 ×3 (2 barajadas), unos 27 s por ejecución, deterministas. Los 71 nombres antiguos se conservan; no hay skip, only ni todo."
+  },
+  {
+   "aspect": "Ausencia de regresiones de comportamiento",
+   "score": 5,
+   "why": "59/59 ganadas en las dos versiones. Todas las configuraciones tardan 2–4 s más, que es lo esperado. Con 4 humanos y 2 ayudantes atentos la mediana sube 24 s y hay daño en 5 de 8 partidas; con 1 humano y 3 despistados, la semilla 4 pasa de 34,7 a 90,1 s. Caídas en la zona del camión: de 9 a 61."
+  },
+  {
+   "aspect": "Poder de detección de las pruebas nuevas (mutaciones)",
+   "score": 6,
+   "why": "Detectadas: M1 (80 %), M3 y M3b (fragilidad), M4 (minCarriers en el reparto), M5b (miembro inactivo) y M7 (freeHand); M5, solo por la comprobación estática. Sin detectar: M2 (quieto), M6 (lejanía) y M4b. T-roles no distingue a un 4.º jugador inútil."
+  },
+  {
+   "aspect": "Pruebas adaptadas (sin pérdida de poder)",
+   "score": 8.5,
+   "why": "Solo hay adaptaciones de API (level: CALLE, respawnItem, carHit target 'item', CALLE.stages); la etapa «Camión» es ahora más estricta. Pero ninguna prueba vigila la combinación de humanos y ayudantes, y T-route con 4 sigue pasando con el 4.º inactivo (ya pasaba antes)."
+  }
+ ],
+ "claims": [
+  {
+   "claim": "tsc OK y Vitest 112/112 sobre el árbol integrado",
+   "source": "QUALITY_STATE.md §9 (Integración)",
+   "verdict": "CONFIRMADO",
+   "evidence": "`npx tsc --noEmit -p .` → exit 0 sin salida (/tmp/claude-0/review-c2/qa/tsc.log). `npx vitest run --config scripts/audit/review-c2/qa/vitest.qa.config.ts --root .` (la misma configuración, con la caché fuera de node_modules) → «Test Files 7 passed (7) · Tests 112 passed (112)» en vitest-1.log, vitest-2-shuffle.log (seed 1792497701866) y vitest-3-shuffle.log (seed 1792497733762)."
+  },
+  {
+   "claim": "El código de 5cab122 es idéntico al de 23b8c66",
+   "source": "QUALITY_STATE.md §9",
+   "verdict": "CONFIRMADO",
+   "evidence": "`git diff --stat 23b8c66 5cab122 -- mudanza-imposible/src mudanza-imposible/tests mudanza-imposible/scripts/*.cjs mudanza-imposible/scripts/*.ts index.html package.json` → vacío."
+  },
+  {
+   "claim": "Las 71 pruebas de V1 siguen con el mismo nombre y ningún umbral se ha rebajado",
+   "source": "verificacion-pausa/pruebas-node.json",
+   "verdict": "CONFIRMADO",
+   "evidence": "Vitest de 657fd30: 71/71. `comm -23 nombres-base.txt nombres-c2.txt` → vacío. `git diff 657fd30 5cab122 -- tests/sim.test.ts tests/coherence.test.ts`: solo `level: CALLE`, `respawnItem`, `carHit target 'item'`, `g.level.timeLimit` y `CALLE.stages`; ningún literal de los expect cambia. grep de skip, only, todo, skipIf, runIf y fails: 0 en los 8 archivos."
+  },
+  {
+   "claim": "duo-e2e 1 de 2 en verde; el fallo es P2, que depende del giro del sofá al soltar, que en el navegador varía con los FPS",
+   "source": "QUALITY_STATE.md §9 (Pruebas antes de integrar)",
+   "verdict": "PARCIAL",
+   "evidence": "Confirmado: la física es igual (duo-traza.ts da salida idéntica en los dos árboles, «IDENTICAS») y el fallo va ligado al giro: en las 6 ejecuciones que fallan «soltar», el giro fue de 0,59–0,88 rad; en las que pasan, de 1,22–1,44 rad. Refutado: no son los FPS. fps-compara.cjs, 3 rondas alternas: base 5,13 fotogramas reales por segundo y ritmo de 0,418 s de juego por s; c2 5,33 y 0,430. El mecanismo es el filo de π/4 que usa la propia prueba para elegir teclas (duo-filo.ts). Tasa real: 2 de 8 en 5cab122 frente a 6 de 6 en 657fd30."
+  },
+  {
+   "claim": "duo-e2e pasó en la última ejecución 21/21 y keyboard-e2e dio «TODO OK»",
+   "source": "informe-paso3-vista.json",
+   "verdict": "PARCIAL",
+   "evidence": "Las dos cosas ocurren, pero no de forma fiable. duo: 21/21 en c2-duo-1 y c2-duo-x1-1; falla en c2-duo-b-1 a b-4, x2 y x3. teclado: c2-teclado-1 da «FALLA Con W el grupo lleva el sofá hacia la calle Δz = -0.00 m en 2.57 s de juego»; las ejecuciones 2 y 3 dan TODO OK."
+  },
+  {
+   "claim": "T-level-2: e2e:duo y e2e:teclado siguen pasando",
+   "source": "cycles/ciclo-2.md",
+   "verdict": "REFUTADO",
+   "evidence": "Como criterio de estabilidad no se cumple: duo 2 de 8 y teclado 2 de 3 en 5cab122, frente a 6 de 6 y 3 de 3 en 657fd30, en la misma máquina y con tandas intercaladas (batch-navegador.txt y batch-navegador-2.txt)."
+  },
+  {
+   "claim": "La entrega dentro del camión añade unos 2 s a «La calle»",
+   "source": "QUALITY_STATE.md §9 / informe-paso2-niveles.json",
+   "verdict": "PARCIAL",
+   "evidence": "Con solo humanos se confirma (regresion.ts calle): 2h 33,38 → 35,72; 3h 33,12 → 35,82; 4h 32,97 → 34,70 s. Con 4 humanos y 2 ayudantes atentos (semillas 1–8): mediana 33,87 → 58,05 s y máximo 76,77 → 127,93 s."
+  },
+  {
+   "claim": "help-batch TOTAL 40/40 (1 jugador con ayudantes)",
+   "source": "informe-paso3-vista.json",
+   "verdict": "CONFIRMADO",
+   "evidence": "regresion-c2.txt: 1h con 2, 3 y 4 atentos y con 4 y 6 despistados, semillas 1–8 → 40/40 ganadas. Los tiempos empeoran (1h/4c despistados, semilla 4: 90,08 s con integridad 91)."
+  },
+  {
+   "claim": "T-roles: medianas 45,85 / 31,68 / 30,85 s",
+   "source": "informe-paso3-vista.json",
+   "verdict": "CONFIRMADO",
+   "evidence": "«Medianas: 2 → 45.85 s; 3 → 31.68 s (30.9 % antes); 4 → 30.85 s (32.7 % antes)» en las 3 ejecuciones de Vitest."
+  },
+  {
+   "claim": "El patio con ayudantes ha pasado de 5/10 a 10/10 partidas ganadas",
+   "source": "informe-paso3-vista.json",
+   "verdict": "PARCIAL",
+   "evidence": "regresion-patio-c2.txt, con el piloto con reparto (como la demo): 23 de 24. 1h/6c despistados, semilla 5: «lost … 240s», 2/5 cargados. La semilla 6 gana en 214,35 s con 69 caídas, y 1h/4c despistados, semilla 1, en 169,33 s."
+  },
+  {
+   "claim": "4 humanos + 2 ayudantes atentos empeoran mucho (mediana 58 s)",
+   "source": "verificacion-pausa/seis-problemas-ciclo-1.json (P1)",
+   "verdict": "CONFIRMADO",
+   "evidence": "Medición independiente con regresion.ts y Autopilot.team, semillas 1–8: 657fd30 mediana 33,87 s, 7 de 8 a 38,63 s o menos; 5cab122 mediana 58,05 s, con 127,93 / 62,43 / 65,65 / 58,05 s e integridad mínima 86."
+  },
+  {
+   "claim": "Las caídas de porteadores se duplican y casi todas ocurren en la zona del camión",
+   "source": "verificacion-pausa/pruebas-node.json",
+   "verdict": "CONFIRMADO",
+   "evidence": "Mi matriz de 59 partidas por versión: caídas 79 → 117; en x ≥ 22: 9 → 61; partidas con integridad < 100: 1 → 7."
+  },
+  {
+   "claim": "Sin el filtro freeHand, la prueba del máximo de manos falla",
+   "source": "informe-paso1-objetos.json",
+   "verdict": "CONFIRMADO",
+   "evidence": "mutar.py M7-sin-freehand → «× tests/items.test.ts > … la lámpara (una asa) no la agarran dos a la vez»."
+  },
+  {
+   "claim": "T-view: las 8 piezas del camión coinciden con sus colliders, con 0,00 mm de error",
+   "source": "informe-paso3-vista.json",
+   "verdict": "CONFIRMADO",
+   "evidence": "vitest-1.log: «T-view, camión de «La calle»: 8 piezas, error máximo 0.00 mm» (y lo mismo en el patio). Lectura de código: las esquinas salen de la geometría y de matrixWorld de cada malla (levelView.ts:578-586), no de los datos."
+  },
+  {
+   "claim": "e2e:smoke: la demo gana",
+   "source": "README / informes",
+   "verdict": "CONFIRMADO",
+   "evidence": "c2-smoke-1: «RESULT … won … t 37.17 … integ 100», 336 llamadas de dibujo, 57.898 triángulos. c2-smoke-patio-1 (?nivel=pruebas&auto=1&carriers=4): won a los 62,85 s con 100 %. En los dos, el único aviso es el de «deprecated parameters» de Rapier."
+  }
+ ],
+ "defects": [
+  {
+   "severity": "major",
+   "title": "e2e:duo es inestable en 5cab122: 2 de 8 ejecuciones en verde, frente a 6 de 6 en 657fd30 (intermitente por reloj, con la tasa empeorada)",
+   "evidence": "batch-navegador.txt y batch-navegador-2.txt (tandas intercaladas base/c2). Fallos literales:\n- c2-duo-b-1: «FALLA soltar mientras tira: J2 se tambalea y cae tambaleo true, caída false».\n- c2-duo-b-2: lo mismo y además «FALLA tras levantarse, J2 vuelve a agarrar».\n- c2-duo-b-3: «soltar…».\n- c2-duo-b-4: 5 fallos (abajo).\n- c2-duo-x2-1 y c2-duo-x3-1: «FALLA soltar mientras tira: … tambaleo false, caída false».\nRelación con el giro: en las 6 en que falla «soltar», el giro fue de 0,59–0,88 rad (en 4 de ellas con KeyS + ArrowUp); en las 8 que pasan, de 1,22–1,44 rad (todas KeyA + ArrowRight).\nCausa (Node, duo-filo.ts): el giro tras «uno solo» pasa de 0,762 rad (S) a 0,787 rad (A) entre 2,6 y 2,7 s de arrastre. duo-e2e.cjs:183-184 elige las teclas con |sen| > |cos|, un filo en π/4. La salida es idéntica en 657fd30 y en 5cab122. FPS iguales (fps-compara.txt).\nClasificación: intermitente por reloj (diseño de la prueba), no es una regresión de física; la tasa observada empeora (p≈0,009).",
+   "repro": "1. `npm run build`.\n2. `npx vite preview --port 4193 --strictPort` en 5cab122 y `--port 4196` en un worktree de 657fd30.\n3. `bash scripts/audit/review-c2/qa/batch-navegador-2.sh` (o, desde una carpeta en /tmp, `NODE_PATH=$(npm root -g) node <repo>/scripts/duo-e2e.cjs http://localhost:4193/` varias veces).\n4. El filo: `ROOT=$PWD npx vite-node scripts/audit/review-c2/qa/duo-filo.ts` en cada árbol.",
+   "kind": "automatizado",
+   "regression": "empeora en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "Regresión sin detectar: en «La calle», con 4 humanos y 2 ayudantes atentos, la entrega es mucho más lenta y con daño",
+   "evidence": "regresion-base.txt frente a regresion-c2.txt, 4h/6c atentos, semillas 1–8:\n- 657fd30: «ganadas 8/8; tiempos 31.3–76.77 (mediana 33.87); integridad mín 97; caídas 51 (camión 2)».\n- 5cab122: «ganadas 8/8; tiempos 35.27–127.93 (mediana 58.05); integridad mín 86; caídas 65 (camión 23)».\nSemilla 1: 32,52 s y 100 % frente a 127,93 s y 89 %.\nEn toda la matriz (59 partidas): caídas 79 → 117; en el camión 9 → 61; partidas con daño 1 → 7.\nNinguna prueba cubre esta combinación: sim.test solo prueba 1 humano con ayudantes y T-route solo humanos.\nCapturas en Chromium con semilla 1: calle-4j2a-semilla1-t32-c2.jpg y calle-4j2a-semilla1-t32-base.jpg.",
+   "repro": "`ROOT=$PWD npx vite-node scripts/audit/review-c2/qa/regresion.ts calle` en el árbol de 657fd30 y en el de 5cab122; comparar el resumen «4h/6c atentos». Capturas: `NODE_PATH=$(npm root -g) node scripts/audit/review-c2/qa/capturas-clave.cjs http://localhost:4193/ http://localhost:4196/ <carpeta>`.",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "major",
+   "title": "T-roles no puede detectar que el 4.º jugador no aporte: con el 4.º fuera de todo equipo, la prueba de tiempos pasa y da mejor resultado",
+   "evidence": "mutar.py M5-cuarto-parado (`let free = this.pilots.filter((i) => !this.crewOf.has(i) && i !== 3);` en autopilot.ts):\n- Medianas: «2 → 45.85 s; 3 → 31.68 s (30.9 % antes); 4 → 30.62 s (33.2 % antes)», mejor que el código real (30,85 s).\n- La prueba de tiempos de T-roles pasa; solo falla la comprobación estática del reparto en t=0 (roles.test.ts:96-101).\nEl criterio (4 frente a 2 ≥ 25 %, 3 < 2) no exige que 4 mejore a 3, así que «el 3.º y el 4.º aportan» queda sin demostrar para el 4.º.",
+   "repro": "`python3 -I scripts/audit/review-c2/qa/mutar.py M5-cuarto-parado` (usa una copia en /tmp/claude-0/review-c2/qa/mut con src original en mut-src-orig); registro en /tmp/claude-0/review-c2/qa/mutaciones/M5-cuarto-parado.log.",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "La condición «quieto» de la entrega (T-deliver) no tiene prueba: con `still = true` pasan las 112",
+   "evidence": "mutar.py M2-entrega-sin-quieto (game.ts, updateLoad: `const still = true;`) → «Tests 112 passed (112)», «NO DETECTADA». El efecto es real: las medianas de T-roles bajan a 43,67 / 30,25 / 28,85 s (cuenta como cargado un objeto que aún se mueve dentro del camión).",
+   "repro": "`python3 -I scripts/audit/review-c2/qa/mutar.py M2-entrega-sin-quieto`",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Reparto por equipos sin vigilancia: elegir a los pilotos más lejanos (M6) no lo detecta ninguna prueba, y el nivel 3 del reparto de ayudantes (M4b) no cambia ninguna partida medida",
+   "evidence": "- M6-reparto-lejanos → 112/112, medianas 46,63 / 31,20 / 31,57 s.\n- M4b-ayudantes-sin-espera (`: -1;` en game.ts chooseItems) → 112/112, y regresion-patio-M4b.txt sale idéntico a regresion-patio-c2.txt en 1h/3c, 1h/4c y 1h/6c: o es código muerto o nada lo ejerce.",
+   "repro": "`python3 -I scripts/audit/review-c2/qa/mutar.py M6-reparto-lejanos M4b-ayudantes-sin-espera`",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Patio de pruebas con 1 humano y ayudantes despistados: una derrota por tiempo y partidas de hasta 214 s, sin prueba",
+   "evidence": "regresion-patio-c2.txt (piloto con reparto, como la demo):\n- 1h/6c despistados: «ganadas 5/6 … s5 lost@Patio de pruebas 240s», con 2/5 cargados.\n- 1h/6c despistados, semilla 6: won en 214,35 s con 69 caídas.\n- 1h/4c despistados, semilla 1: 169,33 s.\nVitest solo prueba 1h con 2 atentos (62,37 s). Con atentos, añadir ayudantes no acorta nada: 62,37 / 62,85 s.",
+   "repro": "`ROOT=$PWD npx vite-node scripts/audit/review-c2/qa/regresion.ts patio` en 5cab122",
+   "kind": "automatizado",
+   "regression": "nuevo en ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "keyboard-e2e intermitente: J1 suelta el sofá justo después de agarrarlo y «Con W» no avanza (2 de 3 en c2; 3 de 3 en base)",
+   "evidence": "c2-teclado-1/out.log:\n- «OK J1 agarra el sofá con Espacio».\n- «FALLA Con W el grupo lleva el sofá hacia la calle Δz = -0.00 m en 2.57 s de juego».\n- diag: J1 «h:false» mientras 3 ayudantes agarran.\nEn la captura shots/k02-alzado-solo.png (observación visual), a t=1,9 s el panel de J1 no dice «agarrando» y sale «Acércate al sofá y pulsa ESPACIO». El bucle de agarre (keyboard-e2e.cjs:44-53) pulsa Espacio con esperas de reloj de 150 ms: una segunda pulsación suelta lo agarrado. El script no ha cambiado entre versiones.",
+   "repro": "`NODE_PATH=$(npm root -g) node scripts/keyboard-e2e.cjs http://localhost:4193/` ×3 desde una carpeta en /tmp (run-e2e.sh c2-teclado …)",
+   "kind": "automatizado",
+   "regression": "desconocido"
+  },
+  {
+   "severity": "minor",
+   "title": "duo-e2e: el piloto de la prueba se atasca, contra la alfombra enrollada o empujando el sofá, y encadena fallos",
+   "evidence": "- c2-duo-b-2: 7 rodeos «J2 bloqueado en (-5.42, 7.20) hacia (-1.42, 7.16)» contra la alfombra (prop 'rug' en (-4,9; 7,4), igual en 657fd30) → «FALLA tras levantarse, J2 vuelve a agarrar».\n- c2-duo-b-4: 21 rodeos empujando el sofá desde la salida → «FALLA los dos agarran el sofá», y en cascada «avanza 0.00 m», «Pesa mucho … contador 0.00 s», «J2 vuelve a agarrar» y «girar el sofá 0.00 rad».\nLa regla de llegada (|dx| y |dz| ≤ 0,2 m con pulsaciones de 0,1 s o más de juego) y el rodeo de 0,6 s no bastan.",
+   "repro": "Repetir duo-e2e en 5cab122; ver los «Rodeos del piloto de prueba» al final de cada out.log en /tmp/claude-0/review-c2/qa/runs/",
+   "kind": "automatizado",
+   "regression": "anterior al ciclo 2"
+  },
+  {
+   "severity": "minor",
+   "title": "Infraestructura de pruebas: en el navegador no se puede fijar la semilla, y two-players-e2e solo funciona contra :4173",
+   "evidence": "- main.ts:199: `seed: Math.floor(Math.random() * 1e9)`, sin parámetro ?seed. Para reproducir la semilla 1 en Chromium hubo que sustituir Math.random durante start() (capturas-clave.cjs).\n- two-players-e2e.cjs:8 tiene `await p.goto('http://localhost:4173/')` fijo. Hizo falta una copia (two-players-e2e-url.cjs), que dio 4/4 OK.",
+   "repro": "Lectura de código; `node scripts/audit/review-c2/qa/two-players-e2e-url.cjs http://localhost:4193/`",
+   "kind": "lectura de código",
+   "regression": "anterior al ciclo 2"
+  }
+ ],
+ "strengths": [
+  "Vitest 112/112 en 3 ejecuciones (2 barajadas) y deterministas; tsc limpio; las 71 pruebas antiguas siguen con el mismo nombre y sin umbrales rebajados.",
+  "La física de la partida a dos es idéntica bit a bit entre 657fd30 y 5cab122: duo-traza.ts y duo-filo.ts dan salidas iguales. El fallo de duo-e2e no es una regresión de física.",
+  "Las pruebas nuevas detectan las mutaciones dirigidas importantes: fracción del 80 % (M1), umbral propio de los frágiles (M3), opcional roto (M3b), minCarriers en el reparto (M4), miembro inactivo en un equipo (M5b) y máximo de manos (M7).",
+  "Rendimiento de dibujo sin regresión en la escena de duo-e2e: 5,33 frente a 5,13 fotogramas reales por segundo; 229 frente a 233 llamadas de dibujo; 69.785 frente a 71.621 triángulos.",
+  "En Chromium, la parte B de duo-e2e gana siempre (35,7 s, 100 %, 8 de 8). Las demos de «La calle» (37,2 s) y del patio (62,85 s) ganan. No hay errores de página ni de consola en ninguna de las 14 ejecuciones de duo.",
+  "Sin derrotas en 59 partidas de «La calle» por versión (humanos solos, humanos con ayudantes y 1 humano con ayudantes, semillas 1–8)."
+ ],
+ "humanChecks": [
+  "Jugar «La calle» con 4 personas y 2 ayudantes y comprobar si la zona de la rampa del camión produce atascos, caídas y golpes que frustran: la simulación da una mediana de 58 s y hasta 128 s, frente a 34 s antes.",
+  "Con teclado real a dos: soltar mientras se tira hacia fuera, ¿hace caer de forma comprensible y repetible? (P2 sigue abierto: depende del ángulo del sofá).",
+  "Con 4 personas en el patio de pruebas, ¿tiene el 4.º jugador algo que hacer que se note y divierta? La medición dice que no acorta nada (30,85 frente a 31,68 s, y 30,62 s si no hace nada).",
+  "1 jugador con 3–5 ayudantes despistados en el patio: ¿se entiende y se tolera la espera o el caos (partidas de 169–214 s y una derrota por tiempo)?",
+  "Sonido «load» o «unload» al cargar y descargar, y su volumen: solo se ha comprobado que el código lo pide.",
+  "Mandos físicos con 3 y 4 jugadores: no se ha probado nada con mandos."
+ ],
+ "files": [
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/qa/run-e2e.sh",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/qa/batch-navegador.sh",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/qa/batch-navegador-2.sh",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/qa/two-players-e2e-url.cjs",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/qa/fps-compara.cjs",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/qa/capturas-clave.cjs",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/qa/regresion.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/qa/duo-traza.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/qa/duo-filo.ts",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/qa/mutar.py",
+  "/home/user/Game-development-rc2/mudanza-imposible/scripts/audit/review-c2/qa/vitest.qa.config.ts",
+  "/tmp/claude-0/review-c2/qa/clave/calle-4j2a-semilla1-t32-c2.jpg",
+  "/tmp/claude-0/review-c2/qa/clave/calle-4j2a-semilla1-t32-base.jpg",
+  "/tmp/claude-0/review-c2/qa/clave/calle-4j2a-semilla1-t49-ganada-c2.jpg",
+  "/tmp/claude-0/review-c2/qa/batch-navegador.txt",
+  "/tmp/claude-0/review-c2/qa/batch-navegador-2.txt",
+  "/tmp/claude-0/review-c2/qa/runs/",
+  "/tmp/claude-0/review-c2/qa/regresion-base.txt",
+  "/tmp/claude-0/review-c2/qa/regresion-c2.txt",
+  "/tmp/claude-0/review-c2/qa/regresion-patio-c2.txt",
+  "/tmp/claude-0/review-c2/qa/regresion-patio-M4b.txt",
+  "/tmp/claude-0/review-c2/qa/mutaciones.txt",
+  "/tmp/claude-0/review-c2/qa/mutaciones/",
+  "/tmp/claude-0/review-c2/qa/duo-traza-base.txt",
+  "/tmp/claude-0/review-c2/qa/duo-traza-c2.txt",
+  "/tmp/claude-0/review-c2/qa/duo-filo-c2.txt",
+  "/tmp/claude-0/review-c2/qa/duo-filo-base.txt",
+  "/tmp/claude-0/review-c2/qa/fps-compara.txt",
+  "/tmp/claude-0/review-c2/qa/vitest-1.log",
+  "/tmp/claude-0/review-c2/qa/vitest-2-shuffle.log",
+  "/tmp/claude-0/review-c2/qa/vitest-3-shuffle.log",
+  "/tmp/claude-0/review-c2/qa/vitest-base.log",
+  "/tmp/claude-0/review-c2/qa/tsc.log"
+ ]
+}

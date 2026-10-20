@@ -1,0 +1,75 @@
+using deprecated parameters for the initialization function; pass a single object instead
+{"cfg":"2h/2c atentos","seed":1,"phase":"won","t":35.72,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"3h/3c atentos","seed":1,"phase":"won","t":35.82,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"4h/4c atentos","seed":1,"phase":"won","t":34.7,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"2h/4c atentos","seed":1,"phase":"won","t":38.88,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"2h/4c atentos","seed":2,"phase":"won","t":35.52,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"2h/4c atentos","seed":3,"phase":"won","t":35.73,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"2h/4c atentos","seed":4,"phase":"won","t":36.78,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"2h/4c atentos","seed":5,"phase":"won","t":35.78,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"2h/4c atentos","seed":6,"phase":"won","t":38.63,"integ":100,"falls":1,"fallsTruck":1,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"2h/4c atentos","seed":7,"phase":"won","t":35.52,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"2h/4c atentos","seed":8,"phase":"won","t":35.47,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"4h/6c atentos","seed":1,"phase":"won","t":127.93,"integ":89,"falls":16,"fallsTruck":9,"stuns":0,"breaks":11,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"4h/6c atentos","seed":2,"phase":"won","t":36.43,"integ":100,"falls":2,"fallsTruck":0,"stuns":0,"breaks":4,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"4h/6c atentos","seed":3,"phase":"won","t":36.75,"integ":98,"falls":2,"fallsTruck":0,"stuns":0,"breaks":3,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"4h/6c atentos","seed":4,"phase":"won","t":36.85,"integ":100,"falls":3,"fallsTruck":1,"stuns":0,"breaks":4,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"4h/6c atentos","seed":5,"phase":"won","t":62.43,"integ":86,"falls":16,"fallsTruck":6,"stuns":0,"breaks":9,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"4h/6c atentos","seed":6,"phase":"won","t":58.05,"integ":90,"falls":13,"fallsTruck":4,"stuns":0,"breaks":5,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"4h/6c atentos","seed":7,"phase":"won","t":65.65,"integ":88,"falls":11,"fallsTruck":3,"stuns":0,"breaks":9,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"4h/6c atentos","seed":8,"phase":"won","t":35.27,"integ":100,"falls":2,"fallsTruck":0,"stuns":0,"breaks":3,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/2c atentos","seed":1,"phase":"won","t":37.4,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/2c atentos","seed":2,"phase":"won","t":37.4,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/2c atentos","seed":3,"phase":"won","t":37.4,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/2c atentos","seed":4,"phase":"won","t":37.4,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/2c atentos","seed":5,"phase":"won","t":37.4,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/2c atentos","seed":6,"phase":"won","t":37.4,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/2c atentos","seed":7,"phase":"won","t":37.4,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/2c atentos","seed":8,"phase":"won","t":37.4,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/3c atentos","seed":1,"phase":"won","t":37.22,"integ":100,"falls":1,"fallsTruck":1,"stuns":0,"breaks":1,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/3c atentos","seed":2,"phase":"won","t":36.63,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":1,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/3c atentos","seed":3,"phase":"won","t":36.65,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":1,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/3c atentos","seed":4,"phase":"won","t":36.63,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":1,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/3c atentos","seed":5,"phase":"won","t":36.77,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":1,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/3c atentos","seed":6,"phase":"won","t":36.93,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":1,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/3c atentos","seed":7,"phase":"won","t":36.93,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/3c atentos","seed":8,"phase":"won","t":37.37,"integ":100,"falls":1,"fallsTruck":1,"stuns":0,"breaks":1,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c atentos","seed":1,"phase":"won","t":41.28,"integ":97,"falls":3,"fallsTruck":1,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c atentos","seed":2,"phase":"won","t":37.32,"integ":100,"falls":1,"fallsTruck":1,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c atentos","seed":3,"phase":"won","t":37.4,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c atentos","seed":4,"phase":"won","t":37.13,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c atentos","seed":5,"phase":"won","t":37.37,"integ":100,"falls":1,"fallsTruck":1,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c atentos","seed":6,"phase":"won","t":41.68,"integ":100,"falls":2,"fallsTruck":2,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c atentos","seed":7,"phase":"won","t":37.55,"integ":100,"falls":1,"fallsTruck":1,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c atentos","seed":8,"phase":"won","t":37.2,"integ":100,"falls":1,"fallsTruck":1,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c despistados","seed":1,"phase":"won","t":43.42,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":1,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c despistados","seed":2,"phase":"won","t":37.7,"integ":100,"falls":1,"fallsTruck":1,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c despistados","seed":3,"phase":"won","t":41.33,"integ":100,"falls":2,"fallsTruck":2,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c despistados","seed":4,"phase":"won","t":90.08,"integ":91,"falls":10,"fallsTruck":9,"stuns":0,"breaks":7,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c despistados","seed":5,"phase":"won","t":38.45,"integ":100,"falls":2,"fallsTruck":2,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c despistados","seed":6,"phase":"won","t":38.38,"integ":100,"falls":1,"fallsTruck":1,"stuns":0,"breaks":1,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c despistados","seed":7,"phase":"won","t":45.83,"integ":100,"falls":0,"fallsTruck":0,"stuns":0,"breaks":0,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/4c despistados","seed":8,"phase":"won","t":40.5,"integ":100,"falls":2,"fallsTruck":2,"stuns":0,"breaks":1,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/6c despistados","seed":1,"phase":"won","t":37.13,"integ":100,"falls":1,"fallsTruck":0,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/6c despistados","seed":2,"phase":"won","t":46.58,"integ":100,"falls":3,"fallsTruck":2,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/6c despistados","seed":3,"phase":"won","t":39.62,"integ":100,"falls":4,"fallsTruck":3,"stuns":0,"breaks":3,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/6c despistados","seed":4,"phase":"won","t":38.25,"integ":100,"falls":2,"fallsTruck":1,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/6c despistados","seed":5,"phase":"won","t":43.75,"integ":100,"falls":2,"fallsTruck":1,"stuns":0,"breaks":3,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/6c despistados","seed":6,"phase":"won","t":42.35,"integ":100,"falls":3,"fallsTruck":1,"stuns":0,"breaks":5,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/6c despistados","seed":7,"phase":"won","t":39.78,"integ":100,"falls":3,"fallsTruck":2,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+{"cfg":"1h/6c despistados","seed":8,"phase":"won","t":38.92,"integ":100,"falls":2,"fallsTruck":1,"stuns":0,"breaks":2,"respawn":0,"unloads":0,"stage":"Camión","loaded":"1/1"}
+--- resumen
+2h/2c atentos: ganadas 1/1; tiempos 35.72–35.72 (mediana 35.72); integridad mín 100; caídas 0 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+3h/3c atentos: ganadas 1/1; tiempos 35.82–35.82 (mediana 35.82); integridad mín 100; caídas 0 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+4h/4c atentos: ganadas 1/1; tiempos 34.7–34.7 (mediana 34.7); integridad mín 100; caídas 0 (camión 0); derribos 0; se escapa 2; reapariciones 0; perdidas: ninguna
+2h/4c atentos: ganadas 8/8; tiempos 35.47–38.88 (mediana 35.78); integridad mín 100; caídas 2 (camión 1); derribos 0; se escapa 16; reapariciones 0; perdidas: ninguna
+4h/6c atentos: ganadas 8/8; tiempos 35.27–127.93 (mediana 58.05); integridad mín 86; caídas 65 (camión 23); derribos 0; se escapa 48; reapariciones 0; perdidas: ninguna
+1h/2c atentos: ganadas 8/8; tiempos 37.4–37.4 (mediana 37.4); integridad mín 100; caídas 0 (camión 0); derribos 0; se escapa 0; reapariciones 0; perdidas: ninguna
+1h/3c atentos: ganadas 8/8; tiempos 36.63–37.37 (mediana 36.93); integridad mín 100; caídas 2 (camión 2); derribos 0; se escapa 9; reapariciones 0; perdidas: ninguna
+1h/4c atentos: ganadas 8/8; tiempos 37.13–41.68 (mediana 37.4); integridad mín 97; caídas 9 (camión 7); derribos 0; se escapa 16; reapariciones 0; perdidas: ninguna
+1h/4c despistados: ganadas 8/8; tiempos 37.7–90.08 (mediana 41.33); integridad mín 91; caídas 19 (camión 17); derribos 0; se escapa 16; reapariciones 0; perdidas: ninguna
+1h/6c despistados: ganadas 8/8; tiempos 37.13–46.58 (mediana 39.78); integridad mín 100; caídas 20 (camión 11); derribos 0; se escapa 21; reapariciones 0; perdidas: ninguna
+
+real	0m37.664s
+user	0m42.713s
+sys	0m0.636s
