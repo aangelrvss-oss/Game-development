@@ -1,0 +1,213 @@
+{
+ "summary": "Inventario hecho leyendo código, datos y git, con scripts propios en Node (sin navegador).\n1) Objetos. V1 solo tiene un objeto movible, el sofá: nominal 90 kg, pero Rapier le da 66,46 kg (652 N) y tiene 6 asas. V2 tiene un catálogo de 7 objetos (ItemDef) con su masa real medida: caja 12, silla 6, lámpara 6, mesa 65, sofá 66,46, nevera 80 y piano 130 kg. Las clases de peso cuadran con el máximo que sostiene una mano (600 N), aunque la mesa lo pasa solo por 38 N. Los 6 objetos nuevos solo aparecen en la escena de prueba; en «La calle» sigue estando solo el sofá.\n2) Niveles. V2 registra 2: «La calle», que es el recorrido de siempre convertido en datos, y el «Patio de pruebas», marcado como escena de prueba. Solo se eligen por la URL (?nivel=); el menú no tiene selector. Con el piloto automático, ambos se completan de principio a fin con 2, 3 y 4 humanos y con ayudantes. De los 4 niveles del plan (casa, edificio con escaleras, calle, almacén), ninguno existe como nivel propio.\n3) Visual. De la línea base a V1: muñeco a escala 0,8914, igual que la cápsula de 1,382 m; caída con el collider tumbado; señales de esfuerzo, que siguen saturadas; ayudantes dentro de su cápsula. De V1 a V2: objetos procedurales y camión con caja de carga abierta y rampa. El código de muñeco, esfuerzo y entradas es idéntico en V1 y V2, así que el mayor de esfuerzo saturado sigue abierto.\n4) Blender. bpy 5.2.2 LTS funciona, pero solo se ha usado para una prueba de instalación: un cubo en /tmp/claude-0/test.glb y test.blend del 19-10 a las 19:16. No hay ningún .glb ni .blend en el repositorio ni en su historial; assets-src/blender/ solo contiene setup.sh.\n5) Audio. Todo es sintetizado con WebAudio, sin archivos de sonido ni recursos de terceros. Hay 17 nombres de sonido en V1 y 19 en V2 (se añaden load y unload). 'thud' y 'step' están definidos pero nunca suenan. No hay música.\n6) Ejecutar en un PC. Instrucciones iguales en V1 y V2 (npm ci, npm run dev en :5173; build + preview en :4173). V2 añade el parámetro ?nivel= y el script perf:patio. El README pide «Node 20» cuando Vite 7.3.6 exige 20.19 o más, y tiene bastantes secciones desfasadas.\n7) Ciclos. Los ciclos 0 y 1 están cerrados en git. El ciclo 2 está en pausa: tiene 3 commits locales sin revisión independiente ni corrección. El QUALITY_STATE de V2 no incluye la segunda ronda de revisión del ciclo 1, porque V2 parte de 5505243 y no de c52a81c.",
+ "items": [
+  {
+   "topic": "(1) Catálogo de objetos movibles: masa real, minCarriers, asas, fragilidad",
+   "v1": "Solo el sofá: SOFA.mass = 90 kg (nominal), pero el cuerpo Rapier pesa 66,46 kg (652 N), igual con humanos que con ayudantes; 6 asas (SLOTS); rozamiento 1,0; se daña con golpes de dv > 3,2 m/s (5 puntos por m/s, RULES). Los 28 'props' (cajas apiladas, sillón, lámpara de pie…) son decoración fija con caja de choque y no se pueden agarrar.",
+   "v2": "7 ItemDef, masa Rapier = masa definida: caja 12 kg, 1 persona, 2 asas, no se daña; silla 6 kg, 1, 2 asas, dv > 4 (6/m·s); lámpara 6 kg, 1, 1 asa, dv > 2,45 (400/m·s, se rompe entera); mesa 65 kg (638 N), 2, 4 asas, dv > 3,5 (4); sofá 66,46 kg, 2, 6 asas, dv > 3,2 (5); nevera 80 kg (785 N), 2, 4 asas, dv > 3 (6); piano 130 kg (1275 N), 3, 4 asas, dv > 2,8 (8). Peso por persona con minCarriers: 118, 59, 59, 319, 326, 392 y 425 N, todos por debajo de HAND.maxV = 600 N.",
+   "verdict": "MEJORADO",
+   "kind": "automatizado",
+   "evidence": "npx vite-node scripts/audit/revision-humana/inventario/catalogo.ts (V2) y catalogo-v1.ts (V1). Salida en /tmp/claude-0/revision-humana/inventario/catalogo-v2.txt y catalogo-v1.txt. Literal V1: «sofá: SOFA.mass nominal = 90 kg; masa Rapier = 66.46 kg; peso = 652 N; asas (SLOTS) = 6». Definiciones en src/sim/items.ts:98-256."
+  },
+  {
+   "topic": "(1) En qué nivel aparece cada objeto",
+   "v1": "El sofá, en el único recorrido.",
+   "v2": "«La calle»: solo el sofá (obligatorio). «Patio de pruebas»: mesa, 2 cajas, lámpara y silla (obligatorias), y nevera y piano (opcionales). Ningún objeto del catálogo se queda sin nivel, pero los 6 nuevos solo están en la escena de prueba.",
+   "verdict": "PARCIAL",
+   "kind": "automatizado",
+   "evidence": "catalogo.ts, salida literal: «nivel ?nivel=calle «La calle» test=false objetos=1 main=sofa …» y «nivel ?nivel=pruebas «Patio de pruebas» test=true objetos=7 main=mesa etapas=1 tiempo=240s par=120s tráfico=false»; «objetos del catálogo sin nivel: ninguno». Datos en src/levels/patio.ts:63-71 y calle.ts:238."
+  },
+  {
+   "topic": "(1) Objetos opcionales (nevera, piano)",
+   "v1": "No aplica.",
+   "v2": "No sirven para nada: la partida se gana en cuanto están cargados los obligatorios (game.ts:609-610), y las estrellas solo cuentan tiempo e integridad (main.ts:331). El piloto termina siempre con 5/7 cargados. Romper un opcional sí resta integridad.",
+   "verdict": "ABIERTO",
+   "kind": "lectura de código",
+   "evidence": "src/sim/game.ts:609-612; src/main.ts:331-337. jugable.ts: «?nivel=pruebas humanos=2 … won 45.85 s, integridad 100, cargados 5/7 (obligatorios 5/5)»."
+  },
+  {
+   "topic": "(2) Niveles que existen y cómo se eligen",
+   "v1": "Un único recorrido fijo en el código (src/sim/level.ts: patio, calle, portal, escalera, piso de arriba, rampa y zona en el suelo junto a un camión macizo). No hay selección.",
+   "v2": "Registro LEVELS = {calle, pruebas} (src/levels/index.ts). Se elige solo con ?nivel=calle|pruebas, sin distinguir mayúsculas; un valor desconocido abre «La calle» sin avisar. El menú no tiene selector de nivel: con el mando no se puede cambiar. En el patio, el menú lo presenta como escena de prueba (main.ts:112-117).",
+   "verdict": "MEJORADO",
+   "kind": "lectura de código",
+   "evidence": "src/levels/index.ts:9-18; src/main.ts:25 y 112-117; index.html sin control de nivel (líneas 104-107)."
+  },
+  {
+   "topic": "(2) Niveles jugables de principio a fin (con el piloto automático, no con personas)",
+   "v1": "Recorrido único, semilla 1: 2h 33,38 s; 3h 33,12; 4h 32,97; 1h+1 ayudante 33,77; 1h+3 ayudantes 35,70 s. Todas ganadas al 100 %.",
+   "v2": "«La calle», semilla 1: 2h 35,72; 3h 35,82; 4h 34,70; 1h+1 37,40; 1h+3 41,28 s (integridad 97, 3 caídas). «Patio»: 2h 45,85; 3h 31,87; 4h 30,85 (97 %); 1h+1 63,80; 1h+3 62,85 s. Todas ganadas.",
+   "verdict": "OK",
+   "kind": "automatizado",
+   "evidence": "jugable-v1.ts y jugable.ts, salidas en /tmp/claude-0/revision-humana/inventario/jugable-v1.txt y jugable-v2.txt. Literal: «?nivel=pruebas humanos=4 porteadores=4 semilla=1: won 30.85 s, integridad 97, cargados 5/7 (obligatorios 5/5), caídas 2»."
+  },
+  {
+   "topic": "(2) Duración de «La calle» con 1 humano y 3 ayudantes, semillas 1-6",
+   "v1": "33,55–35,70 s; 6/6 ganadas al 100 %.",
+   "v2": "37,13–41,68 s; 6/6 ganadas; la semilla 1 queda al 97 %. Entre 2 y 6 s más lento, por la rampa y la entrega dentro del camión (el implementador ya informaba de +2–4 s).",
+   "verdict": "EMPEORADO",
+   "kind": "automatizado",
+   "evidence": "semillas-v1-1x4.txt y semillas-v2-1x4.txt. Literal: «V1 humanos=1 porteadores=4 semilla=1: won 35.70 s, integridad 100» frente a «V2 calle humanos=1 porteadores=4 semilla=1: won 41.28 s, integridad 97, caídas 3»; «semilla=6: won 41.68 s»."
+  },
+  {
+   "topic": "(2) ¿Cuántos de los 4 niveles del plan (casa, piso de escaleras, calle, almacén) existen?",
+   "v1": "0 como niveles propios. El recorrido mezcla el jardín de una casa (solo exterior), la calle y un edificio con escalera.",
+   "v2": "0 de 4 como niveles propios. «La calle» es el mismo recorrido mezclado. No hay casa con habitaciones ni almacén. El «Patio de pruebas» no cuenta: ciclo-2.md:28 lo excluye expresamente. El plan los deja para los ciclos 3 y 5 (QUALITY_STATE, tabla de la sección 6).",
+   "verdict": "ABIERTO",
+   "kind": "lectura de código",
+   "evidence": "src/levels/index.ts:9-12 (solo calle y pruebas); ART_DIRECTION.md:78-83 (1 Casa, 2 Edificio, 3 Calle, 4 Almacén); QUALITY_STATE.md:100-102."
+  },
+  {
+   "topic": "(3) Muñeco a escala de la cápsula y caída tumbada (de la línea base 08547f8 a V1)",
+   "v1": "DOLL_SCALE = 0,8914; altura del muñeco 1,382 m = cápsula (radio 0,32 y halfHeight 0,3708). visOff y pushOut eliminados. La caída gira el collider de verdad (Carrier.down: falling → lying → rising, planFall y tiltPose).",
+   "v2": "Sin cambios (dollView, dollRig, carrierView y tiltFit idénticos a V1). La única diferencia en carrier.ts es el campo maxHands.",
+   "verdict": "SIN CAMBIOS",
+   "kind": "lectura de código",
+   "evidence": "escala.ts, literal: «DOLL_SCALE=0.8914 DOLL_HEIGHT=1.382 m CENTER_Y=0.691 radius=0.32 halfHeight=0.37080779944289705». En la línea base: halfHeight 0.33 (cápsula de 1,30 m) y visOff en dollView.ts:61,169-174. git diff --stat 08547f8 c52a81c -- src/view: «5 files changed, 434 insertions(+), 295 deletions(-)» (carrierView, dollRig, dollView, tiltFit nuevo, world). Commits: d328602, eadedff, f8efb59."
+  },
+  {
+   "topic": "(3) Señales de esfuerzo",
+   "v1": "Añadidas en f8efb59: rayas de cómic, bola roja, sudor, inclinación y aro que late. La segunda revisión las midió saturadas: rayas el 82 % del tiempo con dos cargando bien, así que no distinguen «falta ayuda» de «vamos bien».",
+   "v2": "Sin cambios: dollView.ts idéntico, con la misma fórmula effortGoal = 0,35 + 0,9·strain (dollView.ts:172). El mayor sigue abierto.",
+   "verdict": "SIN CAMBIOS",
+   "kind": "lectura de código",
+   "evidence": "git diff --quiet c52a81c 23b8c66 -- src/view/doll/dollView.ts → «igual V1=V2». segunda-ronda-diseno-arte.json, defecto major «Las señales de esfuerzo nuevas están encendidas casi siempre…»."
+  },
+  {
+   "topic": "(3) Ayudantes ajustados a su cápsula",
+   "v1": "TiltFit (tiltFit.ts, nuevo en f8efb59) y fitScale en carrierView.ts:269-321. La segunda ronda los midió dentro de su cápsula (≤ 2,8 cm). Quedan menores: el perro pierde la silueta y las botas sobresalen 6–9 cm.",
+   "v2": "Sin cambios en el código de vista de los ayudantes.",
+   "verdict": "SIN CAMBIOS",
+   "kind": "lectura de código",
+   "evidence": "carrierView.ts:269-321 y tiltFit.ts, idénticos entre c52a81c y 23b8c66."
+  },
+  {
+   "topic": "(3) Objetos procedurales",
+   "v1": "Solo existe el dibujo del sofá (sofaView). Según el implementador del ciclo 2, sus cojines sobresalían 15–30 cm de los colliders.",
+   "v2": "itemView.ts nuevo (226 líneas), con caja, silla, lámpara, mesa, nevera, piano y un dibujo genérico de reserva; sofaView recortado a sus colliders; iconos SVG por objeto en la lista del HUD. En la captura del implementador (patio-objetos.png, 1280×720) se reconocen nevera, mesa, piano con teclado, silla y caja. La lámpara vista desde arriba es un punto pequeño, y el «1» de la cuenta atrás tapa una caja. El README dice aún que itemView es «dibujo provisional… las cajas de su forma» (README.md:446).",
+   "verdict": "MEJORADO",
+   "kind": "visual",
+   "evidence": "git diff --stat c52a81c 23b8c66 -- src/view: «5 files changed, 701 insertions(+), 414 deletions(-)». Captura /tmp/claude-0/c2-capturas/patio-objetos.png (hecha por el implementador, revisada por mí). El 0,00 mm y los ≤ 3 cm salen de tests/view.test.ts según su informe; no los he ejecutado."
+  },
+  {
+   "topic": "(3) Camión abierto",
+   "v1": "Bloque macizo ('truck') con una zona de entrega en el suelo.",
+   "v2": "Caja de carga abierta: interior de 5,7 × 3,8 × 2,1 m, suelo a 1 m y rampa de 4 m (14°), en 8 piezas de choque que se dibujan con las mismas cajas (levelView.ts:551, truck.ts:185-205). Lleva el rótulo «MUDANZAS PEPE» y paredes que se recortan. Visible en la captura calle-sofa-en-el-camion.png.",
+   "verdict": "MEJORADO",
+   "kind": "visual",
+   "evidence": "src/levels/truck.ts:129-146 y 185-205; captura /tmp/claude-0/c2-capturas/calle-sofa-en-el-camion.png (del implementador, revisada por mí)."
+  },
+  {
+   "topic": "(3) Sombrero distinto por jugador (ART_DIRECTION)",
+   "v1": "Todos llevan la misma gorra con visera (dollRig.ts:222-231); solo cambia el color.",
+   "v2": "Igual: no se distinguen sin el color. ART_DIRECTION.md:27-33 pide gorra, gorro con pompón, pañuelo y casco.",
+   "verdict": "SIN CAMBIOS",
+   "kind": "lectura de código",
+   "evidence": "grep -i 'pomp|pañuelo|casco' src/view → sin resultados en el código; dollRig.ts:222 «Gorra roja ladeada: casquete, visera, botón y ribete». En las capturas, J1 y J2 llevan la misma gorra."
+  },
+  {
+   "topic": "(4) Blender: ¿se ha ejecutado?, ¿hay assets?",
+   "v1": "bpy instalado en ~/blender-venv (enlazado a python3.13). En assets-src/blender/ solo está setup.sh (674 B). No hay .glb ni .blend en el repositorio.",
+   "v2": "Igual (setup.sh idéntico). Fuera de node_modules, del venv y de cachés, en todo el disco solo existen /tmp/claude-0/test.glb (14 332 B, un único «Cube», generado por «Khronos glTF Blender I/O v5.2.40») y /tmp/claude-0/test.blend (86 683 B), ambos del 2026-10-19 19:16:14, la prueba de instalación. Ningún asset del juego. El ciclo 4 («assets con Blender») está Pendiente.",
+   "verdict": "SIN CAMBIOS",
+   "kind": "automatizado",
+   "evidence": "`~/blender-venv/bin/python -c \"import bpy;print(bpy.app.version_string)\"` → «5.2.2 LTS». find / -xdev (sin node_modules, venv, caché uv ni go) → solo /tmp/claude-0/test.blend y test.glb. git log --all --name-only | grep .glb/.gltf/.blend/.fbx/.ogg/.mp3/.wav → 0. Detalle en git-evidencias.txt."
+  },
+  {
+   "topic": "(5) Audio: qué suena y de dónde sale",
+   "v1": "Todo sintetizado con WebAudio (osciladores y ruido filtrado), sin archivos. 17 nombres de sonido; 'thud' y 'step' nunca se reproducen. No hay música. renderTrack genera un WAV solo para los vídeos. Sin derechos de terceros.",
+   "v2": "Igual, más 'load' (golpe sordo y campanilla de 3 notas) y 'unload' (2 notas que bajan): 19 nombres. Al romperse un objeto suena 'crash', el mismo que un atropello (main.ts:264). Sigue sin música.",
+   "verdict": "MEJORADO",
+   "kind": "lectura de código",
+   "evidence": "src/audio/sfx.ts:1-3 y 37-68; grep \"new Audio|.mp3|.ogg|decodeAudioData\" src → ninguna coincidencia (solo `new AudioContext()`). Recuento de sfx.play en V2: «1 load … 1 unload … 2 crash»; 'thud' y 'step' solo aparecen en sfx.ts."
+  },
+  {
+   "topic": "(6) Cómo ejecutar el juego en un PC",
+   "v1": "Node, npm y un navegador con WebGL. `cd mudanza-imposible && npm ci && npm run dev` → http://localhost:5173 (server.host:true, así que también queda visible en la red local). Producción: `npm run build && npm run preview` → :4173. Parámetros: humans 1–4 (2 por defecto), carriers 2–6 (2), style=atentos|despistados, auto=1 (demo), capture=1 (solo para los scripts de grabación).",
+   "v2": "Mismos comandos y dependencias (three 0.179.1, rapier3d-compat 0.19.3, vite 7.3.6). Añade ?nivel=calle|pruebas y el script `npm run perf:patio`; vite.config es idéntico. Problemas de documentación: el README pide «Node 20 o superior», pero Vite 7.3.6 declara engines «^20.19.0 || >=22.12.0»; los e2e necesitan Playwright, que no está en package.json (el README lo dice en la línea 547). No he comprobado si dist/index.html funciona abierto con file://.",
+   "verdict": "PARCIAL",
+   "kind": "lectura de código",
+   "evidence": "package.json (diff V1→V2: solo «perf:patio»); vite.config.ts igual; node_modules/vite/package.json:57 «\"node\": \"^20.19.0 || >=22.12.0\"»; src/main.ts:22-33 (V2) y 19-28 (V1); README.md:17-36."
+  },
+  {
+   "topic": "(6) Controles de teclado y mando",
+   "v1": "J1: WASD, Espacio (agarrar), R (enderezar), Q/E (pedir giro). J2: flechas, Intro, «-» (código Slash), «,» y «.». J3: IJKL, U, O, H/Ñ. J4: teclado numérico 8456, 0, +, 7/9. Mando: stick o cruceta, A agarrar, Y enderezar, LB/RB giro, Start pausa; en el menú, X lanza la demo; en resultados, B vuelve al menú. Globales: Esc pausa, Retroceso reinicia solo desde la pausa, M silencia.",
+   "v2": "Idénticos (inputCore.ts e input.ts sin cambios). En el patio, R endereza el objeto volcado más cercano (game.ts:673-698), pero el menú sigue diciendo «Enderezar el sofá volcado». Los mandos no se han probado con hardware real.",
+   "verdict": "SIN CAMBIOS",
+   "kind": "lectura de código",
+   "evidence": "src/input/inputCore.ts:34-55 y 324-338; index.html:108-115; git diff --quiet c52a81c 23b8c66 -- src/input → sin cambios."
+  },
+  {
+   "topic": "Textos del menú y avisos del HUD con varios objetos",
+   "v1": "No aplica (todo el texto habla del sofá).",
+   "v2": "En ?nivel=pruebas solo cambia #menu-sub. Las notas fijas del menú siguen hablando del sofá («No hay tecla de alzar. El sofá pesa de verdad…», «Gana quien deja el sofá dentro del camión»). El aviso de agarrar sale siempre que ningún humano lleva nada, también justo después de soltar dentro del camión para entregar: en la captura de las 0:34.5 aparece «Acercaos al sofá y agarradlo: J1 con ESPACIO, J2 con INTRO» con el sofá ya dentro. «¡Que se vuelca!» solo mira el objeto principal.",
+   "verdict": "ABIERTO",
+   "kind": "lectura de código",
+   "evidence": "index.html:116,119 (texto fijo); src/ui/hud.ts:184 (`else if (!game.carriers.some((c) => c.human !== null && (c.holding || c.stunned > 0))) w = hints.grab;`); captura /tmp/claude-0/c2-capturas/calle-sofa-en-el-camion.png."
+  },
+  {
+   "topic": "Mejor tiempo compartido entre niveles",
+   "v1": "Una sola clave 'mudanza.best' para un solo recorrido.",
+   "v2": "La misma clave 'mudanza.best' para los dos niveles y cualquier número de jugadores: el patio (unos 45 s) y «La calle» (unos 35 s) se mezclan en un único récord.",
+   "verdict": "EMPEORADO",
+   "kind": "lectura de código",
+   "evidence": "src/main.ts:318-321 («localStorage.getItem('mudanza.best')»)."
+  },
+  {
+   "topic": "README desfasado",
+   "v1": "Habla de `isCoop`, `SOFA.coopMass`, «90 kg nominales (45 con ayudantes)», «Con ayudantes… física original» y «npm test: 29 de 29». Mezcla «zona verde» y «zona amarilla».",
+   "v2": "Corrige el objetivo y la estructura, pero conserva lo anterior. Además cita `src/sim/props.ts` (ya no existe), describe itemView como «provisional» y en «No existe todavía» incluye «Más niveles o muebles». En el código, `isCoop` no existe y la masa del sofá es 66,46 kg con humanos y con ayudantes.",
+   "verdict": "ABIERTO",
+   "kind": "lectura de código",
+   "evidence": "grep isCoop src → solo un comentario en main.ts:26; README.md:43-44, 289, 446, 469, 760; catalogo-v1.ts: «Game {\"humans\":1,\"carriers\":4}: … masa sofá en partida=66.46 kg»."
+  },
+  {
+   "topic": "(7) Ciclos: QUALITY_STATE frente a git log",
+   "v1": "c52a81c (04:39). Ciclo 0 cerrado (2200910…9414259). Ciclo 1 implementado (d328602, a3dae8f, eadedff, e0a1711), integrado (e0d8561), revisado (5; 6,5; 4; 3), corregido (f8efb59 → 7b67f61) y con segunda ronda (6,5 y 6,5, sin críticos) registrada en la sección 9. Aun así, la tabla de la sección 6 sigue diciendo «Falta la segunda ronda» y la sección 9 titula el ciclo 1 «en curso». Ciclo 2 «En curso».",
+   "v2": "23b8c66 (09:04) desciende de 5505243, no de c52a81c (merge-base 5505243). Su QUALITY_STATE no tiene la segunda ronda (31 líneas menos) ni los dos JSON segunda-ronda-*, y no menciona sus propios pasos a84984f, ec1d620 y 23b8c66. La rama publicada ya está en 657fd30 (09:08, solo documentación, mismo código que c52a81c): marca el ciclo 2 «En pausa por revisión humana… sin revisión independiente ni corrección» y el bucle como DETENIDO. Los ciclos 3 a 8 están pendientes y el criterio de parada exige 4 niveles completos.",
+   "verdict": "PARCIAL",
+   "kind": "lectura de código",
+   "evidence": "git log --oneline 08547f8^..657fd30; git merge-base c52a81c 23b8c66 → 550524325478…; git diff c52a81c 23b8c66 -- docs: «3 files changed, 322 deletions(-)»; git branch -a --contains 23b8c66 → solo rebirth/ciclo-2 (local); git diff c52a81c 657fd30 -- QUALITY_STATE.md (tabla y sección 8)."
+  }
+ ],
+ "literal": "== catalogo.ts (V2) ==\nHAND.maxV = 600 N\ncaja | Caja | 12.00 | 12.00 | 118 | 1 | 118 | 2 | no se daña | 0.50×0.50×0.48 | caja\nsilla | Silla | 6.00 | 6.00 | 59 | 1 | 59 | 2 | dv>4 m/s, 6/m·s | 0.46×0.90×0.46 | silla\nlampara | Lámpara de pie | 6.00 | 6.00 | 59 | 1 | 59 | 1 | dv>2.45 m/s, 400/m·s | 0.36×1.12×0.36 | lampara\nmesa | Mesa | 65.00 | 65.00 | 638 | 2 | 319 | 4 | dv>3.5 m/s, 4/m·s | 1.40×0.70×0.80 | mesa\nsofa | Sofá | 66.46 | 66.46 | 652 | 2 | 326 | 6 | dv>3.2 m/s, 5/m·s | 2.20×0.86×0.90 | sofa\nnevera | Nevera | 80.00 | 80.00 | 785 | 2 | 392 | 4 | dv>3 m/s, 6/m·s | 0.70×1.30×0.66 | nevera\npiano | Piano | 130.00 | 130.00 | 1275 | 3 | 425 | 4 | dv>2.8 m/s, 8/m·s | 1.50×0.90×0.80 | piano\nnivel ?nivel=calle «La calle» test=false objetos=1 main=sofa etapas=7 tiempo=180s par=90s tráfico=true props=54\nnivel ?nivel=pruebas «Patio de pruebas» test=true objetos=7 main=mesa etapas=1 tiempo=240s par=120s tráfico=false props=6\nobjetos del catálogo sin nivel: ninguno\n== catalogo-v1.ts (V1) ==\nsofá: SOFA.mass nominal = 90 kg; masa Rapier = 66.46 kg; peso = 652 N; asas (SLOTS) = 6; rozamiento = 1\nGame {\"humans\":2,\"carriers\":2}: grabbables=1 masa sofá en partida=66.46 kg\nGame {\"humans\":1,\"carriers\":4}: grabbables=1 masa sofá en partida=66.46 kg\n== escala.ts (V1) ==\nDOLL_SCALE=0.8914 DOLL_HEIGHT=1.382 m CENTER_Y=0.691 radius=0.32 halfHeight=0.37080779944289705\n== jugable (V1, semilla 1) ==\nV1 humanos=2 porteadores=2 semilla=1: won 33.38 s, integridad 100, etapa Camión, caídas 0\nV1 humanos=1 porteadores=4 semilla=1: won 35.70 s, integridad 100, etapa Camión, caídas 1\n== jugable (V2, semilla 1) ==\n?nivel=calle humanos=2 porteadores=2 semilla=1: won 35.72 s, integridad 100, cargados 1/1 (obligatorios 1/1), caídas 0\n?nivel=calle humanos=1 porteadores=4 semilla=1: won 41.28 s, integridad 97, cargados 1/1 (obligatorios 1/1), caídas 3\n?nivel=pruebas humanos=2 porteadores=2 semilla=1: won 45.85 s, integridad 100, cargados 5/7 (obligatorios 5/5), caídas 2\n?nivel=pruebas humanos=3 porteadores=3 semilla=1: won 31.87 s, integridad 100, cargados 5/7 (obligatorios 5/5), caídas 1\n?nivel=pruebas humanos=4 porteadores=4 semilla=1: won 30.85 s, integridad 97, cargados 5/7 (obligatorios 5/5), caídas 2\n?nivel=pruebas humanos=1 porteadores=4 semilla=1: won 62.85 s, integridad 100, cargados 5/7 (obligatorios 5/5), caídas 0\n== «La calle», 1 humano + 3 ayudantes, semillas 1–6 ==\nV1: 35.70, 33.60, 35.27, 33.58, 33.55, 33.72 s (todas al 100 %)\nV2: 41.28 (97 %), 37.32, 37.40, 37.13, 37.37, 41.68 s\n== Blender ==\n$ ~/blender-venv/bin/python -c \"import bpy;print(bpy.app.version_string)\"\n5.2.2 LTS\n/tmp/claude-0/test.glb  14332 B  2026-10-19 19:16:14  glTF binary, generator \"Khronos glTF Blender I/O v5.2.40\", nodes [{\"mesh\":0,\"name\":\"Cube\"}]\n/tmp/claude-0/test.blend 86683 B 2026-10-19 19:16:14\ngit log --all --name-only | grep -iE '\\.(glb|gltf|blend|fbx|ogg|mp3|wav|m4a|flac)$' | wc -l → 0\n== git ==\ngit diff --stat 08547f8 c52a81c -- src/view → 5 files changed, 434 insertions(+), 295 deletions(-)\ngit diff --stat c52a81c 23b8c66 -- src/view → 5 files changed, 701 insertions(+), 414 deletions(-)\ngit merge-base c52a81c 23b8c66 → 550524325478d520376b699f856cafec8b8027c6\nQUALITY_STATE @657fd30 (publicado): «| 2 | … | **En pausa por revisión humana** (20-10-2026, ~09:10 UTC). Los 3 pasos de implementación están hechos (`a84984f`, `ec1d620`, `23b8c66`, rama local `rebirth/ciclo-2`), pero **sin revisión independiente ni corrección**. |»\nnode_modules/vite/package.json: \"node\": \"^20.19.0 || >=22.12.0\"",
+ "humanChecks": [
+  "Reconocer los 7 objetos desde la cámara de juego en una pantalla real, sobre todo la lámpara vista desde arriba (en la captura es un punto pequeño) y la caja que tapa la cuenta atrás. El juicio visual que he hecho es sobre capturas por software del implementador.",
+  "Manejar la mesa (638 N, solo 38 N más de lo que sostiene una persona): comprobar si se nota que hacen falta dos y si uno solo arrastrándola resulta frustrante o gracioso. Lo mismo con el piano entre 3 y 4 personas.",
+  "Fragilidad de la lámpara (un golpe de 2,45 m/s la rompe entera, con poco margen): comprobar si se rompe de forma justa y comprensible. Es obligatoria en el patio, así que romperla hace perder.",
+  "Subir la rampa del camión con el sofá entre dos personas, soltarlo dentro y ver si se entiende que hay que soltarlo. El HUD dice «Acercaos al sofá y agarradlo» justo después de soltarlo.",
+  "Llegar al Patio de pruebas: solo se entra por la URL (?nivel=pruebas), sin selector en el menú ni con mando. Comprobar también si confunden los textos del menú que hablan del sofá.",
+  "En «La calle» hay cajas apiladas, un sillón y una lámpara de pie de decoración que no se pueden agarrar: comprobar si los jugadores lo intentan.",
+  "Sonido: volumen y timbre de los sonidos sintetizados, si la campanilla de carga se oye y se entiende, y que el sonido de romper un objeto sea el mismo que el de un atropello. No hay música.",
+  "Mandos físicos, que nunca se han probado con hardware, y 2–4 personas en un mismo teclado (teclas fantasma).",
+  "Señales de esfuerzo (rayas, bola roja, sudor): comprobar si distinguen «falta ayuda» de «vamos bien». La medición automática dice que están saturadas.",
+  "Distinguir a J1–J4 sin el color (por ejemplo, con daltonismo): todos llevan la misma gorra.",
+  "Diversión y rendimiento con una tarjeta gráfica real; si la nevera y el piano opcionales, que no dan nada, despiertan interés o estorban."
+ ],
+ "caveats": [
+  "No he usado el navegador (lo usa otro rol). Las dos «comprobaciones visuales» son mías, pero sobre capturas que hizo el implementador del ciclo 2 (/tmp/claude-0/c2-capturas/, de 08:08 a 08:20). Su informe dice que son anteriores a los dos últimos cambios de los ayudantes.",
+  "Que se pueda jugar «de principio a fin» lo he medido solo con el piloto automático, con 1 semilla por configuración (6 semillas para 1h+3 en «La calle»). Demuestra que el nivel se puede completar, no que una persona lo complete.",
+  "La primera ejecución de mi jugable.ts perdió el patio con 1 humano (240 s, 1/5 cargados) porque usaba `new Autopilot(0)`. Era un error de mi script: la demo de main.ts:202 usa `Autopilot.team(game)[0]`. Lo corregí y lo repetí: gana en 62,85 y 63,80 s.",
+  "Las cifras de view.test.ts (0,00 mm en el camión, ≤ 3 cm en los objetos) son del informe del implementador. No he ejecutado Vitest porque es tarea del rol de pruebas.",
+  "V1 = c52a81c ya no es la punta de la rama publicada: origin/ccr-3fc93559-wz951a está en 657fd30, con el mismo código y solo QUALITY_STATE y los informes del ciclo 2 añadidos. V2 no desciende de c52a81c.",
+  "vite-node crea y borra archivos temporales en node_modules/.vite-temp. Como node_modules es un enlace a /home/user/Game-development, eso escribe allí de forma transitoria; el directorio quedó vacío. No he modificado ningún archivo versionado ni dejado procesos en marcha. Los vite preview y Chromium activos son del rol de navegador."
+ ],
+ "files": [
+  "/home/user/Game-development-v2/mudanza-imposible/scripts/audit/revision-humana/inventario/catalogo.ts",
+  "/home/user/Game-development-v2/mudanza-imposible/scripts/audit/revision-humana/inventario/jugable.ts",
+  "/home/user/Game-development-v2/mudanza-imposible/scripts/audit/revision-humana/inventario/calle-semillas.ts",
+  "/home/user/Game-development-v1/mudanza-imposible/scripts/audit/revision-humana/inventario/catalogo-v1.ts",
+  "/home/user/Game-development-v1/mudanza-imposible/scripts/audit/revision-humana/inventario/escala.ts",
+  "/home/user/Game-development-v1/mudanza-imposible/scripts/audit/revision-humana/inventario/jugable-v1.ts",
+  "/tmp/claude-0/revision-humana/inventario/catalogo-v2.txt",
+  "/tmp/claude-0/revision-humana/inventario/catalogo-v1.txt",
+  "/tmp/claude-0/revision-humana/inventario/escala-v1.txt",
+  "/tmp/claude-0/revision-humana/inventario/jugable-v1.txt",
+  "/tmp/claude-0/revision-humana/inventario/jugable-v2.txt",
+  "/tmp/claude-0/revision-humana/inventario/semillas-v1-1x4.txt",
+  "/tmp/claude-0/revision-humana/inventario/semillas-v2-1x4.txt",
+  "/tmp/claude-0/revision-humana/inventario/git-evidencias.txt",
+  "/tmp/claude-0/c2-capturas/patio-objetos.png",
+  "/tmp/claude-0/c2-capturas/calle-sofa-en-el-camion.png"
+ ]
+}

@@ -1,0 +1,246 @@
+{
+ "summary": "Pruebas automáticas en Node, medidas en V1 (c52a81c) y V2 (23b8c66) por separado:\n- tsc limpio en los dos. Vitest en verde dos veces en cada estado (la segunda barajada): V1 71/71 en 3 archivos y V2 112/112 en 7. Las 71 pruebas de V1 siguen en V2 con nombres idénticos. Ninguna lleva skip, only ni todo.\n- No encuentro ningún umbral rebajado. Los cambios en sim.test.ts y coherence.test.ts son adaptaciones de API: `level: CALLE`, `carHit` pasa a `target 'item'`, `respawnSofa` a `respawnItem`, `RULES.timeLimit` a `g.level.timeLimit` (sigue siendo 180) y `STAGES` a `CALLE.stages` (las mismas 7 etapas; la del camión es más estricta). Las 87 cajas comunes del nivel son las mismas y van en el mismo orden.\n- Los 28 scripts de review-c1b que el diff da por borrados no los borró el ciclo 2. Se añadieron en la rama de V1 después del punto de bifurcación (5505243), y c52a81c no es ancestro de 23b8c66.\n- build: correcto en los dos estados. perf: entre 0,34 y 0,72 ms por paso en ambos, con mucho ruido por la carga de otros agentes; no se ve ninguna regresión. perf:patio en V2: patio/calle = 1,17 y 1,16 en la primera ronda, 0,93 y 0,99 en la segunda (la referencia es ≤ 2).\n- sim-run con una matriz de 36 partidas por estado (1–6 porteadores × atentos/despistados × semillas 1–3): con 2 o más porteadores, 30/30 ganadas en los dos estados; con 1 porteador se pierde siempre en los dos. Es determinista: la configuración por defecto sale idéntica byte a byte.\n- En V2 la entrega en «La calle» tarda más: con atentos, 35,5–41,3 s frente a 32,2–35,7 s en V1. Las caídas de porteadores se duplican (24 → 48) y casi todas ocurren en la zona del camión (2 → 28).\n- T-roles pasa tal como lo pide la especificación (mediana de 3 salidas, 4 frente a 2: 32,7 % antes), pero el 4.º jugador apenas aporta. En mi barrido con 7 salidas, 4 jugadores tardan más que 3 en 5 de ellas, y en 2 de las 4 salidas nuevas la mejora de 4 frente a 2 se queda por debajo del 25 %.",
+ "items": [
+  {
+   "topic": "tsc --noEmit -p .",
+   "v1": "exit 0, sin salida (3,66 s)",
+   "v2": "exit 0, sin salida (3,59 s)",
+   "verdict": "SIN CAMBIOS",
+   "kind": "automatizado",
+   "evidence": "`npx tsc --noEmit -p .` → v1 exit=0, v2 exit=0 (/tmp/claude-0/revision-humana/pruebas-node/v1-tsc.log y v2-tsc.log). tsconfig idéntico; incluye src, tests y vite.config.ts, no scripts."
+  },
+  {
+   "topic": "Vitest, 1.ª ejecución (orden por defecto)",
+   "v1": "Test Files 3 passed (3) | Tests 71 passed (71) | Duration 23.88s",
+   "v2": "Test Files 7 passed (7) | Tests 112 passed (112) | Duration 25.88s",
+   "verdict": "OK",
+   "kind": "automatizado",
+   "evidence": "`npx vitest run --reporter=verbose`, exit 0 en los dos (v1-vitest-1.log, v2-vitest-1.log). Única salida por stderr: «using deprecated parameters for the initialization function», en ambos."
+  },
+  {
+   "topic": "Vitest, 2.ª ejecución barajada (--sequence.shuffle)",
+   "v1": "seed \"1792487322927\": 3 passed, 71 passed, Duration 24.68s",
+   "v2": "seed \"1792487384313\": 7 passed, 112 passed, Duration 27.53s",
+   "verdict": "OK",
+   "kind": "automatizado",
+   "evidence": "`npx vitest run --sequence.shuffle --reporter=verbose`, exit 0 (v1-vitest-2-shuffle.log, v2-vitest-2-shuffle.log). Las cifras de T-roles salen idénticas en las dos ejecuciones y coinciden con el informe del implementador."
+  },
+  {
+   "topic": "Pruebas por archivo",
+   "v1": "coherence 10, input 20, sim 41 (36 declaraciones; it.each da 41) = 71",
+   "v2": "coherence 10, input 20, sim 41, items 18, levels 16, roles 5, view 2 = 112 (tests/roles-starts.ts es un auxiliar, no una prueba)",
+   "verdict": "MEJORADO",
+   "kind": "automatizado",
+   "evidence": "Conteo de las líneas «✓ tests/<archivo>» del informe verbose, igual en las dos ejecuciones de cada estado. Cuadra con lo que dicen los informes de los implementadores: paso 1 89, paso 2 105, paso 3 112."
+  },
+  {
+   "topic": "Las 71 pruebas de V1 siguen en V2 con el mismo nombre",
+   "v1": "71 nombres (sim, coherence, input)",
+   "v2": "los mismos 71 nombres",
+   "verdict": "OK",
+   "kind": "automatizado",
+   "evidence": "`diff v1-names-common.txt v2-names-common.txt` → sin diferencias (71 y 71 líneas)."
+  },
+  {
+   "topic": "skip / only / todo / skipIf / runIf / fails",
+   "v1": "0 en los 3 archivos",
+   "v2": "0 en los 7 archivos",
+   "verdict": "OK",
+   "kind": "lectura de código",
+   "evidence": "grep -cE \"\\.(skip|only|todo|skipIf|runIf|fails)\\b\" tests/*.ts → 0 en todos. vite.config.ts es idéntico en los dos estados (include tests/**/*.test.ts, testTimeout 60000)."
+  },
+  {
+   "topic": "npm run build",
+   "v1": "✓ 37 modules transformed; dist/assets/index-DDnIRazG.js 2,905.99 kB (gzip 1,018.01 kB); exit 0",
+   "v2": "✓ 42 modules transformed; dist/assets/index-nU-kwtRH.js 2,940.64 kB (gzip 1,030.74 kB); exit 0",
+   "verdict": "OK",
+   "kind": "automatizado",
+   "evidence": "v1-build.log, v2-build.log. El bundle crece 34,65 kB. Avisa del tamaño del chunk en ninguno de los dos (chunkSizeWarningLimit 4000)."
+  },
+  {
+   "topic": "npm run perf (La calle, 1 humano + ayudantes, semilla 3)",
+   "v1": "Ronda 1: 0.566 / 0.500 / 0.525 ms. Ronda 2: 0.372 / 0.378 / 0.362 ms (2/4/6 porteadores; 2207/2297/2148 pasos)",
+   "v2": "Ronda 1: 0.587 / 0.723 / 0.458 ms. Ronda 2: 0.339 / 0.434 / 0.462 ms (2425/2425/2312 pasos)",
+   "verdict": "SIN CAMBIOS",
+   "kind": "automatizado",
+   "evidence": "v1-perf.log, v2-perf.log (rondas intercaladas, carga 2,7–3,4). Es ruidoso y no se ve ninguna tendencia; todo queda muy por debajo de 16,7 ms. V2 hace más pasos porque la entrega dura más; el número incluye Autopilot.input."
+  },
+  {
+   "topic": "npm run perf:patio (solo V2)",
+   "v1": "no existe",
+   "v2": "Ronda 1: 2 jugadores, patio/calle = 1.17 (0.149 frente a 0.128 ms); 4 jugadores, 1.16 (0.231 frente a 0.199). Ronda 2: 0.93 y 0.99",
+   "verdict": "OK",
+   "kind": "automatizado",
+   "evidence": "v2-perf-patio.log (dos ejecuciones, exit 0). Literal: «patio / calle = 1.17 (referencia: ≤ 2)». Con perf-patio-pasos.ts compruebo lo que se mide: la calle tiene 73–75 cuerpos, pero solo 3–5 dinámicos; el patio, 25–27 cuerpos y 9–11 dinámicos. Pasos medidos: 2324/2580 (2 jugadores) y 2263/2032 (4)."
+  },
+  {
+   "topic": "sim-run: resultado (36 partidas por estado, La calle)",
+   "v1": "30/30 ganadas con 2–6 porteadores. Con 1 porteador, 6/6 «lost broken» a los 70,5 s",
+   "v2": "30/30 ganadas con 2–6 porteadores. Con 1 porteador, 6/6 «lost broken» a los 122,5–123,8 s",
+   "verdict": "SIN CAMBIOS",
+   "kind": "automatizado",
+   "evidence": "sim/v1-resumen.txt y sim/v2-resumen.txt (sim-matriz.sh: carriers 1–6 × atentos/despistados × semillas 1–3, exit 0 en todas). sim-run solo admite «La calle»: en V2, CALLE está fijo en el código."
+  },
+  {
+   "topic": "sim-run: tiempo de entrega",
+   "v1": "atentos: 2 → 33,8; 3 → 32,4–32,7; 4 → 33,6–35,7; 5 → 32,2–34,2; 6 → 32,8–33,0 s. Despistados: 33,7–45,3 s. Integridad siempre 100",
+   "v2": "atentos: 2 → 37,4; 3 → 36,6–37,2; 4 → 37,3–41,3 (una con integridad 97); 5 → 35,5–35,7; 6 → 35,5–36,0 s. Despistados: 37,1–51,8 s",
+   "verdict": "EMPEORADO",
+   "kind": "automatizado",
+   "evidence": "Es la consecuencia esperada de meter el sofá dentro del camión, y los implementadores lo declaran (paso 2: 33,38 → 35,62 s). El límite es 180 s y ninguna prueba depende de este tiempo."
+  },
+  {
+   "topic": "sim-run: caídas de porteadores",
+   "v1": "24 caídas en 30 partidas (15 con alguna); 2 en la zona del camión (x ≥ 22)",
+   "v2": "48 caídas en 30 partidas (23 con alguna); 28 en la zona del camión (x ≥ 22)",
+   "verdict": "EMPEORADO",
+   "kind": "automatizado",
+   "evidence": "Recuento de los sucesos «fall» en sim/*-[2-6]-*.log, clasificados por x. Ejemplo con la configuración por defecto (4 atentos, semilla 1): en V1, 1 caída y victoria a los 35,7 s con integridad 100. En V2, el humano cae 3 veces (31,1, 34,3 y 40,5 s; la última justo después de soltar dentro del camión), hay un «righted» a los 33,8 s y gana a los 41,3 s con integridad 97."
+  },
+  {
+   "topic": "sim-run: determinismo",
+   "v1": "La ejecución por defecto (4 atentos, semilla 1) sale idéntica byte a byte a la de la matriz",
+   "v2": "Ídem",
+   "verdict": "OK",
+   "kind": "automatizado",
+   "evidence": "`npx vite-node scripts/sim-run.ts` → v1 «FIN won null tiempo 35.7 integridad 100», v2 «FIN won null tiempo 41.3 integridad 97». En los dos, «idéntico byte a byte a la ejecución 4 atentos 1 de la matriz»."
+  },
+  {
+   "topic": "Diff de tests/sim.test.ts: ¿algún umbral relajado?",
+   "v1": "referencia",
+   "v2": "Solo adaptaciones de API: level: CALLE; carHit target 'sofa' → 'item' con e.item === sofaItem.index; respawnSofa → respawnItem del sofá; RULES.timeLimit → g.level.timeLimit; STAGES → CALLE.stages; LEVEL → CALLE.boxes + truckBoxes; RAMP y FLOOR2 se importan de calle.ts",
+   "verdict": "OK",
+   "kind": "lectura de código",
+   "evidence": "`git diff c52a81c..23b8c66 -- mudanza-imposible/tests/sim.test.ts`: no cambia ningún literal numérico de los expect. Comprobado: CALLE.timeLimit = 180, igual que RULES.timeLimit de V1 (calle.ts:242; además, levels.test lo afirma). Las 7 etapas tienen las mismas etiquetas y condiciones; «Camión» exige ahora estar dentro de la caja de carga, que es más estricto. RULES.carDamage (12) y respawnCost (15) no cambian. El impacto del sofá se mantiene: fragility { impactDv: 3.2, damage: 5 } (items.ts:114). hand.ts no cambia; carrier.ts solo añade un campo opcional, maxHands."
+  },
+  {
+   "topic": "Diff de tests/coherence.test.ts",
+   "v1": "referencia",
+   "v2": "Solo añade level: CALLE en dos constructores",
+   "verdict": "OK",
+   "kind": "lectura de código",
+   "evidence": "El diff tiene 5 líneas: el import de CALLE y las dos llamadas a new Game. Ningún umbral cambia (siguen en 3 cm)."
+  },
+  {
+   "topic": "Datos del nivel: las cajas de V1 siguen en «La calle» de V2",
+   "v1": "LEVEL: 90 cajas (56 sólidas)",
+   "v2": "CALLE.boxes: 89 (56 sólidas) + 8 piezas del camión",
+   "verdict": "OK",
+   "kind": "automatizado",
+   "evidence": "scripts/audit/revision-humana/pruebas-node/cajas-v1-v2.ts → «Cajas comunes: 87; mismo orden relativo: true». Solo en V1: el seto x = 34,2 (partido en dos en V2 para dejar hueco a la cabina), la zona de entrega (no sólida) y el bloque macizo del camión. FLOOR2, DOOR, STAIRS, RAMP, TERRACE y SOFA_START tienen los mismos valores."
+  },
+  {
+   "topic": "Diff de scripts no de auditoría (perf, sim-run, grip-check, grip-measure, help-batch)",
+   "v1": "referencia",
+   "v2": "Solo cambian el import de CALLE y level: CALLE; grip-measure toma FLOOR2 y STAIRS de levels/calle. Nuevos: item-measure, level-measure, roles-measure, perf-patio y capturas-c2.cjs. Los e2e .cjs no cambian",
+   "verdict": "OK",
+   "kind": "lectura de código",
+   "evidence": "`git diff c52a81c..23b8c66 -- mudanza-imposible/scripts` (sin contar audit/): no cambia ningún criterio ni ningún umbral."
+  },
+  {
+   "topic": "28 scripts de scripts/audit/review-c1b que aparecen «borrados» en el diff",
+   "v1": "existen (añadidos en b6860be/c52a81c)",
+   "v2": "no existen",
+   "verdict": "NO APLICA",
+   "kind": "automatizado",
+   "evidence": "`git merge-base c52a81c 23b8c66` → 5505243; «c52a81c NO es ancestro». `git diff --stat 5505243 c52a81c` solo toca review-c1b y docs; src no cambia. Es divergencia de ramas, no un borrado del ciclo 2."
+  },
+  {
+   "topic": "Compilación de los scripts .ts de primer nivel (tsc no los incluye)",
+   "v1": "Errores solo de tipos: RAPIER.init({}) «Expected 0 arguments» (grip-measure, help-batch) y «Cannot find name 'process'» (sim-run)",
+   "v2": "Los mismos tipos de error. Los scripts nuevos (item-, level-, roles-measure y perf-patio) arrastran el mismo error de RAPIER.init({})",
+   "verdict": "SIN CAMBIOS",
+   "kind": "automatizado",
+   "evidence": "tsconfig.scripts.json en scripts/audit/revision-humana/pruebas-node/ (v1-tsc-scripts.log, v2-tsc-scripts.log). Todos se ejecutan con vite-node. Ningún script fuera de audit/ importa src/sim/level ni src/sim/props; sí lo hacen 8 scripts antiguos de audit/review-c1 en V2."
+  },
+  {
+   "topic": "Pruebas nuevas items.test.ts frente a la especificación (T-item-1/2/3)",
+   "v1": "no existen",
+   "v2": "Umbrales iguales o más estrictos que la especificación: base > 0,1 m con minCarriers; con uno menos, base máxima < 0,05 m; d > 3 m en 3 s; piano 2/3/4 con 4 > 3 en distancia y altura; createItem(sofá) igual campo a campo que createSofa; lámpara rota al caer o al ser arrollada, entera si se deja con cuidado",
+   "verdict": "OK",
+   "kind": "lectura de código",
+   "evidence": "tests/items.test.ts. Riesgo declarado por el implementador: el margen de la lámpara es de 0,26–0,32 m/s frente a su umbral de 2,45 m/s. T-item-2 se prueba con agarre de botón; con agarre en el asa, el sofá no despega (base 0,00), y eso solo está medido, no probado."
+  },
+  {
+   "topic": "Pruebas nuevas levels.test.ts (T-level-1/2, T-truck, T-deliver, HUD y sonido)",
+   "v1": "no existen",
+   "v2": "Siguen la especificación: 80 % (RULES.loadFraction 0.8), winHold, itemLoaded e itemUnloaded, obligatorio roto → lose, 5 objetos en la caja de carga (se piden 4) y grep de constantes del recorrido. La prueba del sonido solo comprueba el gancho onPlay y una expresión regular sobre main.ts",
+   "verdict": "OK",
+   "kind": "lectura de código",
+   "evidence": "tests/levels.test.ts: 16 pruebas en verde. Lo que la prueba del sonido no demuestra: que suene ni que sea audible (lo tiene que oír una persona). Los 4+ objetos de T-truck se colocan con put() (teletransporte); solo la mesa se lleva andando por la rampa."
+  },
+  {
+   "topic": "T-roles (roles.test.ts) y robustez frente a la salida",
+   "v1": "no existe (en «La calle», 2, 3 y 4 humanos tardan igual)",
+   "v2": "La prueba pasa: medianas 45.85 / 31.68 / 30.85 s con 2/3/4 (4 frente a 2, 32,7 % antes; umbral 0.75·m2, como pide la especificación). Con mis 7 salidas, 4 jugadores tardan más que 3 en 5 (de −1,6 % a −17,8 %). Salidas nuevas: «centro», 4 frente a 2 solo 16,9 %; «norte», 24,0 %",
+   "verdict": "PARCIAL",
+   "kind": "automatizado",
+   "evidence": "roles-sensibilidad.ts (log v2-roles-sensibilidad.log). «Medianas (4 nuevas): 2 → 46.77 s; 3 → 31.45 s; 4 → 34.63 s; 4 frente a 2 25.9 % antes» y «Medianas (las 7): … 3 → 31.45 s; 4 → 31.60 s». El 3.º jugador aporta (≈ 30 %); el 4.º, nada en la mediana. El umbral no está rebajado, pero el criterio no detecta que el 4.º sobra."
+  },
+  {
+   "topic": "view.test.ts (T-view)",
+   "v1": "no existe",
+   "v2": "Los objetos se dibujan dentro de sus colliders con ≤ 3 cm de margen y llenan su caja envolvente a ±3 cm. Camión: «8 piezas, error máximo 0.00 mm» en los dos niveles (umbral < 1 cm, como en la especificación)",
+   "verdict": "OK",
+   "kind": "lectura de código",
+   "evidence": "tests/view.test.ts y levelView.ts addTruck. Los 0,00 mm salen de construir la malla y el collider con el mismo truckBoxes: comprueba la colocación, no la forma redondeada del techo (RoundedBoxGeometry tiene la misma caja envolvente)."
+  },
+  {
+   "topic": "sim-run con 1 porteador (observación de física, sin investigar)",
+   "v1": "Sofá arrastrado a la calzada; a los 60–70 s su centro está en y = −0,24/−0,30, por debajo del suelo (en reposo, 0,20). 19 atropellos y pierde a los 70,5 s",
+   "v2": "Los coches empujan el sofá hasta x ≈ 49 (la calzada termina en x = 45). 22 atropellos y pierde a los 122,5–123,8 s",
+   "verdict": "NO MEDIBLE",
+   "kind": "automatizado",
+   "evidence": "sim/v1-1-atentos-1.log («t=70.0 … sofa=(18.3,-0.30,-1.6)») y sim/v2-1-atentos-1.log («t=65.0 … sofa=(49.0,0.20,-1.5)»). Es una configuración imposible por diseño: uno solo no levanta el sofá. Lo dejo anotado para quien revise la física."
+  }
+ ],
+ "literal": "V1 tsc: exit=0 (sin salida) | V2 tsc: exit=0 (sin salida)\nV1 vitest: \" Test Files  3 passed (3)\" / \"      Tests  71 passed (71)\" / \"   Duration  23.88s\"\nV1 vitest --sequence.shuffle: 'Running tests with seed \"1792487322927\"' / \"Tests  71 passed (71)\" / \"Duration  24.68s\"\nV2 vitest: \" Test Files  7 passed (7)\" / \"      Tests  112 passed (112)\" / \"   Duration  25.88s\"\nV2 vitest --sequence.shuffle: 'Running tests with seed \"1792487384313\"' / \"Tests  112 passed (112)\" / \"Duration  27.53s\"\nV2 T-roles (en las dos ejecuciones): \"Medianas: 2 → 45.85 s; 3 → 31.68 s (30.9 % antes); 4 → 30.85 s (32.7 % antes)\"; \"Patio con 1 jugador y 2 ayudantes atentos: won en 62.37 s, integridad 100\"\nV1 build: \"✓ 37 modules transformed.\" \"dist/assets/index-DDnIRazG.js  2,905.99 kB │ gzip: 1,018.01 kB\" \"✓ built in 3.97s\"\nV2 build: \"✓ 42 modules transformed.\" \"dist/assets/index-nU-kwtRH.js  2,940.64 kB │ gzip: 1,030.74 kB\" \"✓ built in 3.73s\"\nV1 perf, ronda 2: \"2 porteadores: 0.372 ms por paso de simulación (2207 pasos, presupuesto 16,7 ms por fotograma)\" / \"4 porteadores: 0.378 ms … (2297 pasos …)\" / \"6 porteadores: 0.362 ms … (2148 pasos …)\"\nV2 perf, ronda 2: \"2 porteadores: 0.339 ms … (2425 pasos …)\" / \"4 porteadores: 0.434 ms … (2425 pasos …)\" / \"6 porteadores: 0.462 ms … (2312 pasos …)\"\nV2 perf:patio, ronda 1: \"2 jugadores: «La calle» (1 objeto, 73 cuerpos, 76 colliders) 0.128 ms por paso | «Patio de pruebas» (7 objetos, 25 cuerpos, 37 colliders) 0.149 ms por paso | patio / calle = 1.17 (referencia: ≤ 2)\"; \"4 jugadores: … 0.199 ms … | … 0.231 ms … | patio / calle = 1.16\"\nV2 perf:patio, ronda 2: \"patio / calle = 0.93\" (2 jugadores); \"patio / calle = 0.99\" (4 jugadores)\nsim-run por defecto: V1 \"FIN won null tiempo 35.7 integridad 100\" | V2 \"FIN won null tiempo 41.3 integridad 97\"\nsim-run, matriz de 36: V1 ganadas 30/36 (30/30 con ≥ 2 porteadores; con 1, \"FIN lost broken tiempo 70.5 integridad 0\") | V2 ganadas 30/36 (30/30 con ≥ 2; con 1, \"FIN lost broken tiempo 123.8 integridad 0\")\nCaídas por zona (≥ 2 porteadores): V1 {'terraza/rampa (x 12-22)': 3, 'camión/rampa camión (x>=22)': 2, 'antes (x<12)': 19} | V2 {'camión/rampa camión (x>=22)': 28, 'antes (x<12)': 17, 'terraza/rampa (x 12-22)': 3}\nCajas: \"V1 LEVEL: 90 cajas (56 sólidas); V2 CALLE.boxes: 89 (56 sólidas); camión V2: 8\" \"Cajas comunes: 87; mismo orden relativo: true\"\nSensibilidad de T-roles: \"centro: 4 frente a 2 16.9 % antes; 3 frente a 2 29.5 %; 4 frente a 3 -17.8 %\" \"norte: 4 frente a 2 24.0 % antes; …; 4 frente a 3 -6.2 %\" \"Medianas (las 7): 2 → 45.85 s; 3 → 31.45 s; 4 → 31.60 s; 4 frente a 2 31.1 % antes\"\ngit: \"c52a81c NO es ancestro\" de 23b8c66; merge-base 550524325478d520376b699f856cafec8b8027c6",
+ "humanChecks": [
+  "Si el 4.º jugador sirve de algo en el «Patio de pruebas»: en Node, 4 jugadores tardan igual o más que 3 en 5 de 7 salidas. Hay que jugar con 4 personas y ver si el 4.º encuentra tarea o se queda esperando en el carril del camión.",
+  "La carga dentro del camión en «La calle»: en V2 las caídas en la zona del camión pasan de 2 a 28 en 30 partidas, y el porteador de delante se tambalea al soltar. Hay que comprobar jugando si se lee como gracioso o como frustrante, y si la rampa del camión se maneja bien con mando y con teclado.",
+  "La entrega dura entre 3 y 6 s más en «La calle» con atentos (≈ 33 → 37 s). Una persona debe decidir si el tramo final (rampa y soltar dentro) aporta o alarga.",
+  "La fragilidad de la lámpara (margen de 0,26–0,32 m/s según el implementador): solo se puede validar con manos reales y mandos físicos si «dejarla con cuidado» es alcanzable y se entiende cuándo se rompe.",
+  "El sonido de carga y descarga (sfx «load» y «unload»): la prueba solo comprueba que se llama. Que suene, se oiga y no moleste lo tiene que juzgar alguien escuchándolo.",
+  "La legibilidad del HUD «Cargados N/M» y de la lista de objetos a resolución real con 2 y 4 jugadores, y si los objetos procedurales se reconocen a la distancia de la cámara de juego.",
+  "El rendimiento real en el navegador (render con GPU): perf y perf:patio solo miden la simulación en Node, no el dibujo de los objetos nuevos ni el camión abierto."
+ ],
+ "caveats": [
+  "Las cifras de perf están medidas con la máquina cargada por otros agentes (carga 2,7–6,6 con 4 núcleos; había otros vite-node de otros roles en marcha). Varían hasta un 40 % entre rondas; solo valen como orden de magnitud y para ver que no hay un salto grande.",
+  "`npm run build` creó dist/ en los dos worktrees (no existía antes; está en .gitignore y git status no lo muestra). Lo he dejado por si otro rol lo usa para vite preview. No he arrancado ningún servidor, y al acabar no queda ningún proceso mío (0 procesos sim-matriz, pruebas-node ni vite preview).",
+  "He creado archivos nuevos solo en <worktree>/mudanza-imposible/scripts/audit/revision-humana/pruebas-node/: tsconfig.scripts.json en V1 y V2, y en V2 además cajas-v1-v2.ts, perf-patio-pasos.ts y roles-sensibilidad.ts. No he modificado ningún archivo existente ni hecho commits; los HEAD siguen en c52a81c y 23b8c66.",
+  "En V2, sim-run.ts solo juega «La calle» (CALLE está fijo en el código): el patio no se puede ejercitar con sim-run. La semilla solo afecta a los ayudantes; con atentos, las semillas apenas cambian el resultado.",
+  "Las 4 salidas extra de la prueba de sensibilidad de T-roles (norte, oesteInvertido, centro, esquinas) las elegí yo; no forman parte de la especificación. La especificación pide la mediana de 3, y con esas 3 la prueba pasa.",
+  "No he ejecutado los e2e de navegador (e2e:duo, e2e:teclado): no son de este rol.",
+  "La revisión de umbrales cubre los literales de las pruebas y las constantes de src de las que dependen (RULES, HAND, CARRIER, SOFA, timeLimit, etapas y cajas). No he auditado si cambios de comportamiento de la IA en src hacen más fáciles pruebas cuyo umbral sigue igual."
+ ],
+ "files": [
+  "/tmp/claude-0/revision-humana/pruebas-node/v1-tsc.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v2-tsc.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v1-vitest-1.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v1-vitest-2-shuffle.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v2-vitest-1.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v2-vitest-2-shuffle.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v1-names-common.txt",
+  "/tmp/claude-0/revision-humana/pruebas-node/v2-names-common.txt",
+  "/tmp/claude-0/revision-humana/pruebas-node/v1-build.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v2-build.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v1-perf.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v2-perf.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v2-perf-patio.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v2-perf-patio-pasos.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v1-tsc-scripts.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v2-tsc-scripts.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/cajas-v1-v2.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/v2-roles-sensibilidad.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/sim-matriz.sh",
+  "/tmp/claude-0/revision-humana/pruebas-node/sim/v1-resumen.txt",
+  "/tmp/claude-0/revision-humana/pruebas-node/sim/v2-resumen.txt",
+  "/tmp/claude-0/revision-humana/pruebas-node/sim/v1-defecto.log",
+  "/tmp/claude-0/revision-humana/pruebas-node/sim/v2-defecto.log",
+  "/home/user/Game-development-v1/mudanza-imposible/scripts/audit/revision-humana/pruebas-node/tsconfig.scripts.json",
+  "/home/user/Game-development-v2/mudanza-imposible/scripts/audit/revision-humana/pruebas-node/tsconfig.scripts.json",
+  "/home/user/Game-development-v2/mudanza-imposible/scripts/audit/revision-humana/pruebas-node/cajas-v1-v2.ts",
+  "/home/user/Game-development-v2/mudanza-imposible/scripts/audit/revision-humana/pruebas-node/perf-patio-pasos.ts",
+  "/home/user/Game-development-v2/mudanza-imposible/scripts/audit/revision-humana/pruebas-node/roles-sensibilidad.ts"
+ ]
+}
