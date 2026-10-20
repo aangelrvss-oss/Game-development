@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { LEVEL, STAIRS, FLOOR2, ZONE, DOOR, RAMP, PED_LIGHT, type Box } from '../sim/level';
-import { LANES } from '../sim/traffic';
+import { TRUCK, truckBoxes, truckDir, truckToWorld } from '../levels/truck';
+import type { Box, LevelDef, Scenery, TrafficDef, TruckPose } from '../levels/types';
 import type { Vec3 } from '../sim/types';
 import { mat, ownMat, PALETTE } from './materials';
 import { textSprite } from './text';
@@ -24,18 +24,36 @@ function kindLook(kind: Box['kind']): { color: string; tex?: THREE.Texture; tile
     case 'ramp': return { color: '#ffffff', tex: TEX.metal(), tile: TEX.metalTile, rough: 0.35, metal: 0.35 };
     case 'hedge': return { color: '#ffffff', tex: TEX.hedge(), tile: TEX.hedgeTile };
     case 'house': return { color: '#ffffff', tex: windowsTex('#fde7b0', '#3f7d4e', 20), tile: 3 };
+    // Camión: suelo de carga de tablas, paredes y techo blancos, rampa de chapa con tacos y bajos oscuros
+    case 'truckFloor': return { color: '#f1d3a6', tex: TEX.planks(), tile: TEX.planksTile, rough: 0.7 };
+    case 'truckWall': case 'truckRoof': return { color: PALETTE.truck, rough: 0.5 };
+    case 'truckRamp': return { color: '#e5e7eb', tex: TEX.metal(), tile: TEX.metalTile, rough: 0.4, metal: 0.35 };
+    case 'truckBase': return { color: '#374151', rough: 0.7 };
     default: return null;
   }
 }
 
-export interface LevelView {
-  group: THREE.Group;
-  /** Mallas que se pueden volver translúcidas si tapan la acción. */
-  fadeables: THREE.Mesh[];
-  update(t: number, light: { cars: string; ped: string; left: number }, zoneActive: boolean, stage: number, sofa: Vec3): void;
+/** Una pieza del camión tal como se dibuja: su tipo y las 8 esquinas de su caja, en el mundo. */
+export interface TruckPart {
+  kind: Box['kind'];
+  corners: Vec3[];
 }
 
-const NEAR_DOOR = (_x: number, _y: number, z: number) => z < DOOR.z + 3.5 && z > DOOR.z - 8;
+export interface LevelView {
+  group: THREE.Group;
+  /** Mallas que se recortan o se ocultan si tapan la acción. */
+  fadeables: THREE.Mesh[];
+  /**
+   * Piezas del camión dibujadas (suelo, paredes y techo de la caja de carga, bajos, cabina y rampa), en el orden de
+   * `truckBoxes`, medidas al construirlas (antes de fundir lo estático). `tests/view.test.ts` comprueba que coinciden
+   * con sus colliders.
+   */
+  truckParts: TruckPart[];
+  /** `main`: posición del objeto principal (el aro del siguiente objetivo se apaga cuando está cerca). */
+  update(t: number, light: { cars: string; ped: string; left: number }, stage: number, main: Vec3): void;
+}
+
+type FadeRule = (x: number, y: number, z: number) => boolean;
 
 function boxMesh(b: Box): THREE.Mesh | null {
   const look = kindLook(b.kind);
@@ -54,38 +72,45 @@ function boxMesh(b: Box): THREE.Mesh | null {
   return m;
 }
 
-export function buildLevel(): LevelView {
+/** Hace que una malla se recorte o se oculte si tapa la acción (`world.ts`). */
+function makeFade(m: THREE.Mesh, b: Box, fadeables: THREE.Mesh[], rule?: FadeRule) {
+  m.userData.fade = 1;
+  // Las paredes que arrancan del suelo (o de un piso) se recortan; lo que cuelga (encima de la puerta, el techo del
+  // camión), se oculta
+  m.userData.mode = b.kind === 'wall' || b.kind === 'truckWall' || b.p[1] - b.h[1] < 0.05 ? 'cut' : 'hide';
+  if (rule) m.userData.fadeRule = rule;
+  fadeables.push(m);
+}
+
+/** Escenario de un nivel: sus cajas, el camión, la decoración, los semáforos y el aro del siguiente objetivo. */
+export function buildLevel(level: LevelDef): LevelView {
   const g = new THREE.Group();
   const fadeables: THREE.Mesh[] = [];
-  for (const b of LEVEL) {
+  const sc = level.scenery, door = sc.facade?.door;
+  // La fachada se recorta con el objeto principal cerca de su puerta
+  const nearDoor: FadeRule | undefined = door ? (_x, _y, z) => z < door.z + 3.5 && z > door.z - 8 : undefined;
+  for (const b of level.boxes) {
     if (b.kind === 'fence') { addFence(g, b); continue; }
     const m = boxMesh(b);
     if (!m) continue;
     g.add(m);
-    if (b.fade) {
-      m.userData.fade = 1;
-      // Las paredes que arrancan del suelo (o del piso de arriba) se recortan; lo que cuelga (encima de la puerta), se oculta
-      m.userData.mode = b.kind === 'wall' || b.p[1] - b.h[1] < 0.05 ? 'cut' : 'hide';
-      if (b.kind === 'facade') m.userData.fadeRule = NEAR_DOOR;
-      if (b.kind === 'wall') m.userData.fadeRule = (_x: number, y: number) => y > 1.6;
-      fadeables.push(m);
-    }
+    if (b.fade) makeFade(m, b, fadeables, b.kind === 'facade' ? nearDoor : b.kind === 'wall' ? (_x, y) => y > 1.6 : undefined);
     if (b.kind === 'block' || b.kind === 'house') addRoof(g, b);
     if (b.kind === 'ramp') addRampStripes(g, b);
     if (b.kind === 'wall' && b.p[1] < 2.2) addSkirting(g, b);
   }
-  addCurbs(g);
-  addStairs(g);
-  addFacadeDetails(g, fadeables);
-  addHouse(g);
-  addNeighbourhood(g);
-  addTrees(g, fadeables);
-  addStreetProps(g);
-  addRooftopProps(g);
-  addDecor(g);
-  const lights = addTrafficLights(g);
-  addTruck(g);
-  const zone = addZone(g);
+  const truckParts = addTruck(g, fadeables, level.truck);
+  if (sc.street) addCurbs(g, sc.street);
+  if (sc.stairs) addStairs(g, sc.stairs);
+  if (sc.facade && nearDoor) addFacadeDetails(g, fadeables, sc.facade, nearDoor);
+  addSigns(g, sc.signs ?? []);
+  if (sc.house) addHouse(g, sc.house);
+  addNeighbourhood(g, sc.buildings ?? []);
+  addTrees(g, fadeables, sc.trees ?? [], sc.flowerBeds ?? []);
+  if (level.traffic) addStopLines(g, level.traffic);
+  addDecor(g, level);
+  addLabels(g, sc.labels ?? []);
+  const lights = addTrafficLights(g, level.traffic?.lights ?? []);
   const beacon = addBeacon(g);
   // Lo que no se mueve ni cambia de opacidad se funde en una malla por material: muchas menos llamadas de dibujo
   g.updateMatrixWorld(true);
@@ -96,19 +121,16 @@ export function buildLevel(): LevelView {
   const keep = new Set<THREE.Object3D>(fadeables);
   beacon.root.traverse((o) => keep.add(o));
   mergeStatic(g, keep);
-  const NEXT: [number, number, number][] = [
-    [0, 0, 2], [0, 0, DOOR.z - 0.5], [0, 0, STAIRS.z0], [0, FLOOR2, -30.6], [RAMP.x0, FLOOR2, (RAMP.z0 + RAMP.z1) / 2],
-    [(ZONE.x0 + ZONE.x1) / 2, 0, (ZONE.z0 + ZONE.z1) / 2],
-  ];
+  // Siguiente objetivo de cada etapa (el aro amarillo)
+  const next = level.stages.map((s) => s.next ?? null);
 
   return {
     group: g,
     fadeables,
-    update(t, light, zoneActive, stage, sofa) {
-      const n = NEXT[stage];
-      beacon.update(t, n ?? null, sofa);
+    truckParts,
+    update(t, light, stage, main) {
+      beacon.update(t, next[stage] ?? null, main);
       lights.set(light.cars, light.ped);
-      (zone.material as THREE.MeshBasicMaterial).opacity = 0.7 + 0.25 * Math.sin(t * 4) * (zoneActive ? 1 : 0.4);
     },
   };
 }
@@ -128,11 +150,11 @@ function addBeacon(g: THREE.Group) {
   g.add(root);
   return {
     root,
-    update(t: number, n: [number, number, number] | null, sofa: Vec3) {
+    update(t: number, n: Vec3 | null, main: Vec3) {
       root.visible = !!n;
       if (!n) return;
-      root.position.set(n[0], n[1] + 0.04, n[2]);
-      const d = Math.hypot(sofa.x - n[0], sofa.z - n[2]);
+      root.position.set(n.x, n.y + 0.04, n.z);
+      const d = Math.hypot(main.x - n.x, main.z - n.z);
       const vis = THREE.MathUtils.clamp((d - 1.5) / 1.5, 0, 1);
       ringMat.opacity = 0.85 * vis;
       const k = (t * 0.8) % 1;
@@ -198,17 +220,17 @@ function addSkirting(g: THREE.Group, b: Box) {
   g.add(m);
 }
 
-function addCurbs(g: THREE.Group) {
+function addCurbs(g: THREE.Group, street: NonNullable<Scenery['street']>) {
   const cm = mat('#efece6', { rough: 0.8 });
-  for (const z of [1, -9]) {
-    const c = new THREE.Mesh(new THREE.BoxGeometry(36, 0.04, 0.22), cm);
-    c.position.set(0, 0.02, z);
+  for (const k of street.curbs) {
+    const c = new THREE.Mesh(new THREE.BoxGeometry(k.w, 0.04, 0.22), cm);
+    c.position.set(k.x, 0.02, k.z);
     c.receiveShadow = true;
     g.add(c);
   }
   // Tapas de alcantarilla
   const lid = mat('#3a3f4a', { rough: 0.6, metal: 0.3 });
-  for (const [x, z] of [[-7, -2.2], [9, -6.3], [-13, -6.1]] as const) {
+  for (const [x, z] of street.manholes) {
     const m = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.02, 20), lid);
     m.position.set(x, 0.012, z);
     g.add(m);
@@ -236,143 +258,150 @@ function addFence(g: THREE.Group, b: Box) {
   }
 }
 
-function addStairs(g: THREE.Group) {
-  const n = 14;
-  const run = (STAIRS.z0 - STAIRS.z1) / n, rise = STAIRS.top / n;
+function addStairs(g: THREE.Group, st: NonNullable<Scenery['stairs']>) {
+  const n = st.steps, w = st.x1 - st.x0, cx = (st.x0 + st.x1) / 2;
+  const run = (st.z0 - st.z1) / n, rise = st.top / n;
   const wood = mat('#ffffff', { map: TEX.planks(), rough: 0.7 });
   const nose = mat('#fbe9c9');
   for (let i = 0; i < n; i++) {
     const h = rise * (i + 1);
-    const geo = worldUV(new THREE.BoxGeometry(2.8, h, run), new THREE.Vector3(0, h / 2, STAIRS.z0 - run * (i + 0.5)), TEX.planksTile);
+    const geo = worldUV(new THREE.BoxGeometry(w, h, run), new THREE.Vector3(cx, h / 2, st.z0 - run * (i + 0.5)), TEX.planksTile);
     const step = new THREE.Mesh(geo, wood);
-    step.position.set(0, h / 2, STAIRS.z0 - run * (i + 0.5));
+    step.position.set(cx, h / 2, st.z0 - run * (i + 0.5));
     step.castShadow = true; step.receiveShadow = true;
     // Canto oscuro de cada peldaño: se lee la escalera desde arriba
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.03, 0.1), nose);
-    edge.position.set(0, h + 0.005, STAIRS.z0 - run * i - 0.05);
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(w, 0.03, 0.1), nose);
+    edge.position.set(cx, h + 0.005, st.z0 - run * i - 0.05);
     g.add(step, edge);
   }
 }
 
+/** Bordes amarillos y negros: señal de peligro en los lados de una rampa (que sube en x, `rz`, o en z, `rx`). */
 function addRampStripes(g: THREE.Group, b: Box) {
-  // Bordes amarillos y negros: señal de peligro en los lados sin barandilla
+  const alongX = !b.rx, len = (alongX ? b.h[0] : b.h[2]) * 2, half = alongX ? b.h[2] : b.h[0];
+  const rot = new THREE.Euler(b.rx ?? 0, 0, b.rz ?? 0);
   for (const side of [-1, 1]) {
     for (let i = 0; i < 10; i++) {
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(b.h[0] * 2 / 10, 0.03, 0.18), mat(i % 2 ? '#111827' : '#facc15'));
-      const u = (i + 0.5) / 10 - 0.5;
-      const local = new THREE.Vector3(u * b.h[0] * 2, b.h[1] + 0.016, side * (b.h[2] - 0.09));
-      local.applyEuler(new THREE.Euler(0, 0, b.rz ?? 0));
+      const geo = alongX ? new THREE.BoxGeometry(len / 10, 0.03, 0.18) : new THREE.BoxGeometry(0.18, 0.03, len / 10);
+      const seg = new THREE.Mesh(geo, mat(i % 2 ? '#111827' : '#facc15'));
+      const u = ((i + 0.5) / 10 - 0.5) * len, o = side * (half - 0.09);
+      const local = alongX ? new THREE.Vector3(u, b.h[1] + 0.016, o) : new THREE.Vector3(o, b.h[1] + 0.016, u);
+      local.applyEuler(rot);
       seg.position.set(b.p[0] + local.x, b.p[1] + local.y, b.p[2] + local.z);
-      seg.rotation.z = b.rz ?? 0;
+      seg.rotation.copy(rot);
       g.add(seg);
     }
   }
 }
 
-function addFacadeDetails(g: THREE.Group, fadeables: THREE.Mesh[]) {
+function addFacadeDetails(g: THREE.Group, fadeables: THREE.Mesh[], facade: NonNullable<Scenery['facade']>, nearDoor: FadeRule) {
+  const door = facade.door, doorX = (door.x0 + door.x1) / 2;
   const fadeWith = (m: THREE.Mesh) => {
     m.material = (m.material as THREE.MeshStandardMaterial).clone();
     m.userData.fade = 1;
-    m.userData.fadeRule = NEAR_DOOR;
+    m.userData.fadeRule = nearDoor;
     fadeables.push(m);
     g.add(m);
   };
   // Marco de la puerta
   const frameMat = mat('#7c3f1d');
-  for (const x of [DOOR.x0 - 0.08, DOOR.x1 + 0.08]) {
-    const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, DOOR.top, 0.5), frameMat);
-    post.position.set(x, DOOR.top / 2, DOOR.z);
+  for (const x of [door.x0 - 0.08, door.x1 + 0.08]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, door.top, 0.5), frameMat);
+    post.position.set(x, door.top / 2, door.z);
     g.add(post);
   }
-  const top = new THREE.Mesh(new THREE.BoxGeometry(DOOR.x1 - DOOR.x0 + 0.32, 0.16, 0.5), frameMat);
-  top.position.set(0, DOOR.top, DOOR.z);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(door.x1 - door.x0 + 0.32, 0.16, 0.5), frameMat);
+  top.position.set(doorX, door.top, door.z);
   fadeWith(top);
   // Jambas claras con contorno: marcan bien el hueco estrecho aunque la fachada esté recortada
-  for (const x of [DOOR.x0 - 0.08, DOOR.x1 + 0.08]) {
-    const trim = new THREE.Mesh(new THREE.BoxGeometry(0.2, DOOR.top, 0.04), mat('#fde68a'));
-    trim.position.set(x, DOOR.top / 2, DOOR.z + 0.27);
+  for (const x of [door.x0 - 0.08, door.x1 + 0.08]) {
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(0.2, door.top, 0.04), mat('#fde68a'));
+    trim.position.set(x, door.top / 2, door.z + 0.27);
     trim.castShadow = true;
     g.add(trim);
   }
   // Felpudo
   const mat1 = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.02, 0.6), mat('#b45309'));
-  mat1.position.set(0, 0.02, DOOR.z + 0.7);
+  mat1.position.set(doorX, 0.02, door.z + 0.7);
   g.add(mat1);
   // Escaparates con toldo a rayas y ventanas con persianas
   const awnColors: [string, string][] = [['#ef4444', '#fff7ed'], ['#16a34a', '#fff7ed'], ['#2563eb', '#fff7ed'], ['#f59e0b', '#fff7ed']];
   let k = 0;
-  for (let x = -16; x <= 16; x += 3.2) {
-    if (Math.abs(x) < 2) continue;
+  const win = facade.windows;
+  for (let x = win.x0; x <= win.x1; x += win.step) {
+    if (Math.abs(x - doorX) < 2) continue;
     const w = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.1, 0.06), ownMat('#5aa9e6', { rough: 0.25 }));
-    w.position.set(x, 1.6, DOOR.z + 0.23);
+    w.position.set(x, 1.6, door.z + 0.23);
     fadeWith(w);
     const frame = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.3, 0.04), ownMat('#fdf6e7'));
-    frame.position.set(x, 1.6, DOOR.z + 0.21);
+    frame.position.set(x, 1.6, door.z + 0.21);
     fadeWith(frame);
     const [a, b] = awnColors[k++ % awnColors.length];
     const awn = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.8), ownMat('#ffffff', { map: awningTex(a, b) }));
     awn.material.side = THREE.DoubleSide;
-    awn.position.set(x, 2.55, DOOR.z + 0.55);
+    awn.position.set(x, 2.55, door.z + 0.55);
     awn.rotation.x = -0.9;
     awn.castShadow = true;
     fadeWith(awn);
   }
-  // Cornisa
-  const corn = new THREE.Mesh(new THREE.BoxGeometry(36.4, 0.22, 0.7), ownMat('#f5e6cc'));
-  corn.position.set(0, 3.25, DOOR.z + 0.05);
+  // Cornisa, de punta a punta de la fachada
+  const corn = new THREE.Mesh(new THREE.BoxGeometry(facade.x1 - facade.x0 + 0.4, 0.22, 0.7), ownMat('#f5e6cc'));
+  corn.position.set((facade.x0 + facade.x1) / 2, facade.top + 0.05, door.z + 0.05);
   fadeWith(corn);
-  const sign = textSprite('Nº 13', { size: 40, color: '#ffffff', bg: '#c8553d', pad: 10 });
-  sign.position.set(2.2, 2.7, DOOR.z + 0.5);
+  const sign = textSprite(facade.number, { size: 40, color: '#ffffff', bg: '#c8553d', pad: 10 });
+  sign.position.set(facade.numberX, 2.7, door.z + 0.5);
   sign.scale.multiplyScalar(0.6);
   g.add(sign);
-  // Cartel pintado de la terraza (sobre su muro, sin tapar la rampa)
-  const warn = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 0.55), mat('#ffffff', { map: signTex('¡SIN BARANDILLA!', { bg: '#facc15', color: '#111827', stripes: true }), rough: 0.6 }));
-  warn.position.set(13.1, FLOOR2 + 1.45, -32.38);
-  g.add(warn);
-  for (const x of [12.25, 13.95]) {
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), mat('#374151'));
-    post.position.set(x, FLOOR2 + 1.2, -32.42);
-    g.add(post);
+}
+
+/** Carteles pintados en una pared (p. ej. el de la terraza, sobre su muro, sin tapar la rampa), con dos postes. */
+function addSigns(g: THREE.Group, signs: NonNullable<Scenery['signs']>) {
+  for (const s of signs) {
+    const warn = new THREE.Mesh(new THREE.PlaneGeometry(s.w, 0.55), mat('#ffffff', { map: signTex(s.text, { bg: '#facc15', color: '#111827', stripes: true }), rough: 0.6 }));
+    warn.position.set(s.x, s.y, s.z);
+    g.add(warn);
+    for (const x of s.posts) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), mat('#374151'));
+      post.position.set(x, s.y - 0.25, s.z - 0.04);
+      g.add(post);
+    }
   }
 }
 
-function addHouse(g: THREE.Group) {
-  // Puerta, toldo y cartel de la casa de salida
+/** Rótulos flotantes con el nombre del sitio. */
+function addLabels(g: THREE.Group, labels: NonNullable<Scenery['labels']>) {
+  for (const l of labels) {
+    const sign = textSprite(l.text, { size: 40, color: '#ffffff', bg: '#7c3aed', pad: 14 });
+    sign.position.set(l.x, l.y, l.z);
+    sign.scale.multiplyScalar(0.7);
+    g.add(sign);
+  }
+}
+
+function addHouse(g: THREE.Group, house: NonNullable<Scenery['house']>) {
+  // Puerta, toldo y cartel de la casa de salida (delante de su fachada, en `front`)
+  const f = house.front;
   const door = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.1, 0.1), mat('#7c3f1d'));
-  door.position.set(0, 1.05, 16.95);
+  door.position.set(house.x, 1.05, f - 0.05);
   const knob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), mat('#facc15', { metal: 0.6, rough: 0.3 }));
-  knob.position.set(0.4, 1.0, 16.88);
+  knob.position.set(house.x + 0.4, 1.0, f - 0.12);
   g.add(door, knob);
   const sign = textSprite('SALIDA', { size: 40, color: '#ffffff', bg: '#7c3aed', pad: 14 });
-  sign.position.set(0, 3, 16.6);
+  sign.position.set(house.x, 3, f - 0.4);
   sign.scale.multiplyScalar(0.7);
   g.add(sign);
   // Camino de losas del patio hasta la acera
   const stone = mat('#d6cfc4', { rough: 0.9 });
-  for (let z = 15.8; z > 4.5; z -= 1.1) {
+  for (let z = f - 1.2; z > house.pathTo; z -= 1.1) {
     const s = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.03, 9), stone);
-    s.position.set(((z * 7) % 3) * 0.12 - 0.12, 0.02, z);
+    s.position.set(house.x + ((z * 7) % 3) * 0.12 - 0.12, 0.02, z);
     s.receiveShadow = true;
     g.add(s);
   }
-  // Gnomo de jardín (vigila la mudanza)
-  const gnome = new THREE.Group();
-  const gb = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.45, 10), mat('#2563eb'));
-  gb.position.y = 0.22;
-  const gh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), mat('#f5c9a6'));
-  gh.position.y = 0.5;
-  const gbeard = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.22, 8), mat('#ffffff'));
-  gbeard.position.set(0, 0.42, 0.07); gbeard.rotation.x = Math.PI;
-  const ghat = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.4, 10), mat('#ef4444'));
-  ghat.position.y = 0.76;
-  for (const m of [gb, gh, gbeard, ghat]) { m.castShadow = true; gnome.add(m); }
-  gnome.position.set(-5.6, 0, 12.5);
-  gnome.rotation.y = 0.5;
-  g.add(gnome);
 }
 
 /** Casas y bloques de fondo, sin colisión, para que la calle parezca un barrio. */
-function addNeighbourhood(g: THREE.Group) {
+function addNeighbourhood(g: THREE.Group, buildings: NonNullable<Scenery['buildings']>) {
   const styles: [string, string][] = [['#f6c89f', '#2f6f4f'], ['#fde7b0', '#b45309'], ['#cfe3f2', '#1e3a8a'], ['#f4b6b6', '#7c2d12'], ['#e9d5ff', '#4c1d95']];
   const building = (x0: number, x1: number, z0: number, z1: number, h: number, style: number) => {
     const [wall, shutter] = styles[style % styles.length];
@@ -388,19 +417,7 @@ function addNeighbourhood(g: THREE.Group) {
     g.add(m);
     addRoof(g, { p: [c.x, c.y, c.z], h: [w / 2, h / 2, d / 2], kind: 'block', solid: false });
   };
-  // Junto al patio de salida
-  building(-17.5, -10, 7, 16, 4.5, 0);
-  building(10, 17.5, 7, 16, 4.5, 1);
-  // Al otro lado de la calle, siguiendo la fachada
-  building(-34, -18.4, -24, -13.6, 6.2, 2);
-  building(18.4, 32, -22, -13.6, 4.2, 3);
-  // Fondo, detrás del patio trasero
-  building(8, 22, -56, -44, 7, 4);
-  building(23, 40, -56, -44, 9, 2);
-  building(-20, -6, -48, -34, 6.5, 1);
-  // Al final de la calle
-  building(-44, -36, -13, 0, 5, 3);
-  building(36, 44, -13, 0, 5, 0);
+  for (const b of buildings) building(b.x0, b.x1, b.z0, b.z1, b.h, b.style);
 }
 
 function tree(x: number, z: number, s = 1, hue = 0) {
@@ -421,132 +438,41 @@ function tree(x: number, z: number, s = 1, hue = 0) {
   return t;
 }
 
-function addTrees(g: THREE.Group, fadeables: THREE.Mesh[]) {
-  const list: [number, number, number][] = [[-6, 7, 1.1], [6, 13, 1], [-6, 14.5, 0.9], [6.2, 6, 0.8], [-14, 5.5, 1.2], [14, 5.6, 1.1], [-15, -11, 1], [15, -11.5, 1], [18, -38, 1.2], [30, -26, 1], [16, -40, 0.9], [-22, 2.5, 1.1], [22, 2.5, 1.2], [-9, -11.6, 0.8], [9, -11.8, 0.8]];
-  // Árboles junto al recorrido (patio, aceras y camión): su copa se oculta si tapa a un jugador o al sofá.
-  // En el patio los jugadores pasan por debajo (los árboles no tienen colisión) y desaparecían de la vista.
-  const nearRoute = new Set(['-6,7', '6,13', '-6,14.5', '6.2,6', '-9,-11.6', '9,-11.8', '30,-26']);
-  list.forEach(([x, z, s], i) => {
-    const t = tree(x, z, s, i);
+function addTrees(g: THREE.Group, fadeables: THREE.Mesh[], trees: NonNullable<Scenery['trees']>, beds: NonNullable<Scenery['flowerBeds']>) {
+  // Árboles junto al recorrido (`fade`): su copa se oculta si tapa a un jugador o al sofá. En el patio los jugadores
+  // pasan por debajo (los árboles no tienen colisión) y desaparecían de la vista.
+  for (const k of trees) {
+    const t = tree(k.x, k.z, k.s, k.hue);
     g.add(t);
-    if (!nearRoute.has(`${x},${z}`)) return;
+    if (!k.fade) continue;
     for (const crown of t.children.slice(1) as THREE.Mesh[]) { crown.userData.fade = 1; crown.userData.mode = 'hide'; fadeables.push(crown); }
-  });
-  // Arriates con flores en el patio
+  }
+  // Arriates con flores (los colores empiezan distinto a cada lado)
   const flowers = ['#f472b6', '#facc15', '#ef4444', '#a78bfa', '#ffffff'];
-  for (const sx of [-1, 1]) {
-    const bed = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.18, 9), mat('#7a4b2a'));
-    bed.position.set(sx * 7.1, 0.09, 10.5);
+  for (const b of beds) {
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.18, b.len), mat('#7a4b2a'));
+    bed.position.set(b.x, 0.09, b.z);
     g.add(bed);
-    for (let i = 0; i < 14; i++) {
-      const f = new THREE.Mesh(new THREE.IcosahedronGeometry(0.16, 0), mat(flowers[(i + (sx > 0 ? 2 : 0)) % flowers.length]));
-      f.position.set(sx * 7.1 + ((i * 37) % 5) * 0.12 - 0.24, 0.3, 6.4 + i * 0.6);
+    const n = Math.round((b.len - 0.6) / 0.6);
+    for (let i = 0; i < n; i++) {
+      const f = new THREE.Mesh(new THREE.IcosahedronGeometry(0.16, 0), mat(flowers[(i + (b.x > 0 ? 2 : 0)) % flowers.length]));
+      f.position.set(b.x + ((i * 37) % 5) * 0.12 - 0.24, 0.3, b.z - b.len / 2 + 0.4 + i * 0.6);
       f.castShadow = true;
       g.add(f);
     }
   }
-  for (const [x, z] of [[-3.5, 15.6], [3.5, 15.6]] as const) {
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.28, 0.5, 10), mat('#c2410c'));
-    pot.position.set(x, 0.25, z);
-    const fl = new THREE.Mesh(new THREE.IcosahedronGeometry(0.4, 1), mat('#f472b6'));
-    fl.position.set(x, 0.7, z);
-    pot.castShadow = fl.castShadow = true;
-    g.add(pot, fl);
-  }
 }
 
-function addStreetProps(g: THREE.Group) {
-  const metal = mat('#5f7391', { rough: 0.55, metal: 0.2 });
-  // Farolas pintadas con globo: en la acera cercana solo las de los extremos, para no cruzar la acción
-  for (const x of [-12, -6, 6, 12]) {
-    for (const [z, dir] of [[1.3, -1], [-9.4, 1]] as const) {
-      if (z > 0 && Math.abs(x) < 10) continue;
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 3.4, 8), metal);
-      pole.position.set(x, 1.7, z);
-      const arm = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.04, 6, 12, Math.PI / 2), metal);
-      arm.position.set(x, 3.4, z + dir * 0.35);
-      arm.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
-      const head = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, 0.12, 10), metal);
-      head.position.set(x, 3.62, z + dir * 0.4);
-      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 8), mat('#fff7cc', { emissive: '#fde68a' }));
-      bulb.position.set(x, 3.84, z + dir * 0.4);
-      pole.castShadow = head.castShadow = true;
-      g.add(pole, arm, head, bulb);
-    }
-  }
-  // Bancos, papeleras, boca de incendios y buzón: lejos del recorrido del sofá
-  const wood = mat('#b7793f');
-  for (const [x, z, ry] of [[-9, 2.9, 0], [9, 2.9, 0], [-9.2, -11.2, Math.PI], [12.4, -11.2, Math.PI]] as const) {
-    const bench = new THREE.Group();
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.08, 0.45), wood);
-    seat.position.y = 0.45;
-    const back = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.4, 0.06), wood);
-    back.position.set(0, 0.72, 0.22);
-    bench.add(seat, back);
-    for (const s of [-0.7, 0.7]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.45, 0.4), metal); l.position.set(s, 0.22, 0); bench.add(l); }
-    bench.traverse((o) => (o.castShadow = true));
-    bench.position.set(x, 0, z);
-    bench.rotation.y = ry;
-    g.add(bench);
-  }
-  for (const [x, z] of [[-4.6, 1.6], [4.8, -9.8], [-15, 2.2]] as const) {
-    const bin = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.22, 0.8, 12), mat('#16a34a', { rough: 0.5 }));
-    bin.position.set(x, 0.4, z);
-    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.06, 12), mat('#15803d'));
-    lid.position.set(x, 0.83, z);
-    bin.castShadow = true;
-    g.add(bin, lid);
-  }
-  const hyd = new THREE.Group();
-  const hb = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.17, 0.6, 10), mat('#dc2626', { rough: 0.4 }));
-  hb.position.y = 0.3;
-  const ht = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat('#dc2626', { rough: 0.4 }));
-  ht.position.y = 0.6;
-  const hs = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 8), mat('#b91c1c'));
-  hs.rotation.z = Math.PI / 2; hs.position.y = 0.4;
-  hyd.add(hb, ht, hs);
-  hyd.traverse((o) => (o.castShadow = true));
-  hyd.position.set(7.4, 0, 1.7);
-  g.add(hyd);
-  const box = new THREE.Mesh(new RoundedBoxGeometry(0.5, 0.9, 0.4, 2, 0.08), mat('#facc15', { rough: 0.5 }));
-  box.position.set(-6.8, 0.75, -10.2);
-  const boxLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.4, 6), metal);
-  boxLeg.position.set(-6.8, 0.2, -10.2);
-  box.castShadow = true;
-  g.add(box, boxLeg);
-  // Líneas de detención de los coches
-  for (const l of LANES) {
+/** Líneas de detención de los coches, una por carril. */
+function addStopLines(g: THREE.Group, traffic: TrafficDef) {
+  for (const l of traffic.lanes) {
     const line = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 2.2), mat('#f8f5ec'));
     line.position.set(l.stopX, 0.02, l.z);
     g.add(line);
   }
 }
 
-function addRooftopProps(g: THREE.Group) {
-  // Aparatos de aire, chimeneas y un depósito: lejos del pasillo para no tapar la escalera
-  const ac = mat('#e5e7eb', { rough: 0.5 });
-  const grill = mat('#6b7280');
-  for (const [x, z] of [[-10, -19], [-7, -27], [-12, -30], [7, -16], [10, -19.5]] as const) {
-    const u = new THREE.Mesh(new RoundedBoxGeometry(1, 0.6, 0.7, 2, 0.06), ac);
-    u.position.set(x, 3.75, z);
-    const f = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.02, 14), grill);
-    f.rotation.x = Math.PI / 2; f.position.set(x - 0.15, 3.75, z + 0.36);
-    u.castShadow = true;
-    g.add(u, f);
-  }
-  for (const [x, z] of [[-5, -15], [5, -15]] as const) {
-    const ch = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1, 0.5), mat('#c8553d'));
-    ch.position.set(x, 3.9, z);
-    ch.castShadow = true;
-    g.add(ch);
-  }
-  const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.1, 14), mat('#93c5fd', { rough: 0.4, metal: 0.3 }));
-  tank.position.set(-12, 4, -23);
-  tank.castShadow = true;
-  g.add(tank);
-}
-
-function addTrafficLights(g: THREE.Group) {
+function addTrafficLights(g: THREE.Group, list: TrafficDef['lights']) {
   const bulbs: { car: THREE.Mesh[]; ped: THREE.Mesh[] }[] = [];
   const make = (x: number, z: number, faceZ: number) => {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 3, 8), mat('#1f2937'));
@@ -574,8 +500,7 @@ function addTrafficLights(g: THREE.Group) {
     });
     bulbs.push({ car, ped });
   };
-  make(PED_LIGHT.x, PED_LIGHT.z, 1);
-  make(-PED_LIGHT.x, -9.6, -1);
+  for (const l of list) make(l.x, l.z, l.face);
   const off = '#1f2937';
   return {
     set(cars: string, ped: string) {
@@ -597,83 +522,108 @@ function addTrafficLights(g: THREE.Group) {
   };
 }
 
-function addTruck(g: THREE.Group) {
-  // Caja de carga x 28..34 (la colisión), abierta por detrás (hacia la zona de entrega); cabina hacia +x
-  const t = new THREE.Group();
-  const white = mat('#f8fafc', { rough: 0.5 });
-  const cz = -30.25, dz = 6.5, top = 3.4, bottom = 1.3;
-  const panel = (w: number, h: number, d: number, x: number, y: number, z: number, m = white) => {
-    const p = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-    p.position.set(x, y, z);
-    p.castShadow = true; p.receiveShadow = true;
-    t.add(p);
-    return p;
-  };
-  panel(6, 0.1, dz, 31, top - 0.05, cz);
-  panel(6, top - bottom, 0.1, 31, (top + bottom) / 2, cz - dz / 2 + 0.05);
-  panel(6, top - bottom, 0.1, 31, (top + bottom) / 2, cz + dz / 2 - 0.05);
-  panel(0.1, top - bottom, dz, 33.95, (top + bottom) / 2, cz);
-  panel(6, 0.15, dz, 31, bottom, cz, mat('#d9b98c'));
-  // Chasis bajo la caja
-  panel(5.6, 0.4, dz - 1.6, 31.2, bottom - 0.3, cz, mat('#374151'));
-  // Interior de contrachapado y cajas de cartón ya cargadas
-  panel(0.05, top - bottom - 0.1, dz - 0.2, 33.85, (top + bottom) / 2, cz, mat('#c69c6d'));
-  const card = mat('#c8a26b');
-  for (const [x, y, z, s] of [[33, 1.83, -32.4, 0.9], [33, 1.83, -31.4, 0.9], [33.1, 2.68, -32, 0.8], [32.2, 1.73, -28.3, 0.7]] as const) {
-    const b = panel(s, s, s, x, y, z, card);
-    const tape = new THREE.Mesh(new THREE.BoxGeometry(s + 0.01, 0.08, 0.12), mat('#a07a46'));
-    tape.position.copy(b.position).add(new THREE.Vector3(0, s / 2 - 0.03, 0));
-    t.add(tape);
-  }
-  // Franja morada y rótulos pintados
-  for (const sz of [-1, 1]) panel(6.02, 0.4, 0.04, 31, bottom + 0.35, cz + sz * (dz / 2 + 0.01), mat('#7c3aed'));
-  panel(0.04, 0.4, dz + 0.02, 34.01, bottom + 0.35, cz, mat('#7c3aed'));
-  const logo = signTex('MUDANZAS PEPE', { bg: '#ffffff', color: '#7c3aed', w: 512, h: 128 });
-  const side = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.15), mat('#ffffff', { map: logo, rough: 0.5 }));
-  side.position.set(31.2, 2.55, cz + dz / 2 + 0.01);
-  // Techo: franja morada en el borde (sin un segundo rótulo cortado)
-  panel(6.02, 0.04, 0.5, 31, top + 0.02, cz + dz / 2 - 0.25, mat('#7c3aed'));
-  t.add(side);
-  // Marco trasero de la caja abierta
-  for (const s of [-1, 1]) panel(0.16, top - bottom, 0.16, 28.05, (top + bottom) / 2, cz + s * (dz / 2 - 0.08), mat('#d1d5db'));
-  // Cabina
-  const cab = new THREE.Mesh(new RoundedBoxGeometry(2.4, 2.5, 5.4, 3, 0.3), mat('#ef4444', { rough: 0.45 }));
-  cab.position.set(35.3, 1.5, cz);
-  cab.castShadow = true;
-  const glass = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.9, 4.6), mat('#93c5fd', { rough: 0.15 }));
-  glass.position.set(36.5, 2.0, cz);
-  t.add(cab, glass);
-  for (const x of [29, 33, 35.5]) for (const z of [cz - dz / 2 + 0.1, cz + dz / 2 - 0.1]) {
-    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.4, 16), mat('#111827'));
-    w.rotation.x = Math.PI / 2; w.position.set(x, 0.6, z);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.42, 10), mat('#d1d5db', { metal: 0.5, rough: 0.3 }));
-    hub.rotation.x = Math.PI / 2; hub.position.copy(w.position);
-    t.add(w, hub);
-  }
-  g.add(t);
-  return t;
+
+/** Rótulo de los costados del camión: blanco, con franja morada abajo y el nombre de la empresa. */
+let truckSide: THREE.CanvasTexture | null = null;
+function truckSideTex() {
+  if (truckSide) return truckSide;
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 376;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = PALETTE.truck; ctx.fillRect(0, 0, 1024, 376);
+  ctx.fillStyle = '#7c3aed'; ctx.fillRect(0, 300, 1024, 46);
+  ctx.fillStyle = '#7c3aed';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '900 92px system-ui, sans-serif';
+  ctx.fillText('MUDANZAS PEPE', 512, 170);
+  truckSide = new THREE.CanvasTexture(c);
+  truckSide.colorSpace = THREE.SRGBColorSpace;
+  truckSide.anisotropy = 8;
+  return truckSide;
 }
 
-function addZone(g: THREE.Group) {
-  const w = ZONE.x1 - ZONE.x0, d = ZONE.z1 - ZONE.z0;
-  const cx = (ZONE.x0 + ZONE.x1) / 2, cz = (ZONE.z0 + ZONE.z1) / 2;
-  // Suelo a rayas amarillas y blancas con borde: se distingue bien sobre el césped
-  const c = document.createElement('canvas');
-  c.width = 256; c.height = 256;
-  const ctx = c.getContext('2d')!;
-  ctx.fillStyle = '#facc15'; ctx.fillRect(0, 0, 256, 256);
-  ctx.fillStyle = '#fff7d6';
-  for (let i = -256; i < 512; i += 64) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i + 32, 0); ctx.lineTo(i + 32 + 256, 256); ctx.lineTo(i + 256, 256); ctx.fill(); }
-  ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 14; ctx.strokeRect(7, 7, 242, 242);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const zone = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.9, depthWrite: false }));
-  zone.rotation.x = -Math.PI / 2;
-  zone.position.set(cx, 0.03, cz);
-  g.add(zone);
-  const lab = textSprite('ENTREGA', { size: 40, color: '#ffffff', bg: '#16a34a', pad: 10 });
-  lab.position.set(cx, 2.2, ZONE.z0 + 0.6);
-  lab.scale.multiplyScalar(0.7);
-  g.add(lab);
-  return zone;
+/**
+ * Camión de mudanzas: se dibujan sus cajas de choque tal cual (`truckBoxes`: suelo, paredes, techo, rampa, bajos y
+ * cabina), así que lo que se ve es lo que choca. Paredes y techo se recortan u ocultan si tapan a alguien que está
+ * dentro. Encima, solo pintura a ras de sus caras: rótulo, ruedas, cristales de la cabina y franja de peligro en el borde
+ * del suelo de carga.
+ */
+function addTruck(g: THREE.Group, fadeables: THREE.Mesh[], pose: TruckPose): TruckPart[] {
+  const boxes = truckBoxes(pose);
+  const parts: TruckPart[] = [];
+  const { length: L, width: W, floor: F, wall: t, cab } = TRUCK;
+  const sideFace = (dz: number) => {
+    // Cara de la caja (orden de `BoxGeometry`: +x, −x, +y, −y, +z, −z) que mira hacia el lado local `dz` del camión
+    const d = truckDir(pose, { x: 0, z: dz });
+    return d.x > 0.5 ? 0 : d.x < -0.5 ? 1 : d.z > 0.5 ? 4 : 5;
+  };
+  boxes.forEach((b, i) => {
+    let m: THREE.Mesh;
+    if (b.kind === 'truckCab') {
+      m = new THREE.Mesh(new RoundedBoxGeometry(b.h[0] * 2, b.h[1] * 2, b.h[2] * 2, 3, 0.25), mat('#ef4444', { rough: 0.45 }));
+      m.position.set(...b.p);
+      m.castShadow = true; m.receiveShadow = true;
+    } else if (i === 1 || i === 2) {
+      // Paredes de los costados, con el rótulo en su cara de fuera
+      const face = sideFace(i === 1 ? -1 : 1);
+      const plain = ownMat(PALETTE.truck, { rough: 0.5 }), logo = ownMat('#ffffff', { map: truckSideTex(), rough: 0.5 });
+      m = new THREE.Mesh(new THREE.BoxGeometry(b.h[0] * 2, b.h[1] * 2, b.h[2] * 2), [0, 1, 2, 3, 4, 5].map((k) => (k === face ? logo : plain)));
+      m.position.set(...b.p);
+      m.castShadow = true; m.receiveShadow = true;
+    } else {
+      m = boxMesh(b)!;
+    }
+    g.add(m);
+    // Esquinas de lo dibujado, en el mundo (el escenario se construye en el origen)
+    m.updateMatrixWorld(true);
+    m.geometry.computeBoundingBox();
+    const bb = m.geometry.boundingBox!;
+    const corners: Vec3[] = [];
+    for (const x of [bb.min.x, bb.max.x]) for (const y of [bb.min.y, bb.max.y]) for (const z of [bb.min.z, bb.max.z]) {
+      const v = new THREE.Vector3(x, y, z).applyMatrix4(m.matrixWorld);
+      corners.push({ x: v.x, y: v.y, z: v.z });
+    }
+    parts.push({ kind: b.kind, corners });
+    if (b.fade) makeFade(m, b, fadeables);
+    if (b.kind === 'truckRamp') addRampStripes(g, b);
+  });
+  // Pintura y detalles, a ras de las caras (a menos de 2 cm de los colliders)
+  const at = (x: number, y: number, z: number) => truckToWorld(pose, { x, y, z });
+  const across = truckDir(pose, { x: 0, z: 1 }), along = truckDir(pose, { x: 1, z: 0 });
+  const turn = (o: THREE.Object3D, axis: { x: number; z: number }) => {
+    // Gira un cilindro (eje y) para que su eje quede en la dirección horizontal `axis`
+    if (Math.abs(axis.z) > 0.5) o.rotation.x = Math.PI / 2; else o.rotation.z = Math.PI / 2;
+  };
+  // Ruedas pintadas en los costados de los bajos
+  const tyre = mat('#111827'), hub = mat('#d1d5db', { metal: 0.5, rough: 0.3 });
+  for (const x of [0.9, L - 0.6]) for (const s of [-1, 1]) {
+    const p = at(x, 0.4, s * (W / 2 + t + 0.01));
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.02, 18), tyre);
+    const h = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.03, 12), hub);
+    for (const o of [w, h]) { o.position.set(p.x, p.y, p.z); turn(o, across); g.add(o); }
+  }
+  // Cristales de la cabina: el parabrisas en su frente y una ventanilla a cada lado
+  const glass = mat('#93c5fd', { rough: 0.15 });
+  const front = L + t + cab.length, cw = W + 2 * t - 2 * cab.inset;
+  const shield = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.9, cw - 0.7), glass);
+  const sp = at(front - 0.005, 1.85, 0);
+  shield.position.set(sp.x, sp.y, sp.z);
+  shield.rotation.y = Math.atan2(-along.z, along.x);
+  g.add(shield);
+  for (const s of [-1, 1]) {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.03), glass);
+    const wp = at(front - 0.75, 1.85, s * (cw / 2 - 0.005));
+    win.position.set(wp.x, wp.y, wp.z);
+    win.rotation.y = Math.atan2(-along.z, along.x);
+    g.add(win);
+  }
+  // Franja de peligro en el borde del suelo de carga, junto a la abertura
+  for (let k = 0; k < 10; k++) {
+    const seg = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.01, W / 10), mat(k % 2 ? '#111827' : '#facc15'));
+    const p = at(0.09, F + 0.005, -W / 2 + (k + 0.5) * (W / 10));
+    seg.position.set(p.x, p.y, p.z);
+    seg.rotation.y = Math.atan2(-along.z, along.x);
+    g.add(seg);
+  }
+  return parts;
 }

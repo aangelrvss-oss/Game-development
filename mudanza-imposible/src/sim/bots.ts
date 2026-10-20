@@ -1,6 +1,7 @@
 // Ayudantes controlados por la máquina. Son deliberadamente simples:
-// van a un asa libre, la agarran e imitan el movimiento de los jugadores humanos que cargan,
-// añadiendo la componente de giro que pidan (Q/E). No esquivan obstáculos ni deciden la ruta.
+// van a un asa libre del objeto (las de su definición, `ItemDef.handles`), la agarran e imitan el movimiento de los
+// jugadores humanos que cargan, añadiendo la componente de giro que pidan (Q/E). No esquivan obstáculos ni deciden
+// la ruta.
 //
 // Tienen la misma física que los jugadores (mano blanda, fuerza y equilibrio de `carrier.ts` y `hand.ts`). Lo
 // que los distingue está solo aquí, en cómo deciden: se acercan a su asa sin correr y rodeando a los demás
@@ -8,10 +9,12 @@
 // estar bloqueados, primero dejan de tirar y acompañan al sofá un momento (`letGo`): soltar de golpe con el
 // sofá tirando de ellos los tumbaría, igual que a un jugador. Y si notan que empiezan a perder el equilibrio
 // (`steady`), dejan de imitar y se dejan llevar por el sofá hasta recuperarlo: imitan con retraso, y cuando el
-// jugador frena de golpe seguirían empujando contra todos.
-import type RAPIER from '@dimforge/rapier3d-compat';
+// jugador frena de golpe seguirían empujando contra todos. Y cuando el objeto ya está dentro del camión y ningún
+// jugador lo lleva, o los que lo llevan se paran ahí (`stow`), lo sueltan con cuidado y no lo vuelven a agarrar: si no,
+// nunca quedaría cargado.
 import { CARRIER, type Carrier } from './carrier';
-import { SLOTS, localToWorld, rotate } from './sofa';
+import type { Item } from './items';
+import { localToWorld, rotate } from './sofa';
 import type { PlayerInput, Vec3 } from './types';
 
 export type BotStyle = 'atentos' | 'despistados';
@@ -29,9 +32,21 @@ export const BOT = {
   /** Desviación del tronco (rad) a partir de la cual dejan de tirar y acompañan al sofá, y a la que vuelven. */
   steady: 0.1,
   steadyBack: 0.04,
+  /** Dentro del camión, tiempo con los jugadores que cargan parados tras el que dejan el objeto (s). */
+  stowAfter: 0.4,
+  /**
+   * Sin nada que llevar, esperan fuera del camión: `foot` m más allá del pie de la rampa y `aside` m al lado de la caja de
+   * carga; para salir, bajan por la rampa a menos de `down` m de su eje (m).
+   */
+  park: { foot: 0.6, aside: 1.6, down: 1.0 },
+  /** Al cambiar de asa, las que están a menos de esto (m) de la más alejada de las ocupadas valen igual. */
+  farTie: 0.05,
 };
 
 export class BotBrain {
+  /** Objeto al que va o que lleva (índice en `Game.items`; lo elige `Game` entre los que necesitan manos). */
+  item = 0;
+  /** Asa a la que va o que agarra (índice en las asas de la definición del objeto). */
   slot: number;
   history: { x: number; z: number; w: number }[] = [];
   tryTime = 0;
@@ -46,17 +61,60 @@ export class BotBrain {
   yielding = false;
   constructor(slot: number, readonly style: BotStyle, private rng: () => number) { this.slot = slot; }
 
-  /** Calcula el mando del ayudante para este paso. */
-  think(me: Carrier, sofa: RAPIER.RigidBody, lead: { x: number; z: number; w: number; active: boolean }, taken: Set<number>, dt: number, others: Vec3[] = []): PlayerInput {
+  /**
+   * Hacia (`dx`, `dz`), a `d` m, sin correr: rodea a quien tiene delante y frena si está muy cerca (no los arrolla).
+   */
+  private approach(p: Vec3, dx: number, dz: number, d: number, others: Vec3[], input: PlayerInput) {
+    let s = Math.min(BOT.approach, d / 0.8);
+    let ux = dx / d, uz = dz / d;
+    // Espacio personal: rodea a quien tiene delante y frena si está muy cerca (no los arrolla)
+    for (const o of others) {
+      const ox = o.x - p.x, oz = o.z - p.z, od = Math.hypot(ox, oz);
+      if (od < 1e-3 || od > BOT.personal || od > d + 0.3) continue;
+      const ahead = (ox * ux + oz * uz) / od;
+      if (ahead < 0.2) continue;
+      // Se desvía hacia el lado contrario al que queda el otro respecto a su camino
+      const px = -uz, pz = ux, side = ox * px + oz * pz > 0 ? -1 : 1, k = 1.5 * ahead * (1 - od / BOT.personal);
+      ux += px * side * k; uz += pz * side * k;
+      const ul = Math.hypot(ux, uz) || 1;
+      ux /= ul; uz /= ul;
+      s *= Math.max(0.35, od / BOT.personal);
+    }
+    input.mx = ux * s; input.mz = uz * s;
+  }
+
+  /**
+   * Sin nada que llevar (su objeto ya está cargado y ninguno necesita manos): va a `goal` (fuera del camión, a un lado de
+   * la rampa, para no quedarse en el carril de los que llegan) y allí espera.
+   */
+  park(me: Carrier, goal: { x: number; z: number }, others: Vec3[]): PlayerInput {
     const input: PlayerInput = { mx: 0, mz: 0, grab: false, turn: 0, right: false };
+    const p = me.pos, dx = goal.x - p.x, dz = goal.z - p.z, d = Math.hypot(dx, dz);
+    if (me.stunned <= 0 && !me.holding && d > 0.3) this.approach(p, dx, dz, d, others, input);
+    return input;
+  }
+
+  /**
+   * Calcula el mando del ayudante para este paso. `item`: el objeto que lleva o al que va; `taken`: sus asas ocupadas;
+   * `stow`: el objeto ya está dentro del camión y ningún jugador lo lleva (se suelta y se deja).
+   */
+  think(me: Carrier, item: Item, lead: { x: number; z: number; w: number; active: boolean }, taken: Set<number>, dt: number, others: Vec3[] = [], stow = false): PlayerInput {
+    const input: PlayerInput = { mx: 0, mz: 0, grab: false, turn: 0, right: false };
+    const body = item.body, handles = item.def.handles;
     if (me.stunned > 0) { this.letGo = 0; return input; }
     const p = me.pos;
     if (!me.holding) {
       this.letGo = 0;
-      // Su asa la ha cogido otro (también un jugador): busca otra libre
+      // Ya está cargado (o a punto): no se vuelve a agarrar
+      if (stow) { this.regrab = 0; return input; }
+      // Su asa la ha cogido otro (también un jugador): busca otra libre, de las más alejadas de las ocupadas (el otro
+      // extremo: el peso se reparte y el objeto va derecho; agarrado por un extremo y por un costado, la mesa iba
+      // inclinada y sus patas topaban con el pie de la rampa). Entre las igual de alejadas, una al azar
       if (taken.has(this.slot)) {
-        const free = SLOTS.map((_, i) => i).filter((i) => !taken.has(i));
-        if (free.length) this.slot = free[Math.floor(this.rng() * free.length)];
+        const free = handles.map((_, i) => i).filter((i) => !taken.has(i));
+        const far = free.map((i) => Math.min(...[...taken].map((k) => Math.hypot(handles[i].p.x - handles[k].p.x, handles[i].p.z - handles[k].p.z))));
+        const best = Math.max(...far), pick = free.filter((_, j) => far[j] > best - BOT.farTie);
+        if (free.length) this.slot = pick[Math.floor(this.rng() * pick.length)];
       }
       if (this.regrab > 0) {
         // Se aparta un poco y deja pasar al sofá; después vuelve a por un asa.
@@ -64,9 +122,9 @@ export class BotBrain {
         input.mx = lead.x / CARRIER.carrySpeed * 0.8; input.mz = lead.z / CARRIER.carrySpeed * 0.8;
         return input;
       }
-      const slot = SLOTS[this.slot];
-      const anchor = localToWorld(sofa, slot.p);
-      const out = rotate(sofa.rotation(), slot.out);
+      const slot = handles[this.slot];
+      const anchor = localToWorld(body, slot.p);
+      const out = rotate(body.rotation(), slot.out);
       const ol = Math.hypot(out.x, out.z) || 1;
       const goal = { x: anchor.x + (out.x / ol) * 0.6, z: anchor.z + (out.z / ol) * 0.6 };
       const dx = goal.x - p.x, dz = goal.z - p.z;
@@ -75,32 +133,19 @@ export class BotBrain {
       if (d < 0.45 && Math.abs(anchor.y - p.y) < 1.2) {
         input.grab = true;
       } else {
-        let s = Math.min(BOT.approach, d / 0.8);
-        let ux = dx / d, uz = dz / d;
-        // Espacio personal: rodea a quien tiene delante y frena si está muy cerca (no los arrolla)
-        for (const o of others) {
-          const ox = o.x - p.x, oz = o.z - p.z, od = Math.hypot(ox, oz);
-          if (od < 1e-3 || od > BOT.personal || od > d + 0.3) continue;
-          const ahead = (ox * ux + oz * uz) / od;
-          if (ahead < 0.2) continue;
-          // Se desvía hacia el lado contrario al que queda el otro respecto a su camino
-          const px = -uz, pz = ux, side = ox * px + oz * pz > 0 ? -1 : 1, k = 1.5 * ahead * (1 - od / BOT.personal);
-          ux += px * side * k; uz += pz * side * k;
-          const ul = Math.hypot(ux, uz) || 1;
-          ux /= ul; uz /= ul;
-          s *= Math.max(0.35, od / BOT.personal);
-        }
-        input.mx = ux * s; input.mz = uz * s;
+        this.approach(p, dx, dz, d, others, input);
       }
       // Si no llega en un rato (bloqueado), prueba otra asa libre.
       if (this.tryTime > 5) {
         this.tryTime = 0;
-        const free = SLOTS.map((_, i) => i).filter((i) => !taken.has(i) && i !== this.slot);
+        const free = handles.map((_, i) => i).filter((i) => !taken.has(i) && i !== this.slot);
         if (free.length) this.slot = free[Math.floor(this.rng() * free.length)];
       }
       return input;
     }
     this.tryTime = 0;
+    // Dentro del camión y sin jugadores que lo lleven: lo suelta con cuidado (acompaña al objeto y después suelta)
+    if (stow && this.letGo <= 0) this.letGo = BOT.letGo;
     const lean = Math.hypot(me.lean.x, me.lean.z);
     this.yielding = lean > BOT.steady || (this.yielding && lean > BOT.steadyBack) || me.wobbling;
     if (this.yielding && this.letGo <= 0) {
@@ -108,7 +153,7 @@ export class BotBrain {
       this.history.push({ x: lead.x, z: lead.z, w: lead.w });
       while (this.history.length > BOT.delay[this.style]) this.history.shift();
       const g = me.grabWorld();
-      if (g) { const v = sofa.velocityAtPoint(g); input.mx = v.x / CARRIER.carrySpeed; input.mz = v.z / CARRIER.carrySpeed; }
+      if (g) { const v = body.velocityAtPoint(g); input.mx = v.x / CARRIER.carrySpeed; input.mz = v.z / CARRIER.carrySpeed; }
       return input;
     }
     if (this.letGo > 0) {
@@ -116,7 +161,7 @@ export class BotBrain {
       this.letGo -= dt;
       const g = me.grabWorld();
       if (g && this.letGo > 0) {
-        const v = sofa.velocityAtPoint(g);
+        const v = body.velocityAtPoint(g);
         input.mx = v.x / CARRIER.carrySpeed; input.mz = v.z / CARRIER.carrySpeed;
         return input;
       }
@@ -131,7 +176,7 @@ export class BotBrain {
     while (this.history.length > delay) this.history.shift();
     const h = this.history[0];
     if (!lead.active && h.x === 0 && h.z === 0 && h.w === 0) return input;
-    const c = sofa.translation();
+    const c = body.translation();
     const rx = p.x - c.x, rz = p.z - c.z;
     // v = v_líder + ω × r (ω sobre +y)
     let vx = h.x + h.w * rz;
@@ -149,7 +194,7 @@ export class BotBrain {
     // sofá sí avanza, suelta para no bloquear al grupo (pasa en puertas). Si todo el grupo va despacio (la
     // escalera, un peso grande), no es él quien se atasca: sigue agarrando.
     const want = Math.hypot(vx, vz);
-    const v = me.body.linvel(), sv = sofa.linvel();
+    const v = me.body.linvel(), sv = body.linvel();
     const along = want > 1e-3 ? (v.x * vx + v.z * vz) / want : 0;
     const stuck = want > 0.9 && along < 0.3 * want && Math.hypot(sv.x, sv.z) > 0.6;
     this.blocked = stuck || me.handSep > 0.3 ? this.blocked + dt : 0;
@@ -157,7 +202,7 @@ export class BotBrain {
       // Bloqueado: suelta para no frenar al grupo (pasa en puertas), pero con cuidado (`letGo`)
       this.blocked = 0;
       this.letGo = BOT.letGo;
-      const free = SLOTS.map((_, i) => i).filter((i) => !taken.has(i) && i !== this.slot);
+      const free = handles.map((_, i) => i).filter((i) => !taken.has(i) && i !== this.slot);
       if (free.length) this.slot = free[Math.floor(this.rng() * free.length)];
     }
     return input;

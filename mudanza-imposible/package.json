@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "sim": "vite-node scripts/sim-run.ts",
     "perf": "vite-node scripts/perf.ts",
+    "perf:patio": "vite-node scripts/perf-patio.ts",
     "e2e:smoke": "node scripts/smoke.cjs",
     "e2e:teclado": "node scripts/keyboard-e2e.cjs",
     "e2e:dos": "node scripts/two-players-e2e.cjs",

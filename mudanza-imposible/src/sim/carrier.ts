@@ -170,6 +170,8 @@ export type BalanceEvent = 'wobble' | 'fall' | 'steady' | null;
 export interface Grabbable {
   body: RAPIER.RigidBody;
   colliders: RAPIER.Collider[];
+  /** Máximo de manos que lo agarran a la vez (las asas de su definición); sin él, sin límite. */
+  maxHands?: number;
 }
 
 export class Carrier implements HandOwner {

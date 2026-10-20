@@ -5,7 +5,8 @@ import { Autopilot } from '../src/sim/autopilot';
 import { CARRIER, CENTER_Y } from '../src/sim/carrier';
 import { Game, RULES } from '../src/sim/game';
 import { HAND } from '../src/sim/hand';
-import { DOOR, FLOOR2, STAGES, STAIRS } from '../src/sim/level';
+import { CALLE, DOOR, FLOOR2, RAMP, STAIRS } from '../src/levels/calle';
+import { truckBoxes } from '../src/levels/truck';
 import { SLOTS, SOFA, localToWorld, yawQuat } from '../src/sim/sofa';
 import { LIGHT, lightAt, LIGHT_PERIOD } from '../src/sim/traffic';
 import { NO_INPUT, type GameEvent, type PlayerInput } from '../src/sim/types';
@@ -33,7 +34,7 @@ function place(g: Game, x: number, z: number, yaw: number, y = 0.6) {
 
 describe('Sofá y agarre', () => {
   it('el sofá en reposo no se mueve ni vibra', () => {
-    const g = new Game(RAPIER, { humans: 0, carriers: 2, botStyle: 'atentos' });
+    const g = new Game(RAPIER, { level: CALLE, humans: 0, carriers: 2, botStyle: 'atentos' });
     g.bots.clear();
     play(g, 2);
     const a = g.sofaPos;
@@ -45,7 +46,7 @@ describe('Sofá y agarre', () => {
   });
 
   it('los ayudantes agarran asas y, con el jugador, levantan y llevan el sofá', () => {
-    const g = new Game(RAPIER, { humans: 1, carriers: 4, botStyle: 'atentos', seed: 3 });
+    const g = new Game(RAPIER, { level: CALLE, humans: 1, carriers: 4, botStyle: 'atentos', seed: 3 });
     const ap = new Autopilot(0);
     play(g, 3 + 4, (g) => [ap.input(g, DT)]);
     expect(g.carriers.filter((c) => c.holding).length).toBe(4);
@@ -55,7 +56,7 @@ describe('Sofá y agarre', () => {
   });
 
   it('soltar deja caer el sofá: se agarra y se suelta con la misma tecla', () => {
-    const g = new Game(RAPIER, { humans: 1, carriers: 1, botStyle: 'atentos' });
+    const g = new Game(RAPIER, { level: CALLE, humans: 1, carriers: 1, botStyle: 'atentos' });
     place(g, 0, 10, 0);
     play(g, 1);
     const me = g.carriers[0];
@@ -74,7 +75,7 @@ describe('Sofá y agarre', () => {
 
 describe('Puerta estrecha', () => {
   const pushThrough = (yaw: number) => {
-    const g = new Game(RAPIER, { humans: 0, carriers: 1, botStyle: 'atentos' });
+    const g = new Game(RAPIER, { level: CALLE, humans: 0, carriers: 1, botStyle: 'atentos' });
     place(g, 0, DOOR.z + 2.5, yaw, 0.3);
     play(g, 0.5);
     for (let i = 0; i < 60 * 5; i++) {
@@ -103,13 +104,13 @@ describe('Tráfico', () => {
   });
 
   it('un coche que encuentra el sofá en su carril lo golpea, lo daña y lo desplaza', () => {
-    const g = new Game(RAPIER, { humans: 0, carriers: 1, botStyle: 'atentos' });
+    const g = new Game(RAPIER, { level: CALLE, humans: 0, carriers: 1, botStyle: 'atentos' });
     // Sofá en mitad del carril que va hacia +x, con el semáforo en verde para los coches
     g.clock = 0;
     place(g, 8, -1.6, 0, 0.3);
     const x0 = g.sofaPos.x;
     const ev = play(g, 8);
-    expect(ev.some((e) => e.type === 'carHit' && e.target === 'sofa')).toBe(true);
+    expect(ev.some((e) => e.type === 'carHit' && e.target === 'item' && e.item === g.sofaItem.index)).toBe(true);
     expect(ev.some((e) => e.type === 'honk')).toBe(true);
     expect(g.integrity).toBeLessThanOrEqual(100 - RULES.carDamage);
     expect(Math.abs(g.sofaPos.x - x0)).toBeGreaterThan(1);
@@ -117,7 +118,7 @@ describe('Tráfico', () => {
   });
 
   it('un porteador atropellado queda mareado y suelta lo que lleva', () => {
-    const g = new Game(RAPIER, { humans: 0, carriers: 1, botStyle: 'atentos' });
+    const g = new Game(RAPIER, { level: CALLE, humans: 0, carriers: 1, botStyle: 'atentos' });
     place(g, 0, 10, 0);
     const c = g.carriers[0];
     c.teleport({ x: 8, y: 0.7, z: -1.6 });
@@ -129,7 +130,7 @@ describe('Tráfico', () => {
 
 describe('Recuperación', () => {
   it('un sofá volcado se puede enderezar', () => {
-    const g = new Game(RAPIER, { humans: 0, carriers: 1, botStyle: 'atentos' });
+    const g = new Game(RAPIER, { level: CALLE, humans: 0, carriers: 1, botStyle: 'atentos' });
     place(g, 0, 10, 0);
     g.sofa.setRotation({ x: 1, y: 0, z: 0, w: 0 }, true); // boca abajo
     play(g, 1.5);
@@ -141,18 +142,18 @@ describe('Recuperación', () => {
   });
 
   it('si el sofá cae fuera del mapa reaparece en el último punto, con penalización', () => {
-    const g = new Game(RAPIER, { humans: 0, carriers: 1, botStyle: 'atentos' });
+    const g = new Game(RAPIER, { level: CALLE, humans: 0, carriers: 1, botStyle: 'atentos' });
     place(g, 0, 10, 0);
     g.sofa.setTranslation({ x: 0, y: -10, z: 10 }, true);
     const ev = play(g, 0.1);
-    expect(ev.some((e) => e.type === 'respawnSofa')).toBe(true);
+    expect(ev.some((e) => e.type === 'respawnItem' && e.item === g.sofaItem.index)).toBe(true);
     expect(g.sofaPos.y).toBeGreaterThan(0);
     expect(g.integrity).toBe(100 - RULES.respawnCost);
     g.dispose();
   });
 
   it('un porteador que se pierde lejos vuelve junto al sofá', () => {
-    const g = new Game(RAPIER, { humans: 0, carriers: 1, botStyle: 'atentos' });
+    const g = new Game(RAPIER, { level: CALLE, humans: 0, carriers: 1, botStyle: 'atentos' });
     place(g, 0, 10, 0);
     g.carriers[0].teleport({ x: 0, y: -8, z: 10 });
     play(g, 0.1);
@@ -169,23 +170,23 @@ describe('Partida completa', () => {
     [4, 'atentos', 3],
     [4, 'despistados', 2],
   ] as const)('el piloto automático entrega el sofá con %i porteadores (%s)', (n, style, seed) => {
-    const g = new Game(RAPIER, { humans: 1, carriers: n, botStyle: style, seed });
+    const g = new Game(RAPIER, { level: CALLE, humans: 1, carriers: n, botStyle: style, seed });
     const ap = new Autopilot(0);
     const stages: number[] = [];
-    for (let i = 0; i < 60 * (RULES.timeLimit + 5) && (g.phase === 'countdown' || g.phase === 'playing'); i++) {
+    for (let i = 0; i < 60 * (g.level.timeLimit + 5) && (g.phase === 'countdown' || g.phase === 'playing'); i++) {
       g.step(DT, [ap.input(g, DT)]);
       for (const e of g.out) if (e.type === 'stage') stages.push(e.index);
     }
     expect(g.phase).toBe('won');
-    expect(stages).toEqual(STAGES.map((_, i) => i).slice(1));
-    expect(g.time).toBeLessThan(RULES.timeLimit);
+    expect(stages).toEqual(CALLE.stages.map((_, i) => i).slice(1));
+    expect(g.time).toBeLessThan(g.level.timeLimit);
     g.dispose();
   });
 
   it('se pierde al agotar el tiempo', () => {
-    const g = new Game(RAPIER, { humans: 1, carriers: 1, botStyle: 'atentos' });
+    const g = new Game(RAPIER, { level: CALLE, humans: 1, carriers: 1, botStyle: 'atentos' });
     g.phase = 'playing';
-    g.time = RULES.timeLimit - 0.05;
+    g.time = g.level.timeLimit - 0.05;
     const ev = play(g, 0.2);
     expect(g.phase).toBe('lost');
     expect(ev).toContainEqual({ type: 'lose', reason: 'time' });
@@ -198,16 +199,14 @@ describe('Partida completa', () => {
 });
 
 describe('Datos del nivel', () => {
-  it('todas las cajas tienen semiextensiones positivas', async () => {
-    const { LEVEL } = await import('../src/sim/level');
-    for (const b of LEVEL) for (const h of b.h) expect(h).toBeGreaterThan(0);
+  it('todas las cajas tienen semiextensiones positivas', () => {
+    for (const b of [...CALLE.boxes, ...truckBoxes(CALLE.truck)]) for (const h of b.h) expect(h).toBeGreaterThan(0);
   });
 });
 
 describe('Rampa', () => {
-  it('un sofá soltado en la rampa de chapa resbala hacia abajo', async () => {
-    const { RAMP, FLOOR2 } = await import('../src/sim/level');
-    const g = new Game(RAPIER, { humans: 0, carriers: 1, botStyle: 'atentos' });
+  it('un sofá soltado en la rampa de chapa resbala hacia abajo', () => {
+    const g = new Game(RAPIER, { level: CALLE, humans: 0, carriers: 1, botStyle: 'atentos' });
     place(g, RAMP.x0 + 2, (RAMP.z0 + RAMP.z1) / 2, 0, FLOOR2 + 0.2);
     play(g, 0.3);
     const x0 = g.sofaPos.x;
@@ -221,7 +220,7 @@ describe('Dos jugadores sin ayudantes', () => {
   const inp = (o: Partial<PlayerInput>): PlayerInput => ({ ...NO_INPUT, ...o });
   /** Partida a dos, ya en juego, con los dos frente a los extremos del sofá. */
   function duo() {
-    const g = new Game(RAPIER, { humans: 2, carriers: 2, botStyle: 'atentos', seed: 1 });
+    const g = new Game(RAPIER, { level: CALLE, humans: 2, carriers: 2, botStyle: 'atentos', seed: 1 });
     play(g, RULES.countdown + 0.2, () => [NO_INPUT, NO_INPUT]);
     return g;
   }
@@ -346,24 +345,24 @@ describe('Recorrido completo con 2, 3 y 4 humanos (T-route)', () => {
   // jugador, con 3 humanos el que se soltaba en la puerta seguía con un punto de paso anterior y bajaba el sofá por la
   // escalera (131 s); con 4, 102 s y 10 caídas. La prueba a dos que había aquí pasa a ser el caso n = 2.
   it.each([2, 3, 4])('%i jugadores (llevados por el piloto automático) completan el recorrido: todas las etapas en orden y dentro del tiempo', (n) => {
-    const g = new Game(RAPIER, { humans: n, carriers: n, botStyle: 'atentos', seed: 1 });
+    const g = new Game(RAPIER, { level: CALLE, humans: n, carriers: n, botStyle: 'atentos', seed: 1 });
     const aps = Autopilot.team(g);
     expect(aps.map((a) => a.carrierIndex)).toEqual(g.carriers.map((c) => c.id));
     const stages: number[] = [];
-    for (let i = 0; i < 60 * (RULES.timeLimit + 5) && (g.phase === 'countdown' || g.phase === 'playing'); i++) {
+    for (let i = 0; i < 60 * (g.level.timeLimit + 5) && (g.phase === 'countdown' || g.phase === 'playing'); i++) {
       g.step(DT, aps.map((a) => a.input(g, DT)));
       for (const e of g.out) if (e.type === 'stage') stages.push(e.index);
     }
     expect(g.phase).toBe('won');
-    expect(stages).toEqual(STAGES.map((_, i) => i).slice(1));
-    expect(g.time).toBeLessThan(RULES.timeLimit);
+    expect(stages).toEqual(CALLE.stages.map((_, i) => i).slice(1));
+    expect(g.time).toBeLessThan(g.level.timeLimit);
     g.dispose();
   });
 
   it('al pasar de punto de paso, la comprobación de atasco mide respecto al nuevo (lastDist se reinicia)', () => {
     // Antes `lastDist` se quedaba con la distancia al punto alcanzado (< 0,8 m): frente al siguiente, más lejano,
     // nunca «se acercaba» y a los 2,5 s el piloto retrocedía sin motivo
-    const g = new Game(RAPIER, { humans: 2, carriers: 2, botStyle: 'atentos', seed: 1 });
+    const g = new Game(RAPIER, { level: CALLE, humans: 2, carriers: 2, botStyle: 'atentos', seed: 1 });
     const crew = Autopilot.team(g)[0].crew;
     g.phase = 'playing'; g.countdown = 0;
     // El sofá a 0,5 m del primer punto de paso (Patio, z = 6,5) y orientado a lo largo de z: se pasa al siguiente
@@ -386,7 +385,7 @@ describe('Mano blanda y física única (ciclo 1)', () => {
 
   /** Partida ya en juego con n humanos, el sofá en (x, z) con giro yaw y los porteadores apartados. */
   function setup(n: number, x = OPEN.x, z = OPEN.z, yaw = 0) {
-    const g = new Game(RAPIER, { humans: n, carriers: n, botStyle: 'atentos', seed: 1 });
+    const g = new Game(RAPIER, { level: CALLE, humans: n, carriers: n, botStyle: 'atentos', seed: 1 });
     g.phase = 'playing';
     g.countdown = 0;
     g.sofa.setTranslation({ x, y: 0.25, z }, true);
@@ -621,7 +620,7 @@ describe('Mano blanda y física única (ciclo 1)', () => {
    * (layout > 0: pseudoaleatorias, deterministas) y luego se quedan quietos, andan a lo largo, de lado o giran.
    */
   function coop(n: number, layout: number, mode: 'quietos' | 'largo' | 'lado' | 'girando') {
-    const g = new Game(RAPIER, { humans: n, carriers: n, botStyle: 'atentos', seed: 1 });
+    const g = new Game(RAPIER, { level: CALLE, humans: n, carriers: n, botStyle: 'atentos', seed: 1 });
     play(g, RULES.countdown + 0.2);
     // El grupo, tal como sale, a un descampado (en el patio, andando de lado acabarían en la calzada)
     const s0 = g.sofaPos;
@@ -747,7 +746,7 @@ describe('Mano blanda y física única (ciclo 1)', () => {
   it('T-phys-unify: con ayudantes la física es la misma (mismo sofá, misma fuerza y mismo equilibrio)', () => {
     // Uno solo arrastrando el sofá: igual en una partida con ayudantes que en una solo de humanos
     const drag = (humans: number, carriers: number) => {
-      const g = new Game(RAPIER, { humans, carriers, botStyle: 'atentos', seed: 1 });
+      const g = new Game(RAPIER, { level: CALLE, humans, carriers, botStyle: 'atentos', seed: 1 });
       g.bots.clear();
       g.phase = 'playing'; g.countdown = 0;
       g.sofa.setTranslation({ x: OPEN.x, y: 0.25, z: OPEN.z }, true);
@@ -771,7 +770,7 @@ describe('Mano blanda y física única (ciclo 1)', () => {
     // dirección (imita al humano, que lleva una caja ligera aparte) y la misma fuerza máxima por persona. Antes la
     // prueba quitaba los cerebros y nunca medía a un ayudante cargando: con el triple de fuerza también pasaba.
     const pull = (helper: boolean) => {
-      const g = new Game(RAPIER, { humans: 1, carriers: 2, botStyle: 'atentos', seed: 1 });
+      const g = new Game(RAPIER, { level: CALLE, humans: 1, carriers: 2, botStyle: 'atentos', seed: 1 });
       if (!helper) g.bots.clear();
       g.phase = 'playing'; g.countdown = 0;
       g.sofa.setTranslation({ x: OPEN.x, y: 0.25, z: OPEN.z }, true);
@@ -800,7 +799,7 @@ describe('Mano blanda y física única (ciclo 1)', () => {
     expect(Math.abs(byHelper.d / byHuman.d - 1)).toBeLessThan(0.25);
     for (const r of [byHuman, byHelper]) expect(r.maxF).toBeLessThanOrEqual(HAND.maxH + 1);
     // Un ayudante también pierde el equilibrio si le arrollan a la carrera
-    const g = new Game(RAPIER, { humans: 1, carriers: 2, botStyle: 'atentos', seed: 1 });
+    const g = new Game(RAPIER, { level: CALLE, humans: 1, carriers: 2, botStyle: 'atentos', seed: 1 });
     g.bots.clear();
     g.phase = 'playing'; g.countdown = 0;
     g.carriers[0].teleport({ x: OPEN.x + 4, y: standY, z: OPEN.z });

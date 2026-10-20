@@ -2,6 +2,7 @@
 // Victoria (G), tiempo agotado (T) o roto (R), segundos/integridad, etapa si no gana, caídas (c), sueltas (s) y
 // enderezados (e). Uso: npx tsx scripts/help-batch.ts
 import RAPIER from '@dimforge/rapier3d-compat';
+import { CALLE } from '../src/levels/calle';
 import { Game } from '../src/sim/game';
 import { Autopilot } from '../src/sim/autopilot';
 await RAPIER.init({});
@@ -11,7 +12,7 @@ let total = 0, wins = 0;
 for (const [n, style] of configs) {
   const res: string[] = []; let w = 0;
   for (const seed of seeds) {
-    const g = new Game(RAPIER, { humans: 1, carriers: n, botStyle: style, seed });
+    const g = new Game(RAPIER, { level: CALLE, humans: 1, carriers: n, botStyle: style, seed });
     const ap = new Autopilot(0);
     let falls = 0, rel = 0, rights = 0;
     for (let i = 0; i < 60 * 200 && (g.phase === 'countdown' || g.phase === 'playing'); i++) {

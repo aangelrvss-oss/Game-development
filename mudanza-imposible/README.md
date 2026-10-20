@@ -26,9 +26,11 @@ npm run dev          # abre http://localhost:5173
 2. **J1** (muñeco de peto y gorra rojos, aro amarillo): **WASD** para moverse y **Espacio** para agarrar o soltar.
 3. **J2** (muñeco de peto y gorra turquesa, aro azul claro): **flechas** para moverse e **Intro** para agarrar o soltar. **J3** usa **IJKL** y **U**; **J4**, el teclado numérico (**8 4 5 6** y **0**). Con mandos, el teclado lleva a los primeros jugadores y los mandos, a los últimos.
 4. Cada uno se pone en un extremo del sofá, lo agarran y lo llevan hacia arriba de la pantalla. El aro amarillo en el suelo marca el siguiente objetivo. **No hay tecla de alzar:** al agarrar, las manos suben el sofá solas. Uno solo apenas lo arrastra por un extremo; entre dos va en el aire y sube la escalera.
-5. **Objetivo:** dejar el sofá en la zona verde junto al camión en menos de 3 minutos sin destrozarlo. Para reiniciar, **Esc** (pausa) y **Retroceso**: en juego, Retroceso no hace nada, porque en el teclado español está encima de Intro, la tecla de agarrar de J2. En la pantalla final, **Intro** vuelve a empezar.
+5. **Objetivo:** meter el sofá dentro del camión (subiendo su rampa de carga) y dejarlo allí, suelto y quieto, en menos de 3 minutos sin destrozarlo. Para reiniciar, **Esc** (pausa) y **Retroceso**: en juego, Retroceso no hace nada, porque en el teclado español está encima de Intro, la tecla de agarrar de J2. En la pantalla final, **Intro** vuelve a empezar.
 
 Para ver una partida completa sin tocar nada, usa «Ver demo automática» o abre `http://localhost:5173/?auto=1` (1 jugador con ayudantes).
+
+**Niveles.** Por defecto se juega «La calle» (`?nivel=calle`). Con `?nivel=pruebas` se abre el «Patio de pruebas»: una escena pequeña y llana con el camión y siete objetos del catálogo (la mesa, dos cajas, la lámpara de pie y la silla, obligatorias; la nevera y el piano, opcionales). No es uno de los niveles del juego: sirve para probar los objetos. Los niveles son datos (`LevelDef`, en `src/levels/`): el juego, la vista y el piloto automático reciben el nivel y no conocen ningún recorrido concreto.
 
 Requisitos: Node 20 o superior y un navegador con WebGL (Chrome, Edge o Firefox). No hay servicios externos ni de pago.
 
@@ -253,6 +255,29 @@ Con humanos y ayudantes mezclados (2 + 1, 2 + 2, 3 + 1, 4 + 2 atentos y 2 + 2 de
 - `keyboard-e2e.cjs '?carriers=4'`: **todo OK.** Al agarrar entre cuatro, el sofá pasa de 0,20 a 0,65 m sin tecla. Con W, 6,02 m en 2,53 s de juego; con Q, 1,21 rad.
 - `sofa-contact-check.cjs` (cuerpo dibujado / cápsula en el sofá): empujar el lateral 3,7 / 3,7 cm, soltar y empujar 5,7 / 6,1 cm, caer contra el sofá 0,6 / 1,0 cm y el resto 0–0,5 cm. Son los mismos valores que en el paso 3, sin errores.
 
+## Objetos dibujados, reparto en equipos y papeles del 3.º y el 4.º jugador (ciclo 2, paso 3)
+
+Objetivos T-view, T-roles, T-level-3, T-hud y T-perf de `docs/quality/cycles/ciclo-2.md`.
+
+- **Vista de los objetos** (`src/view/itemView.ts` y `sofaView.ts`): cada objeto se dibuja a partir de su `ItemDef`, con las medidas de su forma: caja de cartón con cinta, asideros y rótulo; silla de madera miel con cojín mostaza y respaldo de barrotes; lámpara de pie con base oscura, pantalla cónica de tela y franja roja y blanca (frágil); mesa con tablero de tablas, camino de mesa y patas oscuras; nevera blanca con dos puertas, tiradores, imanes y zócalo oscuro; piano de laca negra con tapa, teclado, partitura y pedales. Lo dibujado va dentro de las cajas de choque, y los detalles sobresalen como mucho 3 cm (`tests/view.test.ts`). El sofá también: sus cojines sobresalían 15 cm por encima del asiento, los cojines de colores 30 cm y las cinchas 17 cm, donde no había nada que chocara.
+- **Camión:** la caja de carga abierta y la rampa se dibujan con las mismas cajas que sus colliders. La prueba compara cada pieza dibujada con su collider, esquina a esquina: el error es de 0,00 mm en los dos niveles.
+- **Reparto en equipos** (`PilotPlan`, en `src/sim/autopilot.ts`): cada objeto obligatorio recibe tantos humanos como indica su `minCarriers` (los más cercanos); al acabar, cada uno pasa al siguiente. Antes van los objetos de más personas y, después, los que pueden entrar ya en su carril del camión. El último tramo (de la rampa a su sitio) es un carril: un equipo espera a que se cargue lo que va más al fondo de su carril y a que nadie de otro equipo esté en él. Andando sin carga, el piloto rodea los objetos ligeros (también el suyo, si su asa está al otro lado), sale del camión por la rampa y agarra de frente al asa. Con un solo objeto («La calle»), todos van al sofá, como antes.
+- **Ayudantes** (`Game.chooseItems`): cada uno va al objeto que necesita manos. Primero al que lleva un jugador y aún no va en el aire; después, a uno pesado que lleva un jugador; y si no, a uno obligatorio pesado que nadie lleva, donde espera agarrado. No ayudan con lo ligero que ya lleva alguien. Imitan a los humanos que llevan su objeto. Si alguien les quita el asa a la que iban, van a la más alejada de las ocupadas (el otro extremo: agarrada por un extremo y un costado, la mesa iba inclinada y sus patas topaban con el pie de la rampa). Cuando su objeto ya está cargado y ninguno necesita manos, bajan por la rampa y esperan a un lado del camión (`BOT.park`): antes se quedaban en el carril y el siguiente equipo esperaba a que se fueran.
+- **Patio de pruebas:** los objetos se reordenaron para poder llegar a todas las asas, con dos carriles en el camión. Los conos de la rampa se apartaron porque estorbaban al subir.
+
+| T-roles: «Patio de pruebas», piloto con 2, 3 y 4 humanos (`npm test`, `scripts/roles-measure.ts`) | 2 | 3 | 4 |
+|---|---|---|---|
+| Salida oeste (la del nivel) | 45,85 s | 31,87 s | 30,85 s |
+| Salida en fila al sur | 48,73 s | 28,85 s | 30,10 s |
+| Salida junto a la rampa | 44,08 s | 31,68 s | 32,20 s |
+| **Mediana** | **45,85 s** | **31,68 s (30,9 % antes)** | **30,85 s (32,7 % antes)** |
+
+Con 4 se termina un 32,7 % antes que con 2 (el objetivo era al menos un 25 %) y con 3, un 30,9 % antes. Pero 4 apenas mejora a 3: el camión tiene dos carriles y, en cada uno, lo de delante espera a lo del fondo. Con otras cuatro salidas medidas aparte, 4 frente a 2 queda entre un 24 % y un 38 % antes.
+
+Con ayudantes, el piloto (1 jugador) y 1, 2 o 3 ayudantes atentos cargan el patio en 62–64 s (semillas 1 y 2); 2 jugadores y 2 ayudantes, en 61,6 s. Con 3 ayudantes despistados, una de las dos semillas tarda 169 s (la mesa, con cuatro alrededor, se desvía, retrocede y hay 6 caídas); el límite es de 240 s.
+
+Coste por paso (`npm run perf:patio`, medianas de 5): con 2 jugadores, el patio y sus 7 objetos cuestan 0,163 ms por paso, frente a 0,137 ms en «La calle» (1,19 veces); con 4, 0,202 frente a 0,189 ms (1,07 veces). De una ejecución a otra varía (en otra salió 1,02 y 1,19 veces). La referencia era no pasar de 2 veces. `npm run perf` («La calle» con ayudantes): 0,273, 0,316 y 0,446 ms por paso con 2, 4 y 6 porteadores.
+
 ## Escenario: decoración por zonas
 
 El recorrido y la disposición funcional no cambian: ni paredes, ni puertas, ni escalera, ni rampa, ni la zona de entrega. Se añaden objetos y detalles en cada zona, con una paleta corta y materiales compartidos.
@@ -270,6 +295,8 @@ El recorrido y la disposición funcional no cambian: ni paredes, ni puertas, ni 
 - [Capturas por zonas](docs/capturas/escenario/).
 
 ## Propuesta para la siguiente fase: niveles cortos y varios objetos
+
+*(Histórico. En el ciclo 2 se hizo: catálogo `ItemDef` en `src/sim/items.ts` y niveles como datos en `src/levels/`; ver `docs/quality/cycles/ciclo-2.md`.)*
 
 **Cómo está hecho ahora:**
 - **Nivel:** son constantes de módulo en `src/sim/level.ts` (`LEVEL`, `DOOR`, `STAIRS`, `ZONE`, `ROUTE`, `STAGES`, `SOFA_START`). `levelView.ts` dibuja con funciones que leen esas constantes. Los objetos de decoración ya son datos (`PROPS`).
@@ -333,7 +360,7 @@ No se ha construido nada de esta arquitectura todavía: no hacía falta para cor
 - **Pulsaciones.** Agarrar y enderezar se guardan hasta el siguiente paso de física: no se pierden en pantallas de más de 60 Hz, donde hay fotogramas sin ningún paso. La lógica está en `src/input/inputCore.ts`, sin DOM, y la prueban `tests/input.test.ts`.
 - Cuatro personas en un mismo teclado pueden saturarlo (fantasmas de teclas, según el teclado). Con mandos no pasa.
 
-**Objetivo:** dejar el sofá en la zona amarilla junto al camión en menos de 3 minutos, sin que su estado llegue a 0 %.
+**Objetivo:** dejar el sofá dentro del camión en menos de 3 minutos, sin que su estado llegue a 0 %. Un objeto cuenta como cargado cuando su centro y al menos el 80 % de su caja envolvente están dentro de la caja de carga, nadie lo agarra y lleva 1 s quieto; si se vuelve a sacar (o alguien lo agarra), deja de contar. Se gana con todos los obligatorios cargados. La lista de la derecha dice «Cargados N/M» y el estado de cada objeto (pendiente, en camino, cargado o roto); al cargar uno suena una campanilla.
 
 **Estrellas:**
 - una por entregar;
@@ -359,7 +386,7 @@ No se ha construido nada de esta arquitectura todavía: no hacía falta para cor
 | Escalera | Rampa de 20° con peldaños visuales. Arriba, un rellano obliga a girar 90°. |
 | Pasillo de arriba y terraza | Las paredes que tapan la acción se recortan hasta un zócalo, como en una maqueta. |
 | Rampa | Chapa resbaladiza, 17° y sin barandilla. Si soltáis el sofá, baja deslizándose; si se cae por un lado, recibe daño (y a veces ahorra camino). |
-| Entrega | El sofá tiene que reposar dentro de la zona 1 s. |
+| Camión | Caja de carga abierta por detrás, con rampa de carga de 14° (con tacos: no resbala). Hay que subir el sofá en línea con la rampa, meterlo dentro y soltarlo: cuenta cuando lleva 1 s quieto y suelto dentro. |
 
 ## Decisiones técnicas
 
@@ -398,17 +425,23 @@ mudanza-imposible/
   index.html            menú, interfaz, pausa y resultados (DOM + CSS)
   src/main.ts           bucle de juego, menú, eventos → sonido/efectos/mensajes
   src/sim/              simulación (sin Three.js)
-    level.ts            geometría del recorrido, etapas y puntos de paso
-    props.ts            objetos de decoración: posición y caja de choque (la vista los dibuja)
+    items.ts            catálogo de objetos (ItemDef): forma, masa, rozamiento, asas y fragilidad
     sofa.ts             cuerpo del sofá, asas y utilidades de rotación
     carrier.ts          porteador: movimiento, agarre, alzar, soltar y equilibrio
     traffic.ts          coches, carriles y semáforo
     bots.ts             ayudantes de la máquina
     autopilot.ts        piloto automático (demo y pruebas)
     game.ts             estado de la partida, daños, recuperación, victoria/derrota
+  src/levels/           niveles como datos (sin Three.js)
+    types.ts            LevelDef: cajas, decoración, salidas, objetos y sus rutas, camión, etapas, tráfico, tiempo
+    calle.ts            «La calle», el nivel de referencia
+    patio.ts            «Patio de pruebas» (?nivel=pruebas)
+    truck.ts            camión: caja de carga abierta (suelo, paredes y techo) y rampa, como cajas de choque
+    index.ts            registro de niveles y selección por la url
   src/view/             dibujo con Three.js (escena, sofá, personajes, coches, efectos, cámara)
     textures.ts         texturas procedurales (asfalto, baldosa, ladrillo, tablas, tejas, chapa, tela, fachadas)
-    decor.ts            decoración por zonas: objetos de props.ts y detalles sin choque
+    decor.ts            decoración del nivel: sus objetos (props) y detalles sin choque (scenery)
+    itemView.ts         dibujo provisional de los objetos del catálogo: las cajas de su forma
     doll/               muñeco del laboratorio adaptado a los jugadores (dibuja la cápsula física: anchura, altura y pose)
   src/input/inputCore.ts  entradas sin DOM: teclas de J1–J4, mandos por Gamepad.index, pulsaciones retenidas y paso fijo
   src/input/input.ts    conexión con los eventos de teclado y la Gamepad API del navegador
