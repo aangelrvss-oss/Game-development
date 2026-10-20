@@ -95,8 +95,8 @@ Matices de la verificación sobre los críticos:
 | Ciclo | Objetivo | Estado |
 |---|---|---|
 | 0 | Diagnóstico: auditoría protegida, línea base, dirección artística, checkpoint, estado persistente | **Cerrado** el 19-10-2026, ~21:05 UTC |
-| 1 | **Núcleo fiable**: entradas sin pérdidas (incluidos mandos y 4 jugadores); mano blanda con fuerza limitada y física única; alzado automático; cápsula a la anchura del muñeco y caída física sin `visOff`; pruebas de partida completa con 2, 3 y 4 jugadores. Especificación: [`cycles/ciclo-1.md`](cycles/ciclo-1.md) | **Implementado e integrado** (`e0d8561`: tsc OK, Vitest 62/62, build OK). **Revisión en curso**, con un defecto CRÍTICO abierto (ver sección 9). |
-| 2 | Sistema de objetos (`ItemDef`) y entrega en el camión con progreso; nivel como datos (`LevelDef`) con el recorrido actual como nivel de referencia | Pendiente |
+| 1 | **Núcleo fiable**: entradas sin pérdidas (incluidos mandos y 4 jugadores); mano blanda con fuerza limitada y física única; alzado automático; cápsula a la anchura del muñeco y caída física sin `visOff`; pruebas de partida completa con 2, 3 y 4 jugadores. Especificación: [`cycles/ciclo-1.md`](cycles/ciclo-1.md) | **Implementado, revisado y corregido** (`7b67f61`: tsc OK, Vitest 71/71, `e2e:duo` 21/21, `e2e:teclado` OK). Crítico cerrado. Falta la segunda ronda de revisión (verificación de la corrección), que abre el ciclo 2. Un mayor (3.º y 4.º jugador sin papel) pasa al ciclo 2. |
+| 2 | Sistema de objetos (`ItemDef`) con objetos de varias manos y entrega en el camión con progreso; nivel como datos (`LevelDef`) con el recorrido actual como nivel de referencia; papel real para el 3.º y el 4.º jugador. Especificación: [`cycles/ciclo-2.md`](cycles/ciclo-2.md) | **En curso** (20-10-2026) |
 | 3 | Nivel 1 completo («Una casa imposible»), con aprendizaje integrado | Pendiente |
 | 4 | Personajes y assets con Blender (muebles, camión) siguiendo la dirección artística | Pendiente |
 | 5 | Niveles 2–4 (escaleras, calle, almacén) | Pendiente |
@@ -126,7 +126,7 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
   - Cada iteración ejecuta o integra un único ciclo y programa la siguiente con `ScheduleWakeup`, como latido de respaldo de 30 minutos.
   - La señal principal es el aviso de fin del flujo de agentes del ciclo.
 - **Estado:** reactivado el 19-10-2026 a las ~21:00 UTC, después de cerrar y proteger el ciclo 0.
-- **Ciclo actual:** 1, en curso.
+- **Ciclo actual:** 2, en curso (empieza con la segunda ronda de revisión del ciclo 1).
 - **Límite:** 8 ciclos completos.
 - **Se detiene:**
   - cuando se cumple el criterio de la sección 6;
@@ -161,3 +161,41 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
     - **Mayores:** tirando de lado, uno solo mueve el sofá demasiado deprisa (T-grip-2); y la correa hace inalcanzable «¡Se escapa!» en un tira y afloja.
     - Además, 4 menores.
     - **No se avanza al ciclo 2 hasta corregir el crítico.**
+  - **Revisión de QA (rol F), [`reviews/ciclo-1/revision-qa.json`](reviews/ciclo-1/revision-qa.json): 6,5/10.**
+    - Confirma: tsc limpio; Vitest 62/62 en 4 ejecuciones (2 barajadas); `sim-run` 112/112 frente a 94/112 de la línea base; a 144 Hz en Chromium, 40/40 pulsaciones llegan una sola vez.
+    - **Mayores:** el bucle de `main.ts` no estaba probado; T-phys-unify no medía la fuerza de los ayudantes; «¡Se escapa!» sin prueba positiva; un desplazamiento visual de 15 cm no se detectaba; T-grip-2 de lado; `duo-e2e` usaba un contador privado del juego como oráculo.
+    - Además, 7 menores (teletransportes sin comprobar el sitio, coste por paso duplicado, pulsaciones de la cuenta atrás descartadas, caídas de ayudantes en grupos grandes…).
+  - **Revisión de diseño y producto (roles A y G), [`reviews/ciclo-1/revision-diseno.json`](reviews/ciclo-1/revision-diseno.json): 4/10.**
+    - Confirma: sin tecla de alzar; la mano sube sola; uno solo arrastra un extremo y entre dos va en el aire; el aviso «Pesa mucho» nombra la tecla del compañero libre; cooperar es imprescindible.
+    - **Crítico:** el mismo de las extremidades.
+    - **Mayores:** el esfuerzo no se ve desde la cámara; el 3.º y el 4.º humanos no aportan nada; Retroceso reiniciaba la partida al instante.
+    - Además, 8 menores (menú, mando en la pausa, J4 tapado a 720p, README desfasado…).
+  - **Revisión de arte y animación (roles C y E), [`reviews/ciclo-1/revision-arte.json`](reviews/ciclo-1/revision-arte.json): 3/10.**
+    - Confirma: tronco y cabeza dentro de la cápsula, de pie y tumbado; el collider se tumba de verdad.
+    - **Crítico:** el mismo de las extremidades.
+    - **Mayores:** el aviso «Pesa mucho» se quedaba en pantalla; los ayudantes no cabían en su cápsula (el perro tumbado, vertical).
+    - Además, 7 menores (escalera dibujada con peldaños y física de rampa, botas en el sofá, animación de levantarse más larga que la física…).
+  - **Corrección (`f8efb59`, integrada en `7b67f61`), [`reviews/ciclo-1/informe-correccion.json`](reviews/ciclo-1/informe-correccion.json):**
+    - **Crítico cerrado:** caderas, hombros, tobillos y manos pasan al espacio del grupo (`CharacterRig.local`). Separación de las piernas al cuerpo: 0,03–0,05 m, antes hasta 4,89 m. La prueba nueva, a 43 m del origen, falla con el código anterior (5,27 m).
+    - **Mayores cerrados**, cada uno con una prueba que falla sin la corrección:
+      - elipse lateral de la mano (`HAND.lateral` 0,45): uno solo, como máximo 1,26 m en 3 s en cualquier dirección;
+      - la correa cede en un tira y afloja: «¡Se escapa!» a los 0,55 s;
+      - el ayudante arrastra como un humano (0,64 frente a 0,72 m);
+      - el aviso «Pesa mucho» dura 1 s como máximo;
+      - Retroceso solo reinicia desde la pausa;
+      - `stepFrame` compartido por `main.ts` y las pruebas;
+      - T-coh-1 comprueba los pies en el extremo del eje de la cápsula;
+      - `duo-e2e` mide por su cuenta el tiempo que no cabe de pie;
+      - el esfuerzo se ve desde la cámara de juego;
+      - los ayudantes caben en su cápsula (`TiltFit` compartido).
+    - **Pruebas:** tsc OK; Vitest 71/71 (9 nuevas); `e2e:duo` 21/21; `e2e:teclado` OK.
+    - **Pendiente:**
+      - el 3.º y el 4.º humanos no aportan (33,0–33,5 s con 2, 3 o 4 activos): requiere objetos de varias manos o tareas paralelas, así que **pasa al ciclo 2**;
+      - las botas de los ayudantes sobresalen 6–9 cm.
+    - **Costes medidos de la elipse lateral:** entre dos, el sofá de lado recorre 4,47 m en lugar de 6,29; una caja de 90 kg de lado va al 74 % de la velocidad de carga; con 3 humanos, el giro mínimo es 1,85 rad (el umbral es 0,5).
+    - **Menores que siguen abiertos:**
+      - escalera dibujada con peldaños y física de rampa;
+      - contactos sueltos de hasta 4,4 cm (la línea base daba 6,1 cm);
+      - teletransportes sin comprobar el sitio;
+      - coste por paso duplicado.
+- **Ciclo 2** (20-10-2026, en curso): ver [`cycles/ciclo-2.md`](cycles/ciclo-2.md).
