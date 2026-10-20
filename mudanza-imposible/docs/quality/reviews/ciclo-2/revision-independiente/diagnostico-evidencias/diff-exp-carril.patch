@@ -1,0 +1,13 @@
+diff --git a/mudanza-imposible/src/sim/autopilot.ts b/mudanza-imposible/src/sim/autopilot.ts
+index bd38923..008c185 100644
+--- a/mudanza-imposible/src/sim/autopilot.ts
++++ b/mudanza-imposible/src/sim/autopilot.ts
+@@ -325,7 +325,7 @@ export class PilotPlan {
+     if (this.behind(g, it, mine)) return 'order';
+     const around = grow(mine.rect, LANE.people);
+     for (const c of g.carriers) {
+-      if (crew.members.has(c.id) || c.heldBody === it.body) continue;
++      if (crew.members.has(c.id) || c.heldBody === it.body || c.human === null) continue; // EXPERIMENTO DE DIAGNÓSTICO: los ayudantes no cierran el carril
+       if (inside(around, c.pos)) return 'people';
+     }
+     return 'free';

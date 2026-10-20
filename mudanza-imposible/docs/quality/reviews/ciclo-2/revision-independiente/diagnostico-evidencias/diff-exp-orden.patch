@@ -1,0 +1,14 @@
+diff --git a/mudanza-imposible/src/sim/game.ts b/mudanza-imposible/src/sim/game.ts
+index 2223348..024c6bf 100644
+--- a/mudanza-imposible/src/sim/game.ts
++++ b/mudanza-imposible/src/sim/game.ts
+@@ -136,6 +136,9 @@ export class Game {
+       if (b.kind === 'ramp') cd.setFrictionCombineRule(R.CoefficientCombineRule.Min);
+       this.world.createCollider(cd, body);
+     }
++    // EXPERIMENTO DE DIAGNÓSTICO (no es un arreglo): 8 cuerpos fijos de relleno, lejos, para que los cuerpos dinámicos
++    // reciban los mismos índices que en ec1d620 (donde el camión añade 8 piezas fijas antes del sofá)
++    for (let k = 0; k < 8; k++) { const fb = this.world.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(500 + k * 10, -200, 500)); this.world.createCollider(R.ColliderDesc.cuboid(0.1, 0.1, 0.1), fb); }
+     const s = createSofa(R, this.world, { x: SOFA_START.x, y: SOFA_START.y, z: SOFA_START.z }, SOFA_START.yaw);
+     this.sofa = s.body;
+     this.sofaColliders = s.colliders;

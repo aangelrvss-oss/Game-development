@@ -1,0 +1,13 @@
+diff --git a/mudanza-imposible/src/sim/autopilot.ts b/mudanza-imposible/src/sim/autopilot.ts
+index bd38923..81143f1 100644
+--- a/mudanza-imposible/src/sim/autopilot.ts
++++ b/mudanza-imposible/src/sim/autopilot.ts
+@@ -530,7 +530,7 @@ export class Autopilot {
+       const d = Math.hypot(goal.x - me.pos.x, goal.z - me.pos.z);
+       // Solo cuenta el tiempo junto al asa: de lejos (al volver del camión) tarda más de 3 s en llegar a cualquiera
+       if (pick < 0) return inp;
+-      if (d < WALK.tryNear) this.tryTime += dt;
++      this.tryTime += dt; // EXPERIMENTO DE DIAGNÓSTICO: como en 657fd30, cuenta también lejos del asa
+       if (this.tryTime > 3) { this.skip.set(pick, 5); this.tryTime = 0; }
+       // Suelto, se agarra con el objeto quieto (no rodando ni cayendo: se agarraría de cualquier punto) y de frente a su
+       // asa (llegando de lado, la mano agarraba la esquina más cercana: con la mesa, los dos por el mismo costado, iba

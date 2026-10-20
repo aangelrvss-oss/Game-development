@@ -1,0 +1,36 @@
+## 4,6,atentos
+s1 won t=127.93 espera 'people' 58.12 s (con humanos agarrando 54.00 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 113.6 s
+s2 won t=36.43 espera 'people' 3.50 s (con humanos agarrando 2.22 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 4.8 s
+s3 won t=36.75 espera 'people' 3.82 s (con humanos agarrando 2.38 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 5.3 s
+s4 won t=36.85 espera 'people' 3.93 s (con humanos agarrando 2.37 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 5.5 s
+s5 won t=62.43 espera 'people' 6.17 s (con humanos agarrando 3.78 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 12.3 s
+s6 won t=58.05 espera 'people' 1.35 s (con humanos agarrando 0.62 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 2.7 s
+s7 won t=65.65 espera 'people' 1.50 s (con humanos agarrando 0.02 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 3.0 s
+s8 won t=35.27 espera 'people' 3.90 s (con humanos agarrando 2.62 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 5.2 s
+## 2,4,atentos
+s1 won t=38.88 espera 'people' 4.47 s (con humanos agarrando 3.18 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 5.9 s
+s2 won t=35.52 espera 'people' 0.00 s (con humanos agarrando 0.00 s); fuera del equipo y sin agarrar durante la espera: -
+s3 won t=35.73 espera 'people' 4.18 s (con humanos agarrando 2.83 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 8.4 s
+s4 won t=36.78 espera 'people' 2.37 s (con humanos agarrando 0.98 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 3.9 s
+s5 won t=35.78 espera 'people' 2.87 s (con humanos agarrando 2.87 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 5.7 s
+s6 won t=38.63 espera 'people' 4.97 s (con humanos agarrando 3.05 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 8.7 s
+s7 won t=35.52 espera 'people' 0.00 s (con humanos agarrando 0.00 s); fuera del equipo y sin agarrar durante la espera: -
+s8 won t=35.47 espera 'people' 0.00 s (con humanos agarrando 0.00 s); fuera del equipo y sin agarrar durante la espera: -
+## 1,4,atentos
+s1 won t=45.33 espera 'people' 9.78 s (con humanos agarrando 5.88 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 21.3 s
+s2 won t=37.32 espera 'people' 1.87 s (con humanos agarrando 0.62 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 5.6 s
+s3 won t=37.40 espera 'people' 5.52 s (con humanos agarrando 4.28 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 12.9 s
+s4 won t=37.13 espera 'people' 5.05 s (con humanos agarrando 3.78 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 11.8 s
+s5 won t=37.37 espera 'people' 4.33 s (con humanos agarrando 3.08 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 10.5 s
+s6 won t=40.15 espera 'people' 8.67 s (con humanos agarrando 4.68 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 16.5 s
+s7 won t=37.55 espera 'people' 2.82 s (con humanos agarrando 1.32 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 7.7 s
+s8 won t=37.20 espera 'people' 1.87 s (con humanos agarrando 0.62 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 5.6 s
+## 3,5,atentos
+s1 won t=36.90 espera 'people' 2.42 s (con humanos agarrando 0.02 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 4.8 s
+s2 won t=36.90 espera 'people' 2.42 s (con humanos agarrando 0.02 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 4.8 s
+s3 won t=36.85 espera 'people' 0.22 s (con humanos agarrando 0.02 s); fuera del equipo y sin agarrar durante la espera: ayudante-suelto 0.4 s
+s4 won t=35.32 espera 'people' 0.00 s (con humanos agarrando 0.00 s); fuera del equipo y sin agarrar durante la espera: -
+s5 won t=35.32 espera 'people' 0.00 s (con humanos agarrando 0.00 s); fuera del equipo y sin agarrar durante la espera: -
+s6 won t=35.32 espera 'people' 0.00 s (con humanos agarrando 0.00 s); fuera del equipo y sin agarrar durante la espera: -
+s7 won t=35.32 espera 'people' 0.00 s (con humanos agarrando 0.00 s); fuera del equipo y sin agarrar durante la espera: -
+s8 won t=35.32 espera 'people' 0.00 s (con humanos agarrando 0.00 s); fuera del equipo y sin agarrar durante la espera: -

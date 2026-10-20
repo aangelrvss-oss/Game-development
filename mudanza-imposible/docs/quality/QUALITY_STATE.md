@@ -278,3 +278,21 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
     - 6 revisores que no implementaron nada (e2e y regresiones; física y sabotaje; IA y modos de 1 a 4; diversión y controles; arte y clipping; rendimiento y contenido) y un árbitro de contraste.
     - Solo miden; no corrigen.
     - Si el contenedor se reinicia, se reanuda con `resumeFromRunId`.
+  - **Revisor 1, e2e y regresiones: 5/10.** [`reviews/ciclo-2/revision-independiente/r1-e2e-regresiones.json`](reviews/ciclo-2/revision-independiente/r1-e2e-regresiones.json).
+    - **Resultados:** `duo-e2e` 2/8 en el ciclo 2 frente a 6/6 en `657fd30`, y `keyboard-e2e` 2/3 frente a 3/3. En la configuración de 4 humanos con 2 ayudantes atentos, la mediana pasa de 33,87 a 58,05 s. Hay 4 de 10 mutaciones sin detectar.
+    - **Flujo:** se detuvo después de este revisor para hacer el diagnóstico; reanudarlo mantiene su resultado en caché.
+  - **Diagnóstico de regresiones** (agente independiente, sin cambios en el juego), [`reviews/ciclo-2/revision-independiente/diagnostico-regresiones.md`](reviews/ciclo-2/revision-independiente/diagnostico-regresiones.md):
+    1. **`duo-e2e`: FRAGILIDAD DEL TEST, no es una regresión.** Con la prueba original y tandas intercaladas pasan 5/10 en la base y 5/10 en el ciclo 2. En 400 escenarios emulados, 175 frente a 183 (p = 0,62).
+       - Con las teclas S+↑ el paso «soltar» no pasa nunca, porque la prueba tira en el eje x sea cual sea la orientación del sofá.
+       - El 6/6 del revisor 1 no se ha podido reproducir.
+       - El ciclo 2 (`ec1d620`) cambia el orden interno de Rapier: añade 8 piezas fijas del camión. Eso altera cada ejecución sin inclinar el resultado.
+       - **Consecuencia:** `e2e:duo` no sirve como criterio de aceptación mientras siga así.
+    2. **Agarre fallido: FRAGILIDAD DEL TEST, anterior al ciclo 2.** Es el piloto de la prueba (pulsaciones de 0,87 m frente a una ventana de ±0,2 m y la alfombra fija). El agarre del juego da escenarios idénticos en `657fd30` y en `a84984f`.
+    3. **`keyboard-e2e` «Con W» Δz = 0: FRAGILIDAD DEL TEST.** Una doble pulsación de Espacio con un estado viejo (`keyboard-e2e.cjs:41-50`). La misma secuencia de entradas falla igual en la base. La tasa por versión no es concluyente.
+    4. **REGRESIÓN DE CÓDIGO CONFIRMADA en el piloto automático, introducida en `23b8c66` (confianza alta). BLOQUEANTE para la siguiente iteración. Identificador: R-C2-01.**
+       - `autopilot.ts:533` solo cuenta el tiempo para dar un asa por inalcanzable cuando el piloto está cerca. Un piloto atrapado lejos no cambia nunca de asa y se queda varado entre 15 y 45 s.
+       - Con solo esa línea como en `657fd30`, 4h/6c vuelve a 35,9–43,2 s y las caídas en el camión de esa configuración bajan de 23 a 9. Pero la mediana de T-roles con 2 jugadores empeora de 45,85 a 59,55 s, así que no basta con revertir.
+       - Se suma `mayEnter` (`autopilot.ts:322-334`): cuenta a los ayudantes que no agarran como «gente en el carril», lo que supone 58 s de espera en la semilla 1.
+       - Hay además un coste propio del diseño de `ec1d620`: las caídas en el camión pasan de 9 a 32.
+       - **Alcance:** afecta a la demo, a la parte B de `duo-e2e` y a todas las mediciones que usan el piloto. A los jugadores reales solo les afecta el coste de la rampa y la caja de carga.
+    - **No se ha corregido nada.**

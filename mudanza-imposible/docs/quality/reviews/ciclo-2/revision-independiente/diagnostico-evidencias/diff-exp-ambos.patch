@@ -1,0 +1,22 @@
+diff --git a/mudanza-imposible/src/sim/autopilot.ts b/mudanza-imposible/src/sim/autopilot.ts
+index bd38923..4e14290 100644
+--- a/mudanza-imposible/src/sim/autopilot.ts
++++ b/mudanza-imposible/src/sim/autopilot.ts
+@@ -325,7 +325,7 @@ export class PilotPlan {
+     if (this.behind(g, it, mine)) return 'order';
+     const around = grow(mine.rect, LANE.people);
+     for (const c of g.carriers) {
+-      if (crew.members.has(c.id) || c.heldBody === it.body) continue;
++      if (crew.members.has(c.id) || c.heldBody === it.body || c.human === null) continue; // EXPERIMENTO DE DIAGNÓSTICO: los ayudantes no cierran el carril
+       if (inside(around, c.pos)) return 'people';
+     }
+     return 'free';
+@@ -530,7 +530,7 @@ export class Autopilot {
+       const d = Math.hypot(goal.x - me.pos.x, goal.z - me.pos.z);
+       // Solo cuenta el tiempo junto al asa: de lejos (al volver del camión) tarda más de 3 s en llegar a cualquiera
+       if (pick < 0) return inp;
+-      if (d < WALK.tryNear) this.tryTime += dt;
++      this.tryTime += dt; // EXPERIMENTO DE DIAGNÓSTICO: como en 657fd30, cuenta también lejos del asa
+       if (this.tryTime > 3) { this.skip.set(pick, 5); this.tryTime = 0; }
+       // Suelto, se agarra con el objeto quieto (no rodando ni cayendo: se agarraría de cualquier punto) y de frente a su
+       // asa (llegando de lado, la mano agarraba la esquina más cercana: con la mesa, los dos por el mismo costado, iba

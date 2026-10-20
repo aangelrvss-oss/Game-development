@@ -1,0 +1,97 @@
+## 4,6,atentos
+s1 won t=127.93 integ=89 entra-zona-camión=37.52 tramo-final=90.42s caídas=16 (x≥22: 9) se-escapa=11 agarres/sueltas-en-zona=18/6
+    fall@14.4 J3 antes (-0.9,0.69,-12.7) sofá(0.3,0.67,-14.0)
+    fall@15.2 A5 antes (1.0,0.69,-13.0) sofá(0.3,0.62,-14.8)
+    fall@28.3 J2 antes (17.5,2.25,-30.3) sofá(16.5,2.31,-29.2)
+    fall@30.0 J1 antes (19.6,0.69,-27.2) sofá(17.8,1.02,-27.5)
+    fall@38.0 J2 antes (20.5,0.69,-28.4) sofá(22.3,0.63,-29.2)
+    fall@90.8 J3 antes (19.9,1.49,-30.6) sofá(19.9,1.18,-31.4)
+    fall@90.8 J4 antes (20.5,1.31,-30.4) sofá(19.9,1.19,-31.4)
+    fall@91.8 J1 suelo-camion (22.5,0.70,-30.8) sofá(19.9,1.01,-31.7)
+    fall@101.7 J1 suelo-camion (23.4,0.69,-31.4) sofá(22.9,0.66,-32.7)
+    fall@102.3 J4 suelo-camion (22.4,0.73,-31.3) sofá(23.3,0.66,-32.5)
+    fall@103.3 J3 rampa (25.1,0.69,-32.5) sofá(24.3,0.45,-31.5)
+    fall@104.3 A4 rampa (24.3,0.76,-31.9) sofá(24.8,0.75,-30.9)
+    fall@106.5 J1 suelo-camion (23.8,0.69,-31.2) sofá(26.0,0.80,-31.0)
+    fall@122.2 J1 suelo-camion (23.2,0.69,-29.9) sofá(24.7,0.78,-30.1)
+    fall@123.8 A4 suelo-camion (23.1,0.69,-29.6) sofá(24.2,0.74,-30.4)
+    fall@124.4 A5 rampa (24.4,0.80,-31.5) sofá(25.2,0.93,-30.4)
+s2 won t=36.43 integ=100 entra-zona-camión=31.25 tramo-final=5.18s caídas=2 (x≥22: 0) se-escapa=4 agarres/sueltas-en-zona=1/4
+    fall@14.4 J3 antes (-0.9,0.69,-12.7) sofá(0.3,0.67,-14.0)
+    fall@15.2 A5 antes (1.0,0.69,-13.0) sofá(0.4,0.63,-14.9)
+s3 won t=36.75 integ=98 entra-zona-camión=31.25 tramo-final=5.50s caídas=2 (x≥22: 0) se-escapa=3 agarres/sueltas-en-zona=1/5
+    fall@14.4 J3 antes (-0.9,0.69,-12.7) sofá(0.3,0.67,-14.0)
+    fall@15.2 A5 antes (1.0,0.69,-13.0) sofá(0.4,0.63,-14.9)
+s4 won t=36.85 integ=100 entra-zona-camión=31.25 tramo-final=5.60s caídas=3 (x≥22: 1) se-escapa=4 agarres/sueltas-en-zona=0/3
+    fall@14.4 J3 antes (-0.9,0.69,-12.7) sofá(0.3,0.67,-14.0)
+    fall@15.2 A5 antes (1.0,0.69,-13.0) sofá(0.4,0.63,-14.9)
+    fall@35.7 A4 caja (32.1,1.69,-30.0) sofá(31.0,1.20,-31.0)
+s5 won t=62.43 integ=86 entra-zona-camión=44.03 tramo-final=18.40s caídas=16 (x≥22: 6) se-escapa=9 agarres/sueltas-en-zona=11/9
+    fall@14.4 J3 antes (-0.9,0.69,-12.7) sofá(0.3,0.67,-14.0)
+    fall@15.2 A5 antes (1.0,0.69,-13.0) sofá(0.5,0.62,-14.7)
+    fall@17.3 J1 antes (0.2,0.69,-16.8) sofá(0.3,0.63,-18.3)
+    fall@24.3 J1 antes (1.0,3.30,-29.0) sofá(-0.2,4.09,-30.0)
+    fall@26.8 J3 antes (0.7,3.29,-30.8) sofá(0.5,3.60,-31.6)
+    fall@27.2 J4 antes (1.6,3.29,-30.9) sofá(0.5,3.45,-31.6)
+    fall@27.3 A4 antes (1.8,3.29,-31.4) sofá(0.4,3.41,-31.7)
+    fall@27.3 A5 antes (0.9,3.29,-31.0) sofá(0.3,3.40,-31.8)
+    fall@28.7 J1 antes (0.8,3.29,-31.2) sofá(0.3,3.23,-31.9)
+    fall@33.0 J4 antes (1.3,3.29,-31.7) sofá(-0.2,3.17,-31.1)
+    fall@46.4 J3 rampa (27.9,1.67,-29.8) sofá(27.6,1.43,-30.9)
+    fall@47.0 J2 rampa (27.1,1.48,-30.8) sofá(28.0,2.30,-31.4)
+    fall@51.2 J1 rampa (27.3,1.13,-32.6) sofá(26.3,1.03,-32.8)
+    fall@52.1 J2 rampa (26.6,0.69,-33.7) sofá(26.1,1.99,-32.5)
+    fall@54.3 A5 rampa (24.4,0.69,-33.5) sofá(25.1,0.63,-32.8)
+    fall@55.2 J2 suelo-camion (23.2,0.69,-33.2) sofá(23.7,0.66,-32.4)
+s6 won t=58.05 integ=90 entra-zona-camión=37.45 tramo-final=20.60s caídas=13 (x≥22: 4) se-escapa=5 agarres/sueltas-en-zona=7/7
+    fall@14.4 J3 antes (-0.9,0.69,-12.7) sofá(0.3,0.67,-14.0)
+    fall@15.2 A5 antes (1.0,0.69,-13.0) sofá(0.3,0.62,-14.8)
+    fall@28.3 J2 antes (17.5,2.25,-30.3) sofá(16.5,2.31,-29.2)
+    fall@30.0 J1 antes (19.6,0.69,-27.2) sofá(17.8,1.02,-27.5)
+    fall@37.2 A5 antes (19.4,0.69,-29.0) sofá(21.5,0.65,-28.9)
+    fall@37.4 J2 antes (19.6,0.69,-28.4) sofá(21.9,0.64,-28.9)
+    fall@37.8 A4 antes (20.3,0.69,-28.4) sofá(21.9,0.54,-29.0)
+    fall@45.5 J1 antes (21.6,0.69,-28.6) sofá(20.1,0.59,-28.4)
+    fall@46.2 J2 antes (18.3,0.69,-28.5) sofá(20.1,0.53,-28.3)
+    fall@51.2 A5 suelo-camion (22.0,0.69,-28.7) sofá(23.2,0.69,-29.3)
+    fall@53.2 J4 rampa (26.6,1.34,-29.3) sofá(26.3,1.26,-30.1)
+    fall@53.2 J3 rampa (27.3,1.53,-29.4) sofá(26.4,1.29,-30.1)
+    fall@56.3 J4 caja (28.3,1.69,-30.4) sofá(30.6,1.19,-30.3)
+s7 won t=65.65 integ=88 entra-zona-camión=57.23 tramo-final=8.42s caídas=11 (x≥22: 3) se-escapa=9 agarres/sueltas-en-zona=4/6
+    fall@14.4 J3 antes (-0.9,0.69,-12.7) sofá(0.3,0.67,-14.0)
+    fall@15.2 A5 antes (1.0,0.69,-13.0) sofá(0.3,0.62,-14.8)
+    fall@28.3 J2 antes (17.5,2.22,-30.0) sofá(16.7,2.28,-29.4)
+    fall@30.8 J1 antes (17.8,0.69,-29.0) sofá(18.4,1.70,-28.2)
+    fall@31.0 J2 antes (19.3,2.79,-28.9) sofá(18.4,1.44,-28.2)
+    fall@36.8 A4 antes (19.7,0.69,-27.4) sofá(18.3,0.48,-28.2)
+    fall@42.1 J1 antes (21.3,0.69,-28.8) sofá(20.2,0.61,-28.4)
+    fall@60.0 J3 antes (21.6,0.69,-29.0) sofá(23.5,0.74,-30.0)
+    fall@64.4 A5 caja (30.4,1.69,-29.8) sofá(30.6,1.29,-30.6)
+    fall@64.6 A4 caja (29.9,1.69,-29.8) sofá(30.6,1.20,-30.6)
+    fall@64.7 J3 rampa (27.9,1.70,-30.0) sofá(30.6,1.20,-30.6)
+s8 won t=35.27 integ=100 entra-zona-camión=30.12 tramo-final=5.15s caídas=2 (x≥22: 0) se-escapa=3 agarres/sueltas-en-zona=0/4
+    fall@14.4 J3 antes (-0.9,0.69,-12.7) sofá(0.3,0.67,-14.0)
+    fall@15.2 A5 antes (1.0,0.69,-13.0) sofá(0.3,0.62,-14.8)
+caídas por quién:zona {"humano:antes":29,"ayudante:antes":13,"humano:suelo-camion":6,"humano:rampa":8,"ayudante:rampa":3,"ayudante:suelo-camion":2,"ayudante:caja":3,"humano:caja":1}
+## 4,4,atentos
+s1 won t=34.70 integ=100 entra-zona-camión=30.15 tramo-final=4.55s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=0/3
+s2 won t=34.70 integ=100 entra-zona-camión=30.15 tramo-final=4.55s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=0/3
+s3 won t=34.70 integ=100 entra-zona-camión=30.15 tramo-final=4.55s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=0/3
+s4 won t=35.05 integ=100 entra-zona-camión=30.15 tramo-final=4.90s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=1/4
+s5 won t=34.70 integ=100 entra-zona-camión=30.15 tramo-final=4.55s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=0/3
+s6 won t=34.70 integ=100 entra-zona-camión=30.15 tramo-final=4.55s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=0/3
+s7 won t=34.52 integ=100 entra-zona-camión=30.15 tramo-final=4.37s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=1/4
+s8 won t=34.52 integ=100 entra-zona-camión=30.15 tramo-final=4.37s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=1/4
+caídas por quién:zona {}
+## 2,4,atentos
+s1 won t=38.88 integ=100 entra-zona-camión=31.28 tramo-final=7.60s caídas=1 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=3/4
+    fall@30.9 J1 antes (19.7,1.56,-31.4) sofá(21.1,1.08,-31.4)
+s2 won t=35.52 integ=100 entra-zona-camión=30.90 tramo-final=4.62s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=0/2
+s3 won t=35.73 integ=100 entra-zona-camión=30.90 tramo-final=4.83s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=0/2
+s4 won t=36.78 integ=100 entra-zona-camión=30.90 tramo-final=5.88s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=2/4
+s5 won t=35.78 integ=100 entra-zona-camión=30.83 tramo-final=4.95s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=0/2
+s6 won t=38.63 integ=100 entra-zona-camión=31.02 tramo-final=7.62s caídas=1 (x≥22: 1) se-escapa=2 agarres/sueltas-en-zona=3/4
+    fall@33.3 J1 rampa (26.0,1.19,-30.5) sofá(27.6,1.42,-30.9)
+s7 won t=35.52 integ=100 entra-zona-camión=30.90 tramo-final=4.62s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=0/2
+s8 won t=35.47 integ=100 entra-zona-camión=30.83 tramo-final=4.63s caídas=0 (x≥22: 0) se-escapa=2 agarres/sueltas-en-zona=0/2
+caídas por quién:zona {"humano:antes":1,"humano:rampa":1}

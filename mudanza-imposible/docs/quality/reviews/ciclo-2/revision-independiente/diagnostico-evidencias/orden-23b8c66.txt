@@ -1,0 +1,23 @@
+cuerpo h=3.16e-322 tipo=0 (0.00,10.00) masa=66.4552 ccd=true damp=0.4000000059604645/1.600000023841858 dom=0 ncol=4
+cuerpo h=3.2e-322 tipo=0 (2.40,10.00) masa=70.0000 ccd=true damp=0/0 dom=0 ncol=1
+cuerpo h=3.26e-322 tipo=0 (-2.40,10.00) masa=70.0000 ccd=true damp=0/0 dom=0 ncol=1
+cuerpo h=3.3e-322 tipo=2 (-40.00,-1.60) masa=6.2400 ccd=false damp=0/0 dom=0 ncol=1
+cuerpo h=3.36e-322 tipo=2 (-10.00,-1.60) masa=6.2400 ccd=false damp=0/0 dom=0 ncol=1
+cuerpo h=3.4e-322 tipo=2 (20.00,-1.60) masa=6.2400 ccd=false damp=0/0 dom=0 ncol=1
+cuerpo h=3.46e-322 tipo=2 (-27.00,-6.40) masa=6.2400 ccd=false damp=0/0 dom=0 ncol=1
+cuerpo h=3.5e-322 tipo=2 (3.00,-6.40) masa=6.2400 ccd=false damp=0/0 dom=0 ncol=1
+cuerpo h=3.56e-322 tipo=2 (33.00,-6.40) masa=6.2400 ccd=false damp=0/0 dom=0 ncol=1
+  collider h=3.16e-322 de cuerpo 3.16e-322 shape=12 fric=1 rest=0.05000000074505806 dens=81.7528 grupos=4294967295/4294967295 ev=1 hooks=0 combF=0 ctf=0
+  collider h=3.2e-322 de cuerpo 3.16e-322 shape=1 fric=1 rest=0.05000000074505806 dens=81.7528 grupos=4294967295/4294967295 ev=1 hooks=0 combF=0 ctf=0
+  collider h=3.26e-322 de cuerpo 3.16e-322 shape=1 fric=1 rest=0.05000000074505806 dens=81.7528 grupos=4294967295/4294967295 ev=1 hooks=0 combF=0 ctf=0
+  collider h=3.3e-322 de cuerpo 3.16e-322 shape=1 fric=1 rest=0.05000000074505806 dens=81.7528 grupos=4294967295/4294967295 ev=1 hooks=0 combF=0 ctf=0
+  collider h=3.36e-322 de cuerpo 3.2e-322 shape=2 fric=0 rest=0 dens=186.2518 grupos=4294967295/4294967295 ev=1 hooks=0 combF=1 ctf=0
+  collider h=3.4e-322 de cuerpo 3.26e-322 shape=2 fric=0 rest=0 dens=186.2518 grupos=4294967295/4294967295 ev=1 hooks=0 combF=1 ctf=0
+  collider h=3.46e-322 de cuerpo 3.3e-322 shape=12 fric=0.30000001192092896 rest=0 dens=1.0000 grupos=4294967295/4294967295 ev=1 hooks=0 combF=0 ctf=0
+  collider h=3.5e-322 de cuerpo 3.36e-322 shape=12 fric=0.30000001192092896 rest=0 dens=1.0000 grupos=4294967295/4294967295 ev=1 hooks=0 combF=0 ctf=0
+  collider h=3.56e-322 de cuerpo 3.4e-322 shape=12 fric=0.30000001192092896 rest=0 dens=1.0000 grupos=4294967295/4294967295 ev=1 hooks=0 combF=0 ctf=0
+  collider h=3.6e-322 de cuerpo 3.46e-322 shape=12 fric=0.30000001192092896 rest=0 dens=1.0000 grupos=4294967295/4294967295 ev=1 hooks=0 combF=0 ctf=0
+  collider h=3.66e-322 de cuerpo 3.5e-322 shape=12 fric=0.30000001192092896 rest=0 dens=1.0000 grupos=4294967295/4294967295 ev=1 hooks=0 combF=0 ctf=0
+  collider h=3.7e-322 de cuerpo 3.56e-322 shape=12 fric=0.30000001192092896 rest=0 dens=1.0000 grupos=4294967295/4294967295 ev=1 hooks=0 combF=0 ctf=0
+cuerpos 73 colliders 76
+params 0.01666666753590107 8  1 

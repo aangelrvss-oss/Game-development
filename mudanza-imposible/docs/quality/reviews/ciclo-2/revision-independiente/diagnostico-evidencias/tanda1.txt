@@ -1,0 +1,22 @@
+== inicio 13:28:23
+base-1 exit=1 OK=11 FALLA=1 dur=78s load=4.69 GIRO yaw0 0.1581 teclas S
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo false, caída false
+c2-1 exit=1 OK=10 FALLA=2 dur=106s load=4.86 GIRO yaw0 0.7488 teclas S
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo true, caída false
+    FALLA tras levantarse, J2 vuelve a agarrar 
+base-2 exit=0 OK=12 FALLA=0 dur=72s load=4.35 GIRO yaw0 1.0361 teclas A
+c2-2 exit=0 OK=12 FALLA=0 dur=70s load=4.78 GIRO yaw0 1.5478 teclas A
+base-3 exit=1 OK=10 FALLA=2 dur=113s load=4.94 GIRO yaw0 0.7634 teclas S
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo true, caída false
+    FALLA tras levantarse, J2 vuelve a agarrar 
+c2-3 exit=1 OK=11 FALLA=1 dur=61s load=4.76 GIRO yaw0 0.8310 teclas A
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo true, caída false
+base-4 exit=1 OK=11 FALLA=1 dur=96s load=5.05 GIRO yaw0 1.5799 teclas A
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo true, caída false
+c2-4 exit=1 OK=11 FALLA=1 dur=59s load=4.65 GIRO yaw0 1.1721 teclas A
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo true, caída false
+base-5 exit=0 OK=12 FALLA=0 dur=71s load=4.34 GIRO yaw0 1.3313 teclas A
+c2-5 exit=0 OK=12 FALLA=0 dur=69s load=4.60 GIRO yaw0 1.2959 teclas A
+base-6 exit=0 OK=12 FALLA=0 dur=62s load=5.05 GIRO yaw0 1.1088 teclas A
+c2-6 exit=0 OK=12 FALLA=0 dur=62s load=5.31 GIRO yaw0 1.2505 teclas A
+== fin 13:43:43

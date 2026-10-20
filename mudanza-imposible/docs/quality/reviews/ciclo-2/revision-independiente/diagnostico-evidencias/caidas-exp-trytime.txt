@@ -1,0 +1,10 @@
+## 4,6
+s1 won t=35.93 integ=100 entra-zona-camión=30.37 tramo-final=5.57s caídas=4 (x≥22: 0) se-escapa=3 agarres/sueltas-en-zona=0/5
+s2 won t=35.90 integ=99 entra-zona-camión=30.03 tramo-final=5.87s caídas=3 (x≥22: 1) se-escapa=3 agarres/sueltas-en-zona=0/5
+s3 won t=35.90 integ=99 entra-zona-camión=30.03 tramo-final=5.87s caídas=3 (x≥22: 1) se-escapa=3 agarres/sueltas-en-zona=0/5
+s4 won t=35.90 integ=99 entra-zona-camión=30.03 tramo-final=5.87s caídas=3 (x≥22: 1) se-escapa=3 agarres/sueltas-en-zona=0/5
+s5 won t=42.82 integ=93 entra-zona-camión=37.27 tramo-final=5.55s caídas=9 (x≥22: 0) se-escapa=4 agarres/sueltas-en-zona=0/5
+s6 won t=35.93 integ=100 entra-zona-camión=30.37 tramo-final=5.57s caídas=4 (x≥22: 0) se-escapa=3 agarres/sueltas-en-zona=0/5
+s7 won t=43.20 integ=99 entra-zona-camión=36.03 tramo-final=7.17s caídas=6 (x≥22: 3) se-escapa=3 agarres/sueltas-en-zona=1/5
+s8 won t=43.20 integ=99 entra-zona-camión=36.03 tramo-final=7.17s caídas=6 (x≥22: 3) se-escapa=3 agarres/sueltas-en-zona=1/5
+caídas por quién:zona {"humano:antes":19,"ayudante:antes":10,"ayudante:caja":3,"humano:rampa":2,"ayudante:rampa":2,"humano:caja":2}

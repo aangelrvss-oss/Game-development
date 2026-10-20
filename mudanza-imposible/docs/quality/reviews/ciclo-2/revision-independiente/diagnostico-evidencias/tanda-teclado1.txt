@@ -1,0 +1,20 @@
+== inicio 14:21:40
+base-1 exit=0 OK=12 FALLA=0 dur=47s
+c2-1 exit=0 OK=12 FALLA=0 dur=48s
+base-2 exit=0 OK=12 FALLA=0 dur=46s
+c2-2 exit=0 OK=12 FALLA=0 dur=46s
+base-3 exit=0 OK=12 FALLA=0 dur=47s
+c2-3 exit=1 OK=11 FALLA=2 dur=46s
+    FALLA Con W el grupo lleva el sofá hacia la calle Δz = -0.00 m en 2.55 s de juego
+    FALLAN 1
+base-4 exit=0 OK=12 FALLA=0 dur=45s
+c2-4 exit=0 OK=12 FALLA=0 dur=45s
+base-5 exit=0 OK=12 FALLA=0 dur=46s
+c2-5 exit=0 OK=12 FALLA=0 dur=44s
+base-6 exit=0 OK=12 FALLA=0 dur=45s
+c2-6 exit=0 OK=12 FALLA=0 dur=44s
+base-7 exit=0 OK=12 FALLA=0 dur=44s
+c2-7 exit=0 OK=12 FALLA=0 dur=44s
+base-8 exit=0 OK=12 FALLA=0 dur=48s
+c2-8 exit=0 OK=12 FALLA=0 dur=44s
+== fin 14:33:49
