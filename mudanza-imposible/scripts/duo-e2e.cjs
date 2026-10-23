@@ -15,8 +15,9 @@
 // - antes de agarrar, cada uno se vuelve hacia el centro de su extremo, y un agarre por la esquina se rehace (ver el paso 3);
 // - el aviso «Pesa mucho» respeta la prioridad documentada del HUD (`hud.ts`: con el sofá inclinado, sofaUp < 0,8,
 //   manda «¡Que se vuelca!»), pero se sigue exigiendo que «Pesa mucho» salga con el sofá derecho.
-// Opcional (no cambia lo que se comprueba): E2E_VIEWPORT=320x180 (ventana más pequeña: todo se comprueba con el estado
-// del juego y el texto del HUD, solo cambia lo que cuesta dibujar) y CHROMIUM_PATH (ejecutable de Chromium).
+// Opcional: E2E_VIEWPORT (por defecto 1280x720, la configuración validada en la etapa 0) y CHROMIUM_PATH (ejecutable de
+// Chromium). Un viewport más pequeño NO es equivalente: por debajo de 700 px de ancho el HUD usa otra hoja de estilo y
+// cambia la cadencia de fotogramas (ver docs/quality/reviews/ciclo-2b/etapa-0.md).
 const { chromium } = require('playwright');
 const fs = require('fs');
 const pilot = require('./e2e-piloto.cjs');

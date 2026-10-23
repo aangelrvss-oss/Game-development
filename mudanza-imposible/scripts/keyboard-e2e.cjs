@@ -10,7 +10,7 @@
 // leía un estado aún viejo y volvía a pulsar; si entretanto el juego había procesado la primera pulsación, la segunda
 // SOLTABA el sofá y «Con W» medía 0 m. Ahora cada pulsación que cambia algo (agarrar, pausa, reinicio) se envía UNA vez y
 // se espera a ver su efecto en el juego (tiempo de juego avanzado y estado observado) antes de seguir o de repetir.
-// Opcional (no cambia lo que se comprueba): E2E_VIEWPORT=320x180 y CHROMIUM_PATH, como en duo-e2e.
+// Opcional: E2E_VIEWPORT (por defecto 1280x720) y CHROMIUM_PATH, como en duo-e2e (un viewport pequeño no es equivalente).
 const { chromium } = require('playwright');
 const pilot = require('./e2e-piloto.cjs');
 const [VW, VH] = (process.env.E2E_VIEWPORT || '1280x720').split('x').map(Number);
