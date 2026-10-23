@@ -17,6 +17,15 @@
 
 /** `CARRIER.walkSpeed` y `CARRIER.accel` de src/sim/carrier.ts (iguales en 657fd30 y 5cab122). */
 const WALK = 5.2, ACCEL = 32;
+/**
+ * Tramos más cortos que esto se andan con un toque de UN fotograma (la tecla se suelta en cuanto el juego avanza un
+ * paso). Ciclo 2b, etapa 0: el tiempo de pulsación se redondea, en la práctica, a fotogramas enteros (5 pasos con render
+ * por software): para 0,3–0,6 m, `pressTime` pide 0,10–0,14 s y la tecla quedaba pulsada 2 fotogramas (0,167 s), que son
+ * ~0,86 m. Desde 0,3–0,6 m del objetivo el porteador se pasaba de un lado a otro sin entrar nunca en la ventana de
+ * llegada (visto en duo-e2e al volver a agarrar: 83 pasos de marcha sin llegar). Un fotograma son como mucho 5 pasos:
+ * ~0,22 m.
+ */
+const TAP = 0.6;
 
 /** Tiempo de juego que hay que mantener la tecla, desde parado, para recorrer `d` m (acelera, va a tope y frena). */
 function pressTime(d) {
@@ -119,9 +128,9 @@ async function walkStep(p, moves, arrive) {
   for (const m of moves) {
     const pl = await p.evaluate(planInPage, [m.i, m.target[0], m.target[1], !!m.avoidCarriers, arrive]);
     if (!pl) { plans.push({ m, arrived: true }); continue; }
-    // El último tramo se acorta 0,1 m (se queda corto antes que pasarse); los intermedios, enteros
+    // El último tramo se acorta 0,1 m (se queda corto antes que pasarse); los intermedios, enteros. Los cortos, un toque
     const d = pl.last ? Math.max(0.05, pl.len - 0.1) : pl.len;
-    plans.push({ m, arrived: false, keys: keysToward(m.keys, pl.dx, pl.dz).keys, sec: pressTime(d), plan: pl });
+    plans.push({ m, arrived: false, keys: keysToward(m.keys, pl.dx, pl.dz).keys, sec: d < TAP ? 1 / 60 : pressTime(d), plan: pl });
   }
   const go = plans.filter((x) => !x.arrived && x.keys.length).sort((a, b) => a.sec - b.sec);
   if (go.length) {
@@ -137,4 +146,4 @@ async function walkStep(p, moves, arrive) {
   return plans;
 }
 
-module.exports = { pressTime, keysToward, gameTime, waitGame, walkStep, planInPage };
+module.exports = { pressTime, keysToward, gameTime, waitGame, walkStep, planInPage, TAP };

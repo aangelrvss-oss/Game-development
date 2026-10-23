@@ -1,0 +1,27 @@
+== duo 1..10 (mut-releaseKick:4213:/tmp/claude-0/c2b-e0/wt-mut) inicio 2026-10-23T01:24:53Z
+   script /home/user/Game-development-2b/mudanza-imposible/scripts/duo-e2e.cjs (84adbf6f7faf), piloto 5552813c9aff, viewport 1280x720
+   chromium /opt/pw-browsers/chromium -> /opt/pw-browsers/chromium-1194/chrome-linux/chrome, args: --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist (headless)
+   mut-releaseKick: puerto 4213, árbol /tmp/claude-0/c2b-e0/wt-mut, commit 5cab1222b719 + cambios sin commit: 3b07c46d44e4 (1 file changed, 1 insertion(+), 1 deletion(-)), bundle assets/index-B7Sd2KKz.js
+mut-releaseKick-duo-1 exit=1 OK=20 FALLA=1 semilla=342800049 commit=5cab1222b719+mut navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=411s load=4.28
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo false, caída false (antes de soltar: agarran sí/sí, extremos 1/-1, z local 0.17/0.07; tiran con KeyS / ArrowUp, desvío máximo de las teclas respecto al eje 8°, 0 cambios de tecla; sucesos J2: 16.17 release J2)
+mut-releaseKick-duo-2 exit=1 OK=20 FALLA=1 semilla=998008910 commit=5cab1222b719+mut navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=416s load=4.40
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo false, caída false (antes de soltar: agarran sí/sí, extremos 1/-1, z local -0.01/0.19; tiran con KeyA+KeyS / ArrowRight+ArrowUp, desvío máximo de las teclas respecto al eje 8°, 0 cambios de tecla; sucesos J2: 16.38 release J2)
+mut-releaseKick-duo-3 exit=1 OK=20 FALLA=1 semilla=393965687 commit=5cab1222b719+mut navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=414s load=4.21
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo false, caída false (antes de soltar: agarran sí/sí, extremos 1/-1, z local -0.01/0.08; tiran con KeyA+KeyS / ArrowRight+ArrowUp, desvío máximo de las teclas respecto al eje 9°, 0 cambios de tecla; sucesos J2: 17.22 release J2)
+mut-releaseKick-duo-4 exit=1 OK=20 FALLA=1 semilla=243120775 commit=5cab1222b719+mut navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=419s load=3.93
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo false, caída false (antes de soltar: agarran sí/sí, extremos 1/-1, z local -0.01/0.15; tiran con KeyA+KeyS / ArrowRight+ArrowUp, desvío máximo de las teclas respecto al eje 10°, 0 cambios de tecla; sucesos J2: 15.72 release J2)
+mut-releaseKick-duo-5 exit=1 OK=20 FALLA=1 semilla=467464467 commit=5cab1222b719+mut navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=411s load=4.19
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo false, caída false (antes de soltar: agarran sí/sí, extremos 1/-1, z local -0.01/0.07; tiran con KeyA+KeyS / ArrowRight+ArrowUp, desvío máximo de las teclas respecto al eje 11°, 0 cambios de tecla; sucesos J2: 17.25 release J2)
+mut-releaseKick-duo-6 exit=1 OK=20 FALLA=1 semilla=280279 commit=5cab1222b719+mut navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=438s load=4.29
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo false, caída false (antes de soltar: agarran sí/sí, extremos 1/-1, z local -0.01/0.08; tiran con KeyA+KeyS / ArrowRight+ArrowUp, desvío máximo de las teclas respecto al eje 17°, 0 cambios de tecla; sucesos J2: 30.38 release J2)
+mut-releaseKick-duo-7 exit=1 OK=20 FALLA=1 semilla=702680350 commit=5cab1222b719+mut navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=430s load=4.45
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo false, caída false (antes de soltar: agarran sí/sí, extremos 1/-1, z local -0.01/0.16; tiran con KeyA+KeyS / ArrowRight+ArrowUp, desvío máximo de las teclas respecto al eje 9°, 0 cambios de tecla; sucesos J2: 15.95 release J2)
+mut-releaseKick-duo-8 exit=1 OK=20 FALLA=1 semilla=145668116 commit=5cab1222b719+mut navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=413s load=4.52
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo false, caída false (antes de soltar: agarran sí/sí, extremos 1/-1, z local -0.01/0.23; tiran con KeyA+KeyS / ArrowRight+ArrowUp, desvío máximo de las teclas respecto al eje 8°, 0 cambios de tecla; sucesos J2: 17.53 release J2)
+mut-releaseKick-duo-9 exit=1 OK=20 FALLA=1 semilla=622588191 commit=5cab1222b719+mut navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=416s load=4.20
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo false, caída false (antes de soltar: agarran sí/sí, extremos 1/-1, z local -0.01/0.04; tiran con KeyA+KeyS / ArrowRight+ArrowUp, desvío máximo de las teclas respecto al eje 11°, 0 cambios de tecla; sucesos J2: 17.23 release J2)
+mut-releaseKick-duo-10 exit=1 OK=20 FALLA=1 semilla=682578302 commit=5cab1222b719+mut navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=420s load=4.22
+    FALLA soltar mientras tira: J2 se tambalea y cae tambaleo false, caída false (antes de soltar: agarran sí/sí, extremos 1/-1, z local 0.08/0.16; tiran con KeyA+KeyS / ArrowRight+ArrowUp, desvío máximo de las teclas respecto al eje 17°, 0 cambios de tecla; sucesos J2: 15.50 release J2)
+== fin 2026-10-23T02:34:41Z
+TOTAL mut-releaseKick duo: pasa 0 de 10 (exit=0)
+== CLASIFICACIÓN (etapa-0.md): las 10 ejecuciones fallan con UNA sola FALLA, «soltar mientras tira: J2 se tambalea y cae — tambaleo false, caída false», con agarres buenos (|z| ≤ 0,23) y los dos agarrando: es la mutación detectada (sin el tirón al soltar no hay caída; ver umbral-tiron.ts: kick 0 → no cae ni con 1000 N). Ninguna otra comprobación falla.

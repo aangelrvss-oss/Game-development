@@ -1,0 +1,3 @@
+barrido-notwist-657fd30 se tambalea y cae 648 / 648 tensión J2 min/max 286 298
+barrido-notwist-5cab122 se tambalea y cae 648 / 648 tensión J2 min/max 286 298
+barrido-twist-5cab122 se tambalea y cae 1440 / 1440 tensión J2 min/max 271 294

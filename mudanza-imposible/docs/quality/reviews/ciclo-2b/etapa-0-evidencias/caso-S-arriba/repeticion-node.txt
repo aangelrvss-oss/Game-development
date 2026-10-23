@@ -1,0 +1,22 @@
+### repetición de caso-S-arriba en 5cab122
+5cab122-duo-4 [wt-5cab122] semilla 899888439
+  4.20 agarra J1 local(1.10, 0.48, 0.11) mirada respecto al eje 131°
+  4.20 agarra J2 local(-1.10, 0.48, 0.32) mirada respecto al eje 131°
+  7.98 release J2 (tensión antes 12 N)
+  13.40 agarra J2 local(-1.10, 0.66, -0.27) mirada respecto al eje -172°
+  17.03 release J2 (tensión antes 162 N)
+  17.13 wobble J2
+  20.70 agarra J2 local(-1.10, 0.48, 0.19) mirada respecto al eje 58°
+  20.85 release J1 (tensión antes 26 N)
+{"rec":"5cab122-duo-4","root":"wt-5cab122","var":"grabada","seed":899888439,"before":10,"steps":1283,"evOk":true,"firstBad":-1,"maxErr":0.000957,"soltar":{"pre":{"tension":162,"kick":2.58,"yaw":1.367,"sofa":[0.04,6.87],"J2":[-0.25,5.35],"inputs":[[0,1,0,0,0],[0,-1,1,0,0]]},"wob":true,"fell":false,"stun":null,"maxLean":0.64,"sucesosNode":["0.02 r1","0.12 w1"],"sucesosNavegador":["0.02 r1","0.12 w1"]}}
+### repetición de caso-S-arriba en 657fd30
+5cab122-duo-4 [wt-657fd30] semilla 899888439
+  4.20 agarra J1 local(1.10, 0.48, 0.10) mirada respecto al eje 130°
+  4.20 agarra J2 local(-1.10, 0.48, 0.36) mirada respecto al eje 130°
+  7.98 release J2 (tensión antes 11 N)
+  13.40 agarra J2 local(-1.10, 0.66, -0.27) mirada respecto al eje -172°
+  17.03 release J2 (tensión antes 163 N)
+  17.13 wobble J2
+  20.70 agarra J2 local(-1.10, 0.48, 0.17) mirada respecto al eje 58°
+  20.85 release J1 (tensión antes 23 N)
+{"rec":"5cab122-duo-4","root":"wt-657fd30","var":"grabada","seed":899888439,"before":10,"steps":1283,"evOk":true,"firstBad":-1,"maxErr":0.228,"soltar":{"pre":{"tension":163,"kick":2.59,"yaw":1.374,"sofa":[0.11,6.9],"J2":[-0.18,5.37],"inputs":[[0,1,0,0,0],[0,-1,1,0,0]]},"wob":true,"fell":false,"stun":null,"maxLean":0.65,"sucesosNode":["0.02 r1","0.12 w1"],"sucesosNavegador":["0.02 r1","0.12 w1"]}}

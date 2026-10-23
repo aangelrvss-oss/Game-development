@@ -1,0 +1,6 @@
+toque de 5 pasos: {"modo":"sin","N":150,"agarra":150,"noAgarra":0,"noExtremo":0,"mediana":0.27,"p90":0.45,"max":0.45,"absZmayor03":67,"absZmayor02":116}
+toque de 5 pasos: {"modo":"mira","N":150,"agarra":150,"noAgarra":0,"noExtremo":0,"mediana":0.14,"p90":0.27,"max":0.45,"absZmayor03":5,"absZmayor02":61}
+toque de 5 pasos: {"modo":"apunta","N":150,"agarra":150,"noAgarra":0,"noExtremo":0,"mediana":0.14,"p90":0.27,"max":0.45,"absZmayor03":5,"absZmayor02":58}
+toque de 3 pasos: {"modo":"sin","N":150,"agarra":150,"noAgarra":0,"noExtremo":0,"mediana":0.27,"p90":0.45,"max":0.45,"absZmayor03":67,"absZmayor02":116}
+toque de 3 pasos: {"modo":"mira","N":150,"agarra":150,"noAgarra":0,"noExtremo":0,"mediana":0.08,"p90":0.27,"max":0.3,"absZmayor03":1,"absZmayor02":45}
+toque de 3 pasos: {"modo":"apunta","N":150,"agarra":150,"noAgarra":0,"noExtremo":0,"mediana":0.07,"p90":0.27,"max":0.27,"absZmayor03":0,"absZmayor02":33}

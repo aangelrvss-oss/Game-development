@@ -12,6 +12,7 @@
 //   en proporción a la distancia medidas en tiempo de juego y objetivo fijo);
 // - tirar en sentidos opuestos y «soltar mientras tira» se calculan con el eje REAL del sofá (su giro): cada uno tira
 //   por la dirección de teclado (de las 8) más parecida a la que pide la geometría, y la va corrigiendo si el sofá gira;
+// - antes de agarrar, cada uno se vuelve hacia el centro de su extremo, y un agarre por la esquina se rehace (ver el paso 3);
 // - el aviso «Pesa mucho» respeta la prioridad documentada del HUD (`hud.ts`: con el sofá inclinado, sofaUp < 0,8,
 //   manda «¡Que se vuelca!»), pero se sigue exigiendo que «Pesa mucho» salga con el sofá derecho.
 // Opcional (no cambia lo que se comprueba): E2E_VIEWPORT=320x180 (ventana más pequeña: todo se comprueba con el estado
@@ -32,6 +33,8 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   fs.mkdirSync('shots/duo', { recursive: true });
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: VW, height: VH } });
+  // Entorno de la ejecución (para los resúmenes de las tandas)
+  console.log(`Navegador: Chromium ${b.version()} (${process.env.CHROMIUM_PATH || 'el de Playwright'}), viewport ${VW}x${VH}`);
   const errors = [];
   p.on('pageerror', (e) => errors.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -44,11 +47,12 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   await p.screenshot({ path: 'shots/duo/a0-menu.png' });
   await p.keyboard.press('Enter');
   await p.waitForFunction(() => window.__mudanza.game?.phase === 'playing', null, { timeout: 30000 });
+  console.log(`Semilla de la partida (parte A): ${await p.evaluate(() => window.__mudanza.game.opts.seed)}`);
   const st = () => p.evaluate(() => {
     const g = window.__mudanza.game;
     return {
       t: g.time, helpers: g.bots.size, phase: g.phase, sofa: [g.sofaPos.x, g.sofaPos.y, g.sofaPos.z], yaw: g.sofaYaw, up: g.sofaUp,
-      cs: g.carriers.map((c) => ({ h: c.holding, gl: c.grabLocal, x: c.pos.x, z: c.pos.z, wob: c.wobbling, stun: c.stunned, knock: c.knock, down: c.down, human: c.human, nw: c.wobbles, nf: c.falls })),
+      cs: g.carriers.map((c) => ({ h: c.holding, gl: c.grabLocal, f: [c.facing.x, c.facing.z], x: c.pos.x, z: c.pos.z, wob: c.wobbling, stun: c.stunned, knock: c.knock, down: c.down, human: c.human, nw: c.wobbles, nf: c.falls })),
       solo: g.soloDrag,
       warn: document.getElementById('h-warn').textContent,
     };
@@ -124,32 +128,66 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   // solo se recalcula si el sofá se ha movido de verdad. Si alguien no progresa en 3 pasos de marcha, su ruta esquiva
   // también al otro porteador. La tecla de agarrar se pulsa UNA vez y no se vuelve a pulsar hasta ver, con el juego ya
   // avanzado, que no agarra (agarrar y soltar son la misma tecla: una segunda pulsación soltaría).
-  const ARRIVE = 0.3;
+  // Ciclo 2b, etapa 0 (etapa-0.md, «causa del fallo S/↑»): el juego agarra el punto del sofá más cercano a una sonda
+  // 0,35 m por DELANTE del porteador, hacia donde mira (`Carrier.findGrab`), y el piloto pulsaba agarrar mirando hacia
+  // donde dio el último paso (de lado o en diagonal): agarraba la esquina de la cara del extremo (|z local| ≈ 0,42–0,45
+  // de 0,45). Con las dos manos en esquinas opuestas, tirar hacia fuera hace girar el sofá en vez de tensarlo (≈145 N
+  // frente a ≈290 N por el centro; para caer al soltar hacen falta ≈170 N) y, arrastrando solo desde una esquina, el
+  // sofá se vuelca y el HUD manda «¡Que se vuelca!» en vez de «Pesa mucho». Como haría una persona, antes de agarrar
+  // cada uno se vuelve hacia el centro de su extremo (un toque de la tecla de esa dirección, de las 8, y quieto 0,2 s de
+  // juego) y, si aun así el agarre no es bueno, suelta y vuelve a agarrar (como mucho 5 veces cada uno). Bueno: en el
+  // asiento (y local < 0,55; no en lo alto del respaldo, y 0,66) y a |z local| ≤ GRIP_AIM = 0,25 del centro de la cara
+  // (que mide ±0,45), con las dos manos a menos de GRIP_PAIR = 0,3 entre sí (|z1 − z2|: si no, tiran por líneas
+  // separadas y el par gira el sofá). Medido repitiendo en Node el fallo grabado del navegador con otros agarres
+  // (etapa-0.md): J1 0,11 / J2 −0,27 en el respaldo, 162 N y no cae; los dos en el respaldo, 175 N; en el asiento con
+  // |z| ≤ 0,2 y |z1 − z2| ≤ 0,2, 216–262 N y cae; para caer hacen falta ≈170 N.
+  // «Por un extremo» pasa a exigir también que el punto agarrado esté en la cara del extremo y a ≥ 0,15 m de sus cantos
+  // (|z local| ≤ GRIP_END = 0,3): lo que antes contaba como extremo con la mano en la esquina ya no cuenta.
+  const ARRIVE = 0.3, END_X = 1.1, GRIP_AIM = 0.25, GRIP_PAIR = 0.3, BACK_Y = 0.55, GRIP_END = 0.3, FACE_TOL = 0.35, MAX_REGRAB = 5;
   const pilotLog = [];
   const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
   async function grabBoth() {
-    let ref = null, target = [null, null];
-    const best = [Infinity, Infinity], stall = [0, 0];
-    let walks = 0, presses = 0;
-    for (let it = 0; it < 90; it++) {
+    let ref = null, target = [null, null], side = [0, 0];
+    const best = [Infinity, Infinity], stall = [0, 0], faced = [0, 0], regrabs = [0, 0];
+    let walks = 0, presses = 0, turns = 0;
+    const fresh = (await st()).cs.map((c) => !c.h);
+    for (let it = 0; it < 120; it++) {
       s = await st();
       if (s.cs.every((c) => c.h)) {
-        const ends = s.cs.map((c) => (c.gl && Math.abs(c.gl.x) > 0.8 ? Math.sign(c.gl.x) : 0));
-        pilotLog.push(`agarre: ${walks} pasos de marcha, ${presses} pulsaciones de agarrar, extremos ${ends.join('/')}`);
+        // Agarre que no es bueno: suelta y vuelve a agarrar (como mucho MAX_REGRAB veces cada uno). Si cada uno vale por
+        // separado pero las dos manos quedan lejos entre sí, rehace el suyo el que acaba de agarrar (J2 si los dos)
+        const good = (c) => c.gl && c.gl.y < BACK_Y && Math.abs(c.gl.z) <= GRIP_AIM;
+        let edge = s.cs.map((c, i) => (!good(c) && regrabs[i] < MAX_REGRAB ? i : -1)).filter((i) => i >= 0);
+        if (!edge.length && Math.abs(s.cs[0].gl.z - s.cs[1].gl.z) > GRIP_PAIR) {
+          const cand = [1, 0].filter((i) => fresh[i] && regrabs[i] < MAX_REGRAB);
+          if (cand.length) edge = [cand[0]];
+        }
+        if (edge.length) {
+          for (const i of edge) regrabs[i]++;
+          pilotLog.push(`agarre por mejorar (${s.cs.map((c, i) => `J${i + 1} (${c.gl.x.toFixed(2)}, ${c.gl.y.toFixed(2)}, ${c.gl.z.toFixed(2)})`).join(', ')}): ${edge.map((i) => `J${i + 1}`).join(' y ')} suelta y vuelve a agarrar`);
+          for (const i of edge) await p.keyboard.down(keys[i].g);
+          await tick();
+          for (const i of edge) await p.keyboard.up(keys[i].g);
+          await hold([], 0.3);
+          faced.fill(0);
+          continue;
+        }
+        const ends = s.cs.map((c) => (c.gl && Math.abs(c.gl.x) > 0.8 && Math.abs(c.gl.z) <= GRIP_END ? Math.sign(c.gl.x) : 0));
+        pilotLog.push(`agarre: ${walks} pasos de marcha, ${turns} toques para mirar al extremo, ${presses} pulsaciones de agarrar, ${regrabs[0] + regrabs[1]} reagarres; puntos locales ${s.cs.map((c) => `(${c.gl.x.toFixed(2)}, ${c.gl.y.toFixed(2)}, ${c.gl.z.toFixed(2)})`).join(' / ')}; extremos ${ends.join('/')}`);
         return { ok: true, ends, opposite: ends[0] !== 0 && ends[0] === -ends[1] };
       }
       const ax = Math.cos(s.yaw), az = Math.sin(s.yaw);
       if (!ref || Math.hypot(s.sofa[0] - ref.x, s.sofa[2] - ref.z) > 0.25 || angDiff(s.yaw, ref.yaw) > 0.15) {
         // Extremo libre del sofá según su orientación real: el contrario al que agarra el otro; si nadie agarra, J1 va
         // al más cercano y J2 al otro
-        const side = [0, 0];
+        side = [0, 0];
         for (let i = 0; i < 2; i++) { const o = s.cs[1 - i]; if (o.h && o.gl) side[i] = -Math.sign(o.gl.x); }
         const near0 = (s.cs[0].x - s.sofa[0]) * ax + (s.cs[0].z - s.sofa[2]) * az >= 0 ? 1 : -1;
         if (!side[0]) side[0] = side[1] ? -side[1] : near0;
         if (!side[1]) side[1] = -side[0];
         target = side.map((sd) => [s.sofa[0] + ax * 1.75 * sd, s.sofa[2] + az * 1.75 * sd]);
         ref = { x: s.sofa[0], z: s.sofa[2], yaw: s.yaw };
-        best.fill(Infinity); stall.fill(0);
+        best.fill(Infinity); stall.fill(0); faced.fill(0);
       }
       const moves = [];
       let waiting = false;
@@ -163,6 +201,24 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
       }
       if (moves.length) { walks++; await pilot.walkStep(p, moves, ARRIVE); continue; }
       if (waiting) { await tick(); continue; }
+      // Mirar al centro de su extremo antes de agarrar (como mucho 2 toques por llegada): toque de un paso de juego en la
+      // dirección de teclado más parecida y quieto 0,2 s de juego
+      const face = [];
+      for (let i = 0; i < 2; i++) {
+        const c = s.cs[i];
+        if (c.h || faced[i] >= 2) continue;
+        const ex = s.sofa[0] + ax * END_X * side[i] - c.x, ez = s.sofa[2] + az * END_X * side[i] - c.z;
+        if (angDiff(Math.atan2(c.f[1], c.f[0]), Math.atan2(ez, ex)) > FACE_TOL) { faced[i]++; face.push(pilot.keysToward(keys[i], ex, ez).keys); }
+      }
+      if (face.length) {
+        turns++;
+        const t0 = (await st()).t;
+        for (const ks of face) for (const k of ks) await p.keyboard.down(k);
+        await pilot.waitGame(p, t0 + 1 / 60);
+        for (const ks of face) for (const k of ks) await p.keyboard.up(k);
+        await pilot.waitGame(p, (await st()).t + 0.2);
+        continue;
+      }
       // A la vez: las teclas de agarrar de los que no agarran, en el mismo fotograma, una sola vez
       const g = s.cs.map((c, i) => (c.h ? null : keys[i].g)).filter(Boolean);
       presses++;
@@ -259,7 +315,7 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
     pressed[i] = ks;
   };
   let n4 = await st();
-  const tPull = n4.t, pre = { holding: n4.cs.map((c) => c.h), ends: n4.cs.map((c) => (c.gl ? Math.sign(c.gl.x) : 0)) };
+  const tPull = n4.t, pre = { holding: n4.cs.map((c) => c.h), ends: n4.cs.map((c) => (c.gl ? Math.sign(c.gl.x) : 0)), zs: n4.cs.map((c) => (c.gl ? c.gl.z.toFixed(2) : '-')) };
   let maxErr = 0, switches = 0;
   for (;;) {
     const ks = keysFor(outDirs(n4));
@@ -290,7 +346,7 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   if (ev4.some((e) => / wobble /.test(e))) wob = true;
   if (ev4.some((e) => / fall /.test(e))) fell = true;
   ok(wob && fell, 'soltar mientras tira: J2 se tambalea y cae',
-    `tambaleo ${wob}, caída ${fell} (antes de soltar: agarran ${pre.holding.map((h) => (h ? 'sí' : 'no')).join('/')}, extremos ${pre.ends.join('/')}; tiran con ${pullKeys}, desvío máximo de las teclas respecto al eje ${(maxErr * 180 / Math.PI).toFixed(0)}°, ${switches} cambios de tecla; sucesos J2: ${ev4.join(', ') || 'ninguno'})`);
+    `tambaleo ${wob}, caída ${fell} (antes de soltar: agarran ${pre.holding.map((h) => (h ? 'sí' : 'no')).join('/')}, extremos ${pre.ends.join('/')}, z local ${pre.zs.join('/')}; tiran con ${pullKeys}, desvío máximo de las teclas respecto al eje ${(maxErr * 180 / Math.PI).toFixed(0)}°, ${switches} cambios de tecla; sucesos J2: ${ev4.join(', ') || 'ninguno'})`);
 
   // 5. Se levanta solo y vuelve a agarrar.
   // Desde el ciclo 1 (paso 3) la caída es física: a los 1,3 s en el suelo (`CARRIER.fallTime`) se levanta si cabe de pie;
@@ -388,6 +444,7 @@ const bal = (a, b) => `[tambaleos J1 ${b.cs[0].nw - a.cs[0].nw}, J2 ${b.cs[1].nw
   await p.goto(withParams(url, { capture: '1' }));
   await p.waitForFunction(() => window.__mudanza && document.getElementById('menu').style.display === 'flex');
   await p.evaluate(() => window.__mudanza.start(false));
+  console.log(`Semilla de la partida (parte B): ${await p.evaluate(() => window.__mudanza.game.opts.seed)}`);
   let res;
   for (let i = 0; i < 400; i++) {
     res = await p.evaluate(() => {

@@ -1,0 +1,100 @@
+5cab122-duo-1280-1 [wt-5cab122] semilla 832554964
+  1.88 agarra J1 local(1.10, 0.48, 0.30) mirada respecto al eje 135°
+  1.88 agarra J2 local(-1.10, 0.48, -0.06) mirada respecto al eje -45°
+  5.67 release J2 (tensión antes 7 N)
+  10.27 agarra J2 local(-1.10, 0.48, 0.27) mirada respecto al eje -130°
+  14.05 release J2 (tensión antes 240 N)
+  14.12 wobble J2
+  14.40 fall J2
+  18.70 agarra J2 local(-1.10, 0.24, 0.45) mirada respecto al eje 51°
+  18.87 release J1 (tensión antes 34 N)
+5cab122-duo-320-1 [wt-5cab122] semilla 656537966
+  1.87 agarra J1 local(1.10, 0.48, 0.24) mirada respecto al eje 135°
+  1.87 agarra J2 local(-1.10, 0.48, 0.00) mirada respecto al eje -45°
+  5.68 release J2 (tensión antes 18 N)
+  10.45 agarra J2 local(-1.10, 0.48, 0.10) mirada respecto al eje 19°
+  14.22 release J2 (tensión antes 246 N)
+  14.28 wobble J2
+  14.55 fall J2
+  18.15 agarra J2 local(-1.10, 0.48, 0.38) mirada respecto al eje 60°
+  18.28 release J1 (tensión antes 35 N)
+657fd30-duo-1280-1 [wt-657fd30] semilla 898578636
+  1.87 agarra J1 local(1.10, 0.48, 0.24) mirada respecto al eje 135°
+  1.87 agarra J2 local(-1.10, 0.48, 0.00) mirada respecto al eje -45°
+  5.70 release J2 (tensión antes 13 N)
+  10.63 agarra J2 local(-1.10, 0.48, 0.12) mirada respecto al eje 19°
+  14.38 release J2 (tensión antes 247 N)
+  14.45 wobble J2
+  14.72 fall J2
+  37.52 agarra J2 local(-1.10, 0.48, 0.32) mirada respecto al eje 97°
+  37.65 release J1 (tensión antes 25 N)
+657fd30-duo-320-1 [wt-657fd30] semilla 141236570
+  1.90 agarra J1 local(1.10, 0.48, 0.33) mirada respecto al eje 135°
+  1.90 agarra J2 local(-1.10, 0.66, -0.27) mirada respecto al eje -45°
+  5.58 release J2 (tensión antes 27 N)
+  10.13 agarra J2 local(-1.10, 0.39, 0.35) mirada respecto al eje -130°
+  13.85 release J2 (tensión antes 232 N)
+  13.92 wobble J2
+  14.23 fall J2
+  17.48 agarra J2 local(-1.10, 0.29, 0.36) mirada respecto al eje -0°
+  17.65 release J1 (tensión antes 65 N)
+5cab122-duo-1 [wt-5cab122] semilla 410683411
+  5.57 agarra J1 local(1.10, 0.66, -0.27) mirada respecto al eje -45°
+  5.57 agarra J2 local(-1.10, 0.48, 0.30) mirada respecto al eje 90°
+  9.37 release J2 (tensión antes 64 N)
+  14.23 agarra J2 local(-1.10, 0.66, -0.40) mirada respecto al eje -78°
+  18.02 release J2 (tensión antes 196 N)
+  18.10 wobble J2
+  18.52 fall J2
+  22.02 agarra J2 local(-1.10, 0.48, 0.07) mirada respecto al eje -3°
+  22.17 release J1 (tensión antes 31 N)
+5cab122-duo-2 [wt-5cab122] semilla 115779180
+  2.43 agarra J1 local(1.10, 0.48, 0.42) mirada respecto al eje 135°
+  2.43 agarra J2 local(-1.10, 0.66, -0.45) mirada respecto al eje -90°
+  6.32 release J2 (tensión antes 20 N)
+  14.63 agarra J2 local(-1.10, 0.48, 0.13) mirada respecto al eje -98°
+  18.37 release J2 (tensión antes 195 N)
+  18.45 wobble J2
+  18.87 fall J2
+  22.35 agarra J2 local(-1.10, 0.48, 0.10) mirada respecto al eje -49°
+  22.52 release J1 (tensión antes 49 N)
+5cab122-duo-3 [wt-5cab122] semilla 932479040
+  1.83 agarra J1 local(1.10, 0.48, 0.24) mirada respecto al eje 135°
+  1.83 agarra J2 local(-1.10, 0.48, 0.00) mirada respecto al eje -45°
+  5.67 release J2 (tensión antes 13 N)
+  10.15 agarra J2 local(-1.10, 0.66, -0.27) mirada respecto al eje -117°
+  13.92 release J2 (tensión antes 190 N)
+  14.00 wobble J2
+  14.42 fall J2
+  19.42 agarra J2 local(-1.10, 0.48, 0.06) mirada respecto al eje -165°
+  19.57 release J1 (tensión antes 27 N)
+657fd30-duo-1 [wt-657fd30] semilla 300857178
+  3.18 agarra J1 local(1.10, 0.66, -0.27) mirada respecto al eje -90°
+  3.18 agarra J2 local(-1.10, 0.66, -0.45) mirada respecto al eje -90°
+  7.05 release J2 (tensión antes 12 N)
+  11.75 agarra J2 local(-1.10, 0.66, -0.45) mirada respecto al eje -88°
+  15.47 release J2 (tensión antes 223 N)
+  15.53 wobble J2
+  15.88 fall J2
+  19.87 agarra J2 local(-1.10, 0.48, 0.42) mirada respecto al eje 129°
+  20.03 release J1 (tensión antes 28 N)
+657fd30-duo-2 [wt-657fd30] semilla 314423937
+  2.97 agarra J1 local(1.10, 0.48, 0.15) mirada respecto al eje 135°
+  2.97 agarra J2 local(-1.10, 0.66, -0.45) mirada respecto al eje -90°
+  6.80 release J2 (tensión antes 16 N)
+  10.90 agarra J2 local(-1.10, 0.66, -0.27) mirada respecto al eje -126°
+  14.58 release J2 (tensión antes 207 N)
+  14.67 wobble J2
+  15.07 fall J2
+  18.53 agarra J2 local(-1.10, 0.66, -0.27) mirada respecto al eje 15°
+  18.70 release J1 (tensión antes 18 N)
+657fd30-duo-3 [wt-657fd30] semilla 549004071
+  2.65 agarra J1 local(1.10, 0.66, -0.27) mirada respecto al eje -135°
+  2.65 agarra J2 local(-1.10, 0.66, -0.45) mirada respecto al eje -90°
+  6.52 release J2 (tensión antes 5 N)
+  12.23 agarra J2 local(-1.10, 0.66, -0.45) mirada respecto al eje -86°
+  15.88 release J2 (tensión antes 213 N)
+  15.97 wobble J2
+  16.33 fall J2
+  19.93 agarra J2 local(-1.10, 0.66, -0.34) mirada respecto al eje -51°
+  20.10 release J1 (tensión antes 36 N)

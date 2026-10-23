@@ -1,0 +1,48 @@
+### caso-pesa-mucho en 5cab122: agarres
+5cab122-duo-2 [wt-5cab122] semilla 115779180
+  2.43 agarra J1 local(1.10, 0.48, 0.42) mirada respecto al eje 135°
+  2.43 agarra J2 local(-1.10, 0.66, -0.45) mirada respecto al eje -90°
+  6.32 release J2 (tensión antes 20 N)
+  14.63 agarra J2 local(-1.10, 0.48, 0.13) mirada respecto al eje -98°
+  18.37 release J2 (tensión antes 195 N)
+  18.45 wobble J2
+  18.87 fall J2
+  22.35 agarra J2 local(-1.10, 0.48, 0.10) mirada respecto al eje -49°
+  22.52 release J1 (tensión antes 49 N)
+### variantes de J1 (S / eje) con el agarre grabado
+{"rec":"5cab122-duo-2","root":"wt-5cab122","modo":"S","yaw0":0.06,"yawFin":1.73,"gl1":[1.1,0.48,0.42],"dist25":0.95,"minUp":0.39,"avisoEn25":false,"avisoEn55":false,"avisoAt":-1,"agarra":true}
+{"rec":"5cab122-duo-2","root":"wt-5cab122","modo":"eje","yaw0":0.06,"yawFin":0.11,"gl1":[1.1,0.48,0.42],"dist25":0.42,"minUp":0.35,"avisoEn25":false,"avisoEn55":false,"avisoAt":-1,"agarra":true}
+### J1 reagarra a |z local| = 0 y arrastra con S
+{"rec":"5cab122-duo-2","root":"wt-5cab122","modo":"S","yaw0":0.06,"yawFin":1.13,"gl1":[1.1,0.48,0],"dist25":1.27,"minUp":0.94,"avisoEn25":true,"avisoEn55":true,"avisoAt":0.6,"agarra":true}
+### J1 reagarra a |z local| = 0.1 y arrastra con S
+{"rec":"5cab122-duo-2","root":"wt-5cab122","modo":"S","yaw0":0.06,"yawFin":0.92,"gl1":[1.1,0.48,0.1],"dist25":1.06,"minUp":0.93,"avisoEn25":true,"avisoEn55":true,"avisoAt":0.6,"agarra":true}
+### J1 reagarra a |z local| = 0.2 y arrastra con S
+{"rec":"5cab122-duo-2","root":"wt-5cab122","modo":"S","yaw0":0.06,"yawFin":0.77,"gl1":[1.1,0.48,0.2],"dist25":0.88,"minUp":0.92,"avisoEn25":true,"avisoEn55":true,"avisoAt":0.6,"agarra":true}
+### J1 reagarra a |z local| = 0.3 y arrastra con S
+{"rec":"5cab122-duo-2","root":"wt-5cab122","modo":"S","yaw0":0.06,"yawFin":0.79,"gl1":[1.1,0.48,0.3],"dist25":0.82,"minUp":0.89,"avisoEn25":true,"avisoEn55":true,"avisoAt":0.6,"agarra":true}
+### J1 reagarra a |z local| = 0.42 y arrastra con S
+{"rec":"5cab122-duo-2","root":"wt-5cab122","modo":"S","yaw0":0.06,"yawFin":1.72,"gl1":[1.1,0.48,0.42],"dist25":0.96,"minUp":0.41,"avisoEn25":false,"avisoEn55":false,"avisoAt":-1,"agarra":true}
+### caso-pesa-mucho en 657fd30: agarres
+5cab122-duo-2 [wt-657fd30] semilla 115779180
+  2.43 agarra J1 local(1.10, 0.48, 0.42) mirada respecto al eje 135°
+  2.43 agarra J2 local(-1.10, 0.66, -0.45) mirada respecto al eje -90°
+  6.32 release J2 (tensión antes 20 N)
+  14.63 agarra J2 local(-1.10, 0.48, 0.13) mirada respecto al eje -98°
+  18.37 release J2 (tensión antes 195 N)
+  18.45 wobble J2
+  18.87 fall J2
+  22.35 agarra J2 local(-1.10, 0.48, 0.10) mirada respecto al eje -49°
+  22.52 release J1 (tensión antes 49 N)
+### variantes de J1 (S / eje) con el agarre grabado
+{"rec":"5cab122-duo-2","root":"wt-657fd30","modo":"S","yaw0":0.06,"yawFin":1.73,"gl1":[1.1,0.48,0.42],"dist25":0.95,"minUp":0.39,"avisoEn25":false,"avisoEn55":false,"avisoAt":-1,"agarra":true}
+{"rec":"5cab122-duo-2","root":"wt-657fd30","modo":"eje","yaw0":0.06,"yawFin":0.11,"gl1":[1.1,0.48,0.42],"dist25":0.42,"minUp":0.35,"avisoEn25":false,"avisoEn55":false,"avisoAt":-1,"agarra":true}
+### J1 reagarra a |z local| = 0 y arrastra con S
+{"rec":"5cab122-duo-2","root":"wt-657fd30","modo":"S","yaw0":0.06,"yawFin":1.13,"gl1":[1.1,0.48,0],"dist25":1.27,"minUp":0.94,"avisoEn25":true,"avisoEn55":true,"avisoAt":0.6,"agarra":true}
+### J1 reagarra a |z local| = 0.1 y arrastra con S
+{"rec":"5cab122-duo-2","root":"wt-657fd30","modo":"S","yaw0":0.06,"yawFin":0.92,"gl1":[1.1,0.48,0.1],"dist25":1.06,"minUp":0.93,"avisoEn25":true,"avisoEn55":true,"avisoAt":0.6,"agarra":true}
+### J1 reagarra a |z local| = 0.2 y arrastra con S
+{"rec":"5cab122-duo-2","root":"wt-657fd30","modo":"S","yaw0":0.06,"yawFin":0.77,"gl1":[1.1,0.48,0.2],"dist25":0.88,"minUp":0.92,"avisoEn25":true,"avisoEn55":true,"avisoAt":0.6,"agarra":true}
+### J1 reagarra a |z local| = 0.3 y arrastra con S
+{"rec":"5cab122-duo-2","root":"wt-657fd30","modo":"S","yaw0":0.06,"yawFin":0.79,"gl1":[1.1,0.48,0.3],"dist25":0.82,"minUp":0.89,"avisoEn25":true,"avisoEn55":true,"avisoAt":0.6,"agarra":true}
+### J1 reagarra a |z local| = 0.42 y arrastra con S
+{"rec":"5cab122-duo-2","root":"wt-657fd30","modo":"S","yaw0":0.06,"yawFin":1.72,"gl1":[1.1,0.48,0.42],"dist25":0.96,"minUp":0.41,"avisoEn25":false,"avisoEn55":false,"avisoAt":-1,"agarra":true}

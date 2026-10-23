@@ -365,3 +365,24 @@ O bien se llega al ciclo 8, o una regresión crítica sin resolver obliga a para
       4. solo si se cumple, hacer el commit de la etapa 0 validada y pasar a la etapa 1 (piloto, R-C2-01).
     - Los worktrees temporales de referencia están en `/tmp/claude-0/c2b-e0/wt-{657fd30,5cab122,mut}`. Se pueden volver a crear en cualquier momento con `git worktree add --detach`.
     - **`/loop` desactivado, sin despertares programados.**
+  - **Reanudación** (22-10-2026) y **ETAPA 0 VALIDADA** (23-10-2026). Informe: [`reviews/ciclo-2b/etapa-0.md`](reviews/ciclo-2b/etapa-0.md); evidencias en [`reviews/ciclo-2b/etapa-0-evidencias/`](reviews/ciclo-2b/etapa-0-evidencias/).
+    - **Configuración:** 1280×720. **Se rechaza 320×180**: con menos de 700 px de ancho se aplica otra hoja de estilo, el aviso se sale de la ventana y no se acerca a la cadencia de un jugador real. La física es idéntica en los dos tamaños.
+    - **Tandas** (scripts `duo-e2e` 84adbf6f7faf, `keyboard-e2e` 9f44e750137c y `e2e-piloto` 5552813c9aff; alternando versiones; Chromium 141, swiftshader):
+      - `duo-e2e`: 657fd30 20/20 y 5cab122 20/20;
+      - `keyboard-e2e`: 20/20 y 20/20;
+      - mutación sin tirón al soltar: 10/10 fallan, todas en «soltar mientras tira».
+      - Además, tsc OK y Vitest 112/112. El coordinador lo ha comprobado por su cuenta.
+    - **Causa del fallo con S/↑: de la prueba, no del juego ni una regresión.**
+      - El piloto pulsaba agarrar mirando de lado y agarraba por lo alto del respaldo o por un canto. La tensión al soltar quedaba en 162 N, por debajo de los ~169 N que hacen caer.
+      - Con las mismas entradas en 657fd30 salen 163 N y los mismos sucesos.
+      - El `stun` era un atropello posterior en la calzada.
+      - **Corrección en la prueba:** el piloto se orienta antes de agarrar y vuelve a agarrar si el agarre no es bueno.
+    - **Sin cambios en el juego ni umbrales relajados.** Cuatro comprobaciones salen más estrictas.
+    - **Reinicio del contenedor** (~00:35 UTC del 23-10): se cortó 657fd30-duo-19 sin resultado. Se repitieron desde cero la 19 y la 20 de cada versión, tras comprobar que los SHA de los scripts y de los bundles no habían cambiado.
+    - **Hallazgos para etapas posteriores, sin tocar el juego:**
+      - soltar solo tumba a partir de unos 169 N;
+      - lo alto del respaldo atrae muchos agarres y las asas definidas no se usan con humanos;
+      - el aviso de enderezar tapa «Pesa mucho»;
+      - en pantallas bajas el aviso se sale;
+      - quien no cae tras soltar sigue andando hacia la calzada.
+    - **Siguiente:** etapa 1 (piloto, R-C2-01), pendiente de autorización.

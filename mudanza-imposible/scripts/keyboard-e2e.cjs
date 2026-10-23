@@ -21,6 +21,7 @@ const check = (name, ok, info) => { results.push({ name, ok, info }); console.lo
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: VW, height: VH } });
+  console.log(`Navegador: Chromium ${b.version()} (${process.env.CHROMIUM_PATH || 'el de Playwright'}), viewport ${VW}x${VH}`);
   const errors = [];
   p.on('pageerror', (e) => errors.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -43,6 +44,7 @@ const check = (name, ok, info) => { results.push({ name, ok, info }); console.lo
   const rest = await st();
   check('Partida de 1 jugador con 3 ayudantes', rest.humans === 1 && rest.n === 4, `${rest.humans} jugador(es), ${rest.n} porteadores`);
   await p.waitForFunction(() => window.__mudanza.game.phase === 'playing', null, { timeout: 15000 });
+  console.log(`Semilla de la partida: ${await p.evaluate(() => window.__mudanza.game.opts.seed)}`);
   // 1) Caminar hasta el extremo del sofá (por su eje real) y agarrarlo. Una sola pulsación de Espacio; antes de volver a
   // pulsar se espera a que el juego avance (0,15 s de juego: la pulsación ya se ha procesado) y se mira si agarra
   let s = await st();

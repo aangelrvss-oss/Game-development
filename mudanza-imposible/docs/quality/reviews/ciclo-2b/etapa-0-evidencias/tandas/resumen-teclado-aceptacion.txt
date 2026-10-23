@@ -1,0 +1,49 @@
+== teclado 1..20 (657fd30:4211:/tmp/claude-0/c2b-e0/wt-657fd30 5cab122:4212:/tmp/claude-0/c2b-e0/wt-5cab122) inicio 2026-10-23T01:04:32Z
+   script /home/user/Game-development-2b/mudanza-imposible/scripts/keyboard-e2e.cjs (9f44e750137c), piloto 5552813c9aff, viewport 1280x720
+   chromium /opt/pw-browsers/chromium -> /opt/pw-browsers/chromium-1194/chrome-linux/chrome, args: --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist (headless)
+   657fd30: puerto 4211, árbol /tmp/claude-0/c2b-e0/wt-657fd30, commit 657fd30b2c78, bundle assets/index-DDnIRazG.js
+   5cab122: puerto 4212, árbol /tmp/claude-0/c2b-e0/wt-5cab122, commit 5cab1222b719, bundle assets/index-nU-kwtRH.js
+657fd30-teclado-1 exit=0 OK=12 FALLA=0 semilla=455835500 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.43
+5cab122-teclado-1 exit=0 OK=12 FALLA=0 semilla=779730371 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.46
+657fd30-teclado-2 exit=0 OK=12 FALLA=0 semilla=187823096 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.41
+5cab122-teclado-2 exit=0 OK=12 FALLA=0 semilla=361015165 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.65
+657fd30-teclado-3 exit=0 OK=12 FALLA=0 semilla=384415732 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.63
+5cab122-teclado-3 exit=0 OK=12 FALLA=0 semilla=328702571 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=32s load=4.58
+657fd30-teclado-4 exit=0 OK=12 FALLA=0 semilla=947488620 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.46
+5cab122-teclado-4 exit=0 OK=12 FALLA=0 semilla=984000921 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.56
+657fd30-teclado-5 exit=0 OK=12 FALLA=0 semilla=473493106 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.39
+5cab122-teclado-5 exit=0 OK=12 FALLA=0 semilla=872322075 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.44
+657fd30-teclado-6 exit=0 OK=12 FALLA=0 semilla=316266749 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.54
+5cab122-teclado-6 exit=0 OK=12 FALLA=0 semilla=414964831 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.92
+657fd30-teclado-7 exit=0 OK=12 FALLA=0 semilla=716225275 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.78
+5cab122-teclado-7 exit=0 OK=12 FALLA=0 semilla=895163993 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.36
+657fd30-teclado-8 exit=0 OK=12 FALLA=0 semilla=829755923 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.27
+5cab122-teclado-8 exit=0 OK=12 FALLA=0 semilla=355875633 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.29
+657fd30-teclado-9 exit=0 OK=12 FALLA=0 semilla=255249181 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.15
+5cab122-teclado-9 exit=0 OK=12 FALLA=0 semilla=662901078 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=3.83
+657fd30-teclado-10 exit=0 OK=12 FALLA=0 semilla=485079932 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.15
+5cab122-teclado-10 exit=0 OK=12 FALLA=0 semilla=262887735 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.45
+657fd30-teclado-11 exit=0 OK=12 FALLA=0 semilla=703152513 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.62
+5cab122-teclado-11 exit=0 OK=12 FALLA=0 semilla=316666741 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.70
+657fd30-teclado-12 exit=0 OK=12 FALLA=0 semilla=969452773 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.55
+5cab122-teclado-12 exit=0 OK=12 FALLA=0 semilla=795037623 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.79
+657fd30-teclado-13 exit=0 OK=12 FALLA=0 semilla=650951762 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.61
+5cab122-teclado-13 exit=0 OK=12 FALLA=0 semilla=530103578 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.58
+657fd30-teclado-14 exit=0 OK=12 FALLA=0 semilla=23633053 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.52
+5cab122-teclado-14 exit=0 OK=12 FALLA=0 semilla=852977175 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.97
+657fd30-teclado-15 exit=0 OK=12 FALLA=0 semilla=108986629 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=5.19
+5cab122-teclado-15 exit=0 OK=12 FALLA=0 semilla=296585945 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.88
+657fd30-teclado-16 exit=0 OK=12 FALLA=0 semilla=404448735 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=32s load=4.93
+5cab122-teclado-16 exit=0 OK=12 FALLA=0 semilla=216832265 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.66
+657fd30-teclado-17 exit=0 OK=12 FALLA=0 semilla=368963893 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.47
+5cab122-teclado-17 exit=0 OK=12 FALLA=0 semilla=275633020 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.46
+657fd30-teclado-18 exit=0 OK=12 FALLA=0 semilla=720781098 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.42
+5cab122-teclado-18 exit=0 OK=12 FALLA=0 semilla=517351387 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=31s load=4.50
+657fd30-teclado-19 exit=0 OK=12 FALLA=0 semilla=316057012 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.50
+5cab122-teclado-19 exit=0 OK=12 FALLA=0 semilla=717909068 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.56
+657fd30-teclado-20 exit=0 OK=12 FALLA=0 semilla=543553956 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.42
+5cab122-teclado-20 exit=0 OK=12 FALLA=0 semilla=898284708 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=30s load=4.68
+== fin 2026-10-23T01:24:53Z
+TOTAL 657fd30 teclado: pasa 20 de 20 (exit=0)
+TOTAL 5cab122 teclado: pasa 20 de 20 (exit=0)
+== CLASIFICACIÓN (etapa-0.md): ninguna FALLA en las 40 ejecuciones.

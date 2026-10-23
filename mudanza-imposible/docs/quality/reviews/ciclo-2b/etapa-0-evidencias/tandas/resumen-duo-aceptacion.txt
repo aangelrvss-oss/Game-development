@@ -1,0 +1,55 @@
+== duo 1..20 (657fd30:4211:/tmp/claude-0/c2b-e0/wt-657fd30 5cab122:4212:/tmp/claude-0/c2b-e0/wt-5cab122) inicio 2026-10-22T19:38:13Z
+   script /home/user/Game-development-2b/mudanza-imposible/scripts/duo-e2e.cjs (84adbf6f7faf), piloto 5552813c9aff, viewport 1280x720
+   chromium /opt/pw-browsers/chromium -> /opt/pw-browsers/chromium-1194/chrome-linux/chrome, args: --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist (headless)
+   657fd30: puerto 4211, árbol /tmp/claude-0/c2b-e0/wt-657fd30, commit 657fd30b2c78, bundle assets/index-DDnIRazG.js
+   5cab122: puerto 4212, árbol /tmp/claude-0/c2b-e0/wt-5cab122, commit 5cab1222b719, bundle assets/index-nU-kwtRH.js
+657fd30-duo-1 exit=0 OK=21 FALLA=0 semilla=825776644 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=479s load=4.73
+5cab122-duo-1 exit=0 OK=21 FALLA=0 semilla=797754588 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=488s load=4.25
+657fd30-duo-2 exit=0 OK=21 FALLA=0 semilla=140055443 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=524s load=3.98
+5cab122-duo-2 exit=0 OK=21 FALLA=0 semilla=721624936 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=490s load=4.40
+657fd30-duo-3 exit=0 OK=21 FALLA=0 semilla=865283654 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=527s load=4.36
+5cab122-duo-3 exit=0 OK=21 FALLA=0 semilla=659880351 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=544s load=4.45
+657fd30-duo-4 exit=0 OK=21 FALLA=0 semilla=746415174 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=531s load=4.27
+5cab122-duo-4 exit=0 OK=21 FALLA=0 semilla=736633461 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=500s load=4.32
+657fd30-duo-5 exit=0 OK=21 FALLA=0 semilla=954082536 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=479s load=4.27
+5cab122-duo-5 exit=0 OK=21 FALLA=0 semilla=739761046 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=499s load=4.21
+657fd30-duo-6 exit=0 OK=21 FALLA=0 semilla=352454312 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=536s load=4.45
+5cab122-duo-6 exit=0 OK=21 FALLA=0 semilla=348707072 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=498s load=4.76
+657fd30-duo-7 exit=0 OK=21 FALLA=0 semilla=614404121 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=487s load=4.19
+5cab122-duo-7 exit=0 OK=21 FALLA=0 semilla=78957657 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=487s load=4.05
+657fd30-duo-8 exit=0 OK=21 FALLA=0 semilla=967469930 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=490s load=4.29
+5cab122-duo-8 exit=0 OK=21 FALLA=0 semilla=495115652 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=481s load=4.21
+657fd30-duo-9 exit=0 OK=21 FALLA=0 semilla=383728536 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=500s load=4.11
+5cab122-duo-9 exit=0 OK=21 FALLA=0 semilla=620252829 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=479s load=4.19
+657fd30-duo-10 exit=0 OK=21 FALLA=0 semilla=635618309 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=514s load=4.42
+5cab122-duo-10 exit=0 OK=21 FALLA=0 semilla=403682094 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=462s load=4.13
+657fd30-duo-11 exit=0 OK=21 FALLA=0 semilla=922129787 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=560s load=4.21
+5cab122-duo-11 exit=0 OK=21 FALLA=0 semilla=277464754 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=468s load=4.23
+657fd30-duo-12 exit=0 OK=21 FALLA=0 semilla=68002164 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=488s load=4.31
+5cab122-duo-12 exit=0 OK=21 FALLA=0 semilla=349261610 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=474s load=4.47
+657fd30-duo-13 exit=0 OK=21 FALLA=0 semilla=64718878 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=449s load=4.05
+5cab122-duo-13 exit=0 OK=21 FALLA=0 semilla=649316791 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=460s load=4.25
+657fd30-duo-14 exit=0 OK=21 FALLA=0 semilla=382155003 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=488s load=3.94
+5cab122-duo-14 exit=0 OK=21 FALLA=0 semilla=538918935 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=456s load=4.23
+657fd30-duo-15 exit=0 OK=21 FALLA=0 semilla=499179363 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=448s load=3.89
+5cab122-duo-15 exit=0 OK=21 FALLA=0 semilla=292439673 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=480s load=4.72
+657fd30-duo-16 exit=0 OK=21 FALLA=0 semilla=414776051 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=487s load=4.01
+5cab122-duo-16 exit=0 OK=21 FALLA=0 semilla=461941751 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=477s load=4.01
+657fd30-duo-17 exit=0 OK=21 FALLA=0 semilla=167844311 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=522s load=4.86
+5cab122-duo-17 exit=0 OK=21 FALLA=0 semilla=732685277 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=489s load=4.45
+657fd30-duo-18 exit=0 OK=21 FALLA=0 semilla=922106214 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=455s load=4.14
+5cab122-duo-18 exit=0 OK=21 FALLA=0 semilla=15625497 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=502s load=4.46
+   (NOTA: el contenedor se reinició hacia las 00:35 UTC del 23-10-2026 durante 657fd30-duo-19, que quedó a medias, sin resultado, y no cuenta: su salida parcial está en /tmp/claude-0/c2b-e0/final-interrumpida/657fd30-duo-19. Se reanuda con los mismos guiones, comprobados byte a byte por SHA-1, y los mismos dist/: 657fd30-duo-19 y 5cab122-duo-19 se repiten desde cero; después, la 20 de cada versión)
+== duo 19..20 (657fd30:4211:/tmp/claude-0/c2b-e0/wt-657fd30 5cab122:4212:/tmp/claude-0/c2b-e0/wt-5cab122) inicio 2026-10-23T00:36:50Z
+   script /home/user/Game-development-2b/mudanza-imposible/scripts/duo-e2e.cjs (84adbf6f7faf), piloto 5552813c9aff, viewport 1280x720
+   chromium /opt/pw-browsers/chromium -> /opt/pw-browsers/chromium-1194/chrome-linux/chrome, args: --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist (headless)
+   657fd30: puerto 4211, árbol /tmp/claude-0/c2b-e0/wt-657fd30, commit 657fd30b2c78, bundle assets/index-DDnIRazG.js
+   5cab122: puerto 4212, árbol /tmp/claude-0/c2b-e0/wt-5cab122, commit 5cab1222b719, bundle assets/index-nU-kwtRH.js
+657fd30-duo-19 exit=0 OK=21 FALLA=0 semilla=437923387 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=405s load=4.06
+5cab122-duo-19 exit=0 OK=21 FALLA=0 semilla=769942019 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=439s load=4.22
+657fd30-duo-20 exit=0 OK=21 FALLA=0 semilla=998635129 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=414s load=4.26
+5cab122-duo-20 exit=0 OK=21 FALLA=0 semilla=672295357 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=403s load=4.28
+== fin 2026-10-23T01:04:32Z
+TOTAL 657fd30 duo: pasa 20 de 20 (exit=0)
+TOTAL 5cab122 duo: pasa 20 de 20 (exit=0)
+== CLASIFICACIÓN (etapa-0.md): ninguna FALLA en las 40 ejecuciones; no hay nada que clasificar. 657fd30-duo-19 se interrumpió por el reinicio del contenedor (sin resultado) y se repitió entera.

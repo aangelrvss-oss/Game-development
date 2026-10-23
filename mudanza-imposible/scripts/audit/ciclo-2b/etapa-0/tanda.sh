@@ -3,7 +3,8 @@
 # cada ronda y nunca dos navegadores a la vez. Cada ejecución en su carpeta <runs>/<versión>-<prueba>-<i>/ (out.log y
 # capturas); el resumen (código de salida, OK/FALLA y cada línea FALLA) se añade a <runs>/resumen-<prueba>-<etiqueta>.txt.
 # Uso: tanda.sh <duo|teclado> <desde> <hasta> <etiqueta-del-resumen> <versión:puerto> [<versión:puerto> ...]
-# Entorno: RUNS (por defecto /tmp/claude-0/c2b-e0/runs), E2E_VIEWPORT (por defecto 320x180), CHROMIUM_PATH
+# Entorno: RUNS (por defecto /tmp/claude-0/c2b-e0/runs), E2E_VIEWPORT (por defecto 1280x720: 320x180 cambia el diseño
+# del HUD, ver etapa-0.md; las tandas definitivas son las de tanda-final.sh), CHROMIUM_PATH
 # (por defecto /opt/pw-browsers/chromium), TIMEOUT por ejecución en s (por defecto 1500).
 set -u
 D=$(dirname "$(readlink -f "$0")")
@@ -12,7 +13,7 @@ test=$1; a=$2; b=$3; tag=$4; shift 4
 case "$test" in duo) script=$SCRIPTS/duo-e2e.cjs ;; teclado) script=$SCRIPTS/keyboard-e2e.cjs ;; *) echo "prueba desconocida: $test"; exit 2 ;; esac
 RUNS=${RUNS:-/tmp/claude-0/c2b-e0/runs}
 export NODE_PATH=$(npm root -g)
-export E2E_VIEWPORT=${E2E_VIEWPORT:-320x180}
+export E2E_VIEWPORT=${E2E_VIEWPORT:-1280x720}
 export CHROMIUM_PATH=${CHROMIUM_PATH:-/opt/pw-browsers/chromium}
 TIMEOUT=${TIMEOUT:-1500}
 mkdir -p "$RUNS"

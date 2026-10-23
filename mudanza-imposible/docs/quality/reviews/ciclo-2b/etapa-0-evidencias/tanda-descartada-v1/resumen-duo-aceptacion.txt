@@ -1,0 +1,12 @@
+== duo 1..20 (657fd30:4211:/tmp/claude-0/c2b-e0/wt-657fd30 5cab122:4212:/tmp/claude-0/c2b-e0/wt-5cab122) inicio 2026-10-22T18:48:36Z
+   script /home/user/Game-development-2b/mudanza-imposible/scripts/duo-e2e.cjs (f80cb9e2c9da), piloto 5d807ba6b670, viewport 1280x720
+   chromium /opt/pw-browsers/chromium -> /opt/pw-browsers/chromium-1194/chrome-linux/chrome, args: --use-gl=angle --use-angle=swiftshader --enable-unsafe-swiftshader --ignore-gpu-blocklist (headless)
+   657fd30: puerto 4211, árbol /tmp/claude-0/c2b-e0/wt-657fd30, commit 657fd30b2c78, bundle assets/index-DDnIRazG.js
+   5cab122: puerto 4212, árbol /tmp/claude-0/c2b-e0/wt-5cab122, commit 5cab1222b719, bundle assets/index-nU-kwtRH.js
+657fd30-duo-1 exit=0 OK=21 FALLA=0 semilla=838798827 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=488s load=4.30
+5cab122-duo-1 exit=0 OK=21 FALLA=0 semilla=300653320 commit=5cab1222b719 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=532s load=4.26
+657fd30-duo-2 exit=1 OK=18 FALLA=3 semilla=969922355 commit=657fd30b2c78 navegador="Chromium 141.0.7390.37" viewport=1280x720 dur=556s load=4.32
+    FALLA los dos agarran el sofá, cada uno por un extremo (Espacio e Intro a la vez) extremos 0/0; agarre FALLIDO tras 83 pasos de marcha y 2 pulsaciones; objetivos [[1.75,10],[-1.75,10]]; [{"h":false,"x":2.08,"z":10.44,"stun":0},{"h":true,"x":-1.6,"z":9.99,"stun":0}]
+    FALLA tirando juntos hacia arriba, el sofá avanza 0.92 m en 2,5 s [tambaleos J1 0, J2 0; agarran no/sí]
+    FALLA aviso en pantalla: «Pesa mucho: falta alguien en el otro extremo» (sin inclinación del sofá que lo tape; contador 0.00 s; sucesos: 41.33 release J2, 41.47 wobble J2)
+== CLASIFICACIÓN (etapa-0.md): 657fd30-duo-2, «agarre FALLIDO tras 83 pasos de marcha»: fallo del PILOTO DE PRUEBA (tramos de 0,3–0,6 m pulsados 2 fotogramas, ~0,86 m, oscilando sin entrar en la ventana de llegada al volver a agarrar). Las otras dos FALLA de esa ejecución son en cascada (sin agarrar, no hay arrastre juntos ni aviso). Corregido en e2e-piloto.cjs (TAP); tanda descartada entera.

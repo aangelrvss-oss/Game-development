@@ -1,0 +1,7 @@
+using deprecated parameters for the initialization function; pass a single object instead
+exacta: tambalea y cae 40/40; extremos opuestos 40/40
+teclas: tambalea y cae 40/40; extremos opuestos 40/40
+
+real	0m4.569s
+user	0m5.309s
+sys	0m0.310s
